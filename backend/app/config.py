@@ -22,6 +22,12 @@ def _bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def normalize_phone(raw: str) -> str:
+    """Digits only, with a leading '+' - so "+62 810 0000 1000" (however it's stored
+    or typed) and a REAL_CALL_ALLOWLIST entry compare equal, and Twilio gets strict E.164."""
+    return "+" + "".join(c for c in (raw or "") if c.isdigit())
+
+
 @dataclass(frozen=True)
 class Settings:
     store_backend: str  # "memory" or "firestore"
@@ -52,6 +58,12 @@ class Settings:
     twilio_auth_token: str | None
     twilio_from_number: str | None
     public_base_url: str | None  # this service's own https URL, e.g. the Cloud Run URL
+
+    # Safety gate on top of Twilio being configured at all: dial_now() still refuses
+    # every real call unless BOTH of these allow it. Deliberately env-only, not a
+    # dashboard toggle - nothing to misclick live in front of an audience.
+    real_calls_enabled: bool
+    real_call_allowlist: tuple[str, ...]  # E.164, normalized; only these may ever be dialed
 
 
 @lru_cache
@@ -95,4 +107,8 @@ def get_settings() -> Settings:
         twilio_auth_token=os.environ.get("TWILIO_AUTH_TOKEN") or None,
         twilio_from_number=os.environ.get("TWILIO_FROM_NUMBER") or None,
         public_base_url=os.environ.get("PUBLIC_BASE_URL") or None,
+        real_calls_enabled=_bool("REAL_CALLS_ENABLED", False),
+        real_call_allowlist=tuple(
+            normalize_phone(n) for n in os.environ.get("REAL_CALL_ALLOWLIST", "").split(",") if n.strip()
+        ),
     )

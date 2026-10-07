@@ -253,15 +253,35 @@ def twilio_settings(settings, **extra):
                                **extra)
 
 
+def allowlisted_settings(store, settings, farmer_id="f01", **extra):
+    from app.config import normalize_phone
+
+    phone = store.get("farmers", farmer_id)["phone"]
+    return twilio_settings(settings, real_calls_enabled=True,
+                           real_call_allowlist=(normalize_phone(phone),), **extra)
+
+
 def test_dial_now_requires_twilio_config(store, settings):
     with pytest.raises(services.ServiceError):
         services.dial_now(store, settings, "f01")
 
 
+def test_dial_now_refuses_when_real_calls_are_disabled(store, settings):
+    # twilio_settings() alone leaves real_calls_enabled at its default (off).
+    with pytest.raises(services.ServiceError, match="turned off"):
+        services.dial_now(store, twilio_settings(settings), "f01")
+
+
+def test_dial_now_refuses_a_number_not_on_the_allowlist(store, settings):
+    s = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=("+10000000000",))
+    with pytest.raises(services.ServiceError, match="allowlist"):
+        services.dial_now(store, s, "f01")
+
+
 def test_dial_now_refuses_do_not_call_farmer(store, settings):
     store.set("farmers", "f01", {"do_not_call": True}, merge=True)
-    with pytest.raises(services.ServiceError):
-        services.dial_now(store, twilio_settings(settings), "f01")
+    with pytest.raises(services.ServiceError, match="asked not to be called"):
+        services.dial_now(store, allowlisted_settings(store, settings), "f01")
 
 
 def test_dial_now_places_a_twilio_call_and_queues_it(store, settings, monkeypatch):
@@ -277,7 +297,7 @@ def test_dial_now_places_a_twilio_call_and_queues_it(store, settings, monkeypatc
             self.calls = FakeCalls()
 
     monkeypatch.setattr("twilio.rest.Client", FakeClient)
-    s = twilio_settings(settings)
+    s = allowlisted_settings(store, settings)
     call_id = services.dial_now(store, s, "f01")
 
     call = store.get("calls", call_id)
@@ -286,6 +306,7 @@ def test_dial_now_places_a_twilio_call_and_queues_it(store, settings, monkeypatc
     assert " " in stored_phone  # seed_data formats it for display, e.g. "+62 810 0000 1000"
     assert created[0]["to"] == "+" + "".join(c for c in stored_phone if c.isdigit())  # E.164, no spaces
     assert " " not in created[0]["to"]
+    assert created[0]["to"] in s.real_call_allowlist
     assert created[0]["from_"] == s.twilio_from_number
     assert created[0]["url"] == f"https://gw.example.test/twilio/voice?call_id={call_id}"
 
@@ -302,7 +323,7 @@ def test_dial_now_rolls_back_the_queued_call_on_twilio_failure(store, settings, 
     monkeypatch.setattr("twilio.rest.Client", FakeClient)
     before = len(store.list("calls"))
     with pytest.raises(services.ServiceError):
-        services.dial_now(store, twilio_settings(settings), "f01")
+        services.dial_now(store, allowlisted_settings(store, settings), "f01")
     assert len(store.list("calls")) == before
 
 

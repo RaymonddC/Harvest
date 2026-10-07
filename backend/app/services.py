@@ -8,7 +8,7 @@ import datetime as dt
 import io
 
 from . import forecast as fc
-from .config import Settings
+from .config import Settings, normalize_phone
 from .rules_engine import Limits, LimitsError, normalize_crop, premium_pct
 from .store import Store
 
@@ -307,10 +307,13 @@ def twilio_ready(settings: Settings) -> bool:
 
 
 def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None = None) -> str:
-    """Place a real outbound call (VA-8). Same preconditions as call_now, plus Twilio config."""
+    """Place a real outbound call (VA-8). Same preconditions as call_now, plus Twilio config
+    and the REAL_CALLS_ENABLED/REAL_CALL_ALLOWLIST safety gate - see config.py."""
     if not twilio_ready(settings):
         raise ServiceError("Twilio is not configured (need TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, "
                            "TWILIO_FROM_NUMBER and PUBLIC_BASE_URL).")
+    if not settings.real_calls_enabled:
+        raise ServiceError("Real calls are turned off. Set REAL_CALLS_ENABLED=true to place one.")
     farmer = store.get("farmers", farmer_id)
     if not farmer:
         raise ServiceError("Farmer not found.")
@@ -321,7 +324,10 @@ def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None 
         raise ServiceError("This farmer has no phone number on record.")
     # Stored/displayed as "+62 810 0000 1000" (seed_data._phone, and whatever a planner
     # types into the upload CSV) - Twilio's Calls API wants strict E.164, no separators.
-    to_number = "+" + "".join(c for c in phone if c.isdigit())
+    to_number = normalize_phone(phone)
+    if to_number not in settings.real_call_allowlist:
+        raise ServiceError(f"{to_number} is not on the real-call allowlist (REAL_CALL_ALLOWLIST). "
+                           "This is a safety gate, not a bug - add the number there first.")
     gap = first_gap_week(store)
     call_id = queue_call(store, farmer, kind or "collect", gap_week=gap["week"] if gap else None,
                          channel="twilio")

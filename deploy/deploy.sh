@@ -10,6 +10,8 @@
 # VA-8 stretch goal (the real phone channel): also set TWILIO_ACCOUNT_SID and
 # TWILIO_FROM_NUMBER, and first create a secret named twilio-auth-token:
 #   gcloud secrets create twilio-auth-token --data-file=- <<< "$TWILIO_AUTH_TOKEN"
+# It still won't dial anyone without REAL_CALLS_ENABLED=true and REAL_CALL_ALLOWLIST
+# set too - that gate is deliberate, see DECISIONS.md.
 set -euo pipefail
 
 : "${PROJECT:?Set PROJECT to your GCP project id}"
@@ -25,6 +27,8 @@ PLANNER_TOKEN="${PLANNER_TOKEN:-}"
 TWILIO_ACCOUNT_SID="${TWILIO_ACCOUNT_SID:-}"
 TWILIO_AUTH_TOKEN="${TWILIO_AUTH_TOKEN:-}"
 TWILIO_FROM_NUMBER="${TWILIO_FROM_NUMBER:-}"
+REAL_CALLS_ENABLED="${REAL_CALLS_ENABLED:-false}"
+REAL_CALL_ALLOWLIST="${REAL_CALL_ALLOWLIST:-}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 gcloud config set project "$PROJECT" >/dev/null
@@ -50,9 +54,9 @@ URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'valu
 echo "Gateway: $URL"
 
 if [[ -n "$TWILIO_ACCOUNT_SID" && -n "$TWILIO_AUTH_TOKEN" && -n "$TWILIO_FROM_NUMBER" ]]; then
-  echo "Wiring up the Twilio channel (PUBLIC_BASE_URL=$URL)..."
+  echo "Wiring up the Twilio channel (PUBLIC_BASE_URL=$URL, REAL_CALLS_ENABLED=$REAL_CALLS_ENABLED)..."
   gcloud run services update "$SERVICE" --region "$REGION" --set-env-vars \
-    "^@^PUBLIC_BASE_URL=$URL@TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID@TWILIO_FROM_NUMBER=$TWILIO_FROM_NUMBER" \
+    "^@^PUBLIC_BASE_URL=$URL@TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID@TWILIO_FROM_NUMBER=$TWILIO_FROM_NUMBER@REAL_CALLS_ENABLED=$REAL_CALLS_ENABLED@REAL_CALL_ALLOWLIST=$REAL_CALL_ALLOWLIST" \
     --set-secrets TWILIO_AUTH_TOKEN=twilio-auth-token:latest
 fi
 

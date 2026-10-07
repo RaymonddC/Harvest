@@ -62,6 +62,12 @@ trial accounts only dial pre-verified numbers) and `PUBLIC_BASE_URL` (the deploy
 `deploy/deploy.sh` wires `PUBLIC_BASE_URL` to the real URL automatically once it's known, if the
 three Twilio vars are set. Nothing else changes if they're left blank.
 
+A second, independent gate sits in front of `dial_now` itself: `REAL_CALLS_ENABLED` (default off)
+and `REAL_CALL_ALLOWLIST` (comma-separated numbers — the only ones `dial_now` will ever actually
+call). Being Twilio-configured is not enough on its own; both of these must also allow it. Set them
+deliberately before testing — they're env vars, not a dashboard toggle, on purpose: nothing to
+misclick live in front of an audience.
+
 Known, accepted gap: Twilio doesn't sign the Media Streams WebSocket handshake itself (only the
 `/twilio/voice` webhook that sets it up) — `/twilio/stream/{call_id}`'s only protection is the
 unguessable `call_id` and `run_call`'s own queued/channel checks. Fine for a hackathon demo; not

@@ -118,7 +118,8 @@ See `.env.example`. The main settings are `GOOGLE_API_KEY` (or Vertex AI variabl
 
 The real phone channel (VA-8, off by default) needs `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
 `TWILIO_FROM_NUMBER` and `PUBLIC_BASE_URL` all set — see `DECISIONS.md`. With those set,
-`POST /api/farmers/{id}/dial` places a real outbound call instead of waiting for a browser answer.
+`POST /api/farmers/{id}/dial` places a real outbound call instead of waiting for a browser answer —
+but only once `REAL_CALLS_ENABLED=true` and the farmer's number is in `REAL_CALL_ALLOWLIST` too.
 
 The Live model name changes often. If the default is retired, set `LIVE_MODEL` to the
 current native-audio model listed in the Gemini API docs.
