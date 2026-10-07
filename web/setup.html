@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Setup · Harvest-Call</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Domine:wght@500;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <main class="page">
+    <div class="page-head">
+      <div>
+        <h1>Set up the week</h1>
+        <p id="subtitle">Upload farmers, set price limits, then start the call campaign. All data is synthetic.</p>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="col-main">
+        <section class="card" aria-labelledby="farmers-title">
+          <div class="card-head">
+            <div>
+              <h2 id="farmers-title">Farmers</h2>
+              <div class="sub" id="farmer-count"></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <input type="search" id="search" placeholder="Search name or village" aria-label="Search farmers" style="width:220px">
+              <button class="btn" id="upload-open">Upload CSV</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table style="min-width:720px">
+              <thead><tr><th>Farmer</th><th>Village</th><th>Phone</th><th>Language</th><th>Crop</th><th class="r">Usual kg / week</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody id="farmer-rows"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+            <span class="sub" id="showing"></span>
+            <button class="btn" id="more">Show more</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="col-side">
+        <form class="card" id="limits-form" aria-labelledby="limits-title">
+          <div>
+            <h2 id="limits-title">Price limits</h2>
+            <div class="sub" id="limits-sub">Enforced in code; the agent can never offer outside them.</div>
+          </div>
+          <label class="field">Floor price<input type="number" step="any" name="floor_price" required></label>
+          <label class="field">Reference price<input type="number" step="any" name="reference_price" required><span class="hint" id="ref-source"></span></label>
+          <label class="field">Ceiling price<input type="number" step="any" name="ceiling_price" required></label>
+          <details>
+            <summary>Offer ladder</summary>
+            <div class="grid2" style="margin-top:10px">
+              <label class="field">First offer, % over reference<input type="number" step="0.5" name="first_premium_pct" required></label>
+              <label class="field">Step, % of reference<input type="number" step="0.5" name="step_pct" required></label>
+            </div>
+            <p class="sub" style="margin:10px 0 6px">The agent offers these in order when asked for a better price:</p>
+            <div class="ladder" id="ladder"></div>
+          </details>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn solid" type="submit">Save limits</button>
+            <span class="small muted">Illustrative prices for the demo.</span>
+          </div>
+        </form>
+
+        <section class="card dark" aria-labelledby="campaign-title">
+          <h2 id="campaign-title">Call campaign</h2>
+          <div id="campaign-lines" style="display:flex;flex-direction:column;gap:4px;font-size:15px"></div>
+          <div id="campaign-actions" style="display:flex;flex-direction:column;gap:10px"></div>
+        </section>
+      </div>
+    </div>
+
+    <p class="small muted">All data is synthetic. <button class="btn" id="reset" style="min-height:36px;margin-left:8px">Reset demo data</button></p>
+  </main>
+
+  <dialog id="upload-dialog" aria-labelledby="upload-title">
+    <h2 id="upload-title">Upload farmer list</h2>
+    <p class="muted" style="margin:8px 0">CSV with columns name, phone, crop, language. Optional: village, can_pull_forward.</p>
+    <input type="file" id="upload-file" accept=".csv,text/csv" aria-label="CSV file" style="margin-bottom:8px">
+    <textarea id="upload-text" aria-label="CSV text">name,phone,crop,language,village
+Pak Contoh,+62 812 0000 5001,palm,Bahasa Indonesia,Sungai Lala</textarea>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn solid" id="upload-send">Upload</button>
+      <form method="dialog"><button class="btn">Cancel</button></form>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/setup.js"></script>
+</body>
+</html>

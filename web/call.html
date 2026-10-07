@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Call client · Harvest-Call</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Domine:wght@500;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/call.css">
+  <script src="config.js"></script>
+</head>
+<body class="call-page">
+  <div class="phone">
+    <div class="ai-badge" role="note">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="8" width="14" height="11" rx="3"></rect><path d="M12 8V4"></path><circle cx="12" cy="3" r="1"></circle><path d="M9 13h.01M15 13h.01"></path></svg>
+      <span id="ai-badge-text">AI agent calling for the cooperative</span>
+    </div>
+
+    <section id="view-waiting" class="view">
+      <div>
+        <h1>Incoming calls</h1>
+        <p class="sub">This browser stands in for the farmer's phone. A teammate answers and plays the farmer. Use headphones so the agent does not hear itself.</p>
+      </div>
+      <ul class="incoming" id="incoming"></ul>
+      <a class="back-link" href="index.html">Planner dashboard</a>
+    </section>
+
+    <section id="view-call" class="view" hidden>
+      <div>
+        <div class="caller" id="call-farmer">Farmer</div>
+        <div class="sub mint-text" id="call-meta"></div>
+      </div>
+      <ol class="stages" id="stages" aria-label="Call stages"></ol>
+      <div class="captions" id="captions" aria-live="polite" aria-label="Live captions"></div>
+      <div id="captured" class="panel" hidden></div>
+      <div id="rail" class="panel" hidden></div>
+      <div id="offer-saved" hidden></div>
+      <p class="consent" id="consent"></p>
+      <div class="controls">
+        <button class="btn outline-mint" id="mute" aria-pressed="false">Mute</button>
+        <button class="btn end" id="hangup">End call</button>
+      </div>
+    </section>
+
+    <section id="view-ended" class="view" hidden>
+      <div>
+        <div class="caller" id="ended-farmer"></div>
+        <div class="sub mint-text" id="ended-meta"></div>
+      </div>
+      <div id="ended-body"></div>
+      <button class="btn mint big" id="back">Back to incoming calls</button>
+      <a class="back-link" href="index.html">Back to live forecast</a>
+    </section>
+  </div>
+  <script type="module" src="js/call.js"></script>
+</body>
+</html>

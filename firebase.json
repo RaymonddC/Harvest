@@ -1,0 +1,12 @@
+{
+  "hosting": {
+    "public": "web",
+    "ignore": ["**/.*"],
+    "headers": [
+      { "source": "config.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}

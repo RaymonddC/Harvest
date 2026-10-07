@@ -1,0 +1,12 @@
+rules_version = '2';
+// The dashboard reads live; every write goes through the Cloud Run backend (admin SDK).
+// Synthetic hackathon data only. Add Firebase Auth to the read rule before any real data.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{coll}/{doc} {
+      allow read: if coll in ['farmers', 'calls', 'harvests', 'forecast', 'offers', 'limits',
+                              'rival_quotes', 'campaigns'];
+      allow write: if false;
+    }
+  }
+}

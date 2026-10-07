@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live forecast · Harvest-Call</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Domine:wght@500;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <main class="page">
+    <div class="page-head">
+      <div>
+        <h1>Live supply forecast</h1>
+        <p id="subtitle">Expected supply per week against the mill's target, updated as each call is saved.</p>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <span id="campaign-pill" class="pill lg dot">No campaign running</span>
+        <a class="btn" id="csv" href="#" download="forecast.csv">Export CSV</a>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpis" aria-live="polite"></div>
+
+    <div class="cols">
+      <div class="col-main">
+        <section class="card" aria-labelledby="chart-title">
+          <div class="card-head">
+            <h2 id="chart-title">Expected supply vs target, tonnes per week</h2>
+            <div class="legend" aria-hidden="true">
+              <span><i class="l-leaf"></i>On track</span>
+              <span><i class="l-amber"></i>Gap</span>
+              <span><i class="l-pend"></i>Pending approval</span>
+              <span><i class="l-target"></i><span id="legend-target">Target</span></span>
+            </div>
+          </div>
+          <div id="chart-area"></div>
+          <div class="note" id="gap-note" hidden></div>
+          <p class="small muted">Unsure answers count for half. All data is synthetic.</p>
+        </section>
+      </div>
+
+      <div class="col-side">
+        <section class="card amber" id="gap-card" hidden aria-live="polite"></section>
+        <section class="card mint" id="ok-card" hidden>
+          <div class="eyebrow">No gap</div>
+          <h2 class="serif" style="font-size:24px">Every week is on track</h2>
+          <p>Each week is within the gap threshold of the target.</p>
+        </section>
+        <section class="card" aria-labelledby="calls-title">
+          <div class="card-head">
+            <h2 id="calls-title">Live calls</h2>
+            <a href="call.html" target="_blank" rel="noopener">Open call client</a>
+          </div>
+          <div class="rows" id="calls"></div>
+          <button class="btn" id="call-log-open">Call log</button>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <dialog id="call-dialog" aria-labelledby="call-dialog-title">
+    <h2 id="call-dialog-title">Call</h2>
+    <div id="call-dialog-body"></div>
+    <form method="dialog"><button class="btn">Close</button></form>
+  </dialog>
+  <dialog id="log-dialog" aria-labelledby="log-title">
+    <h2 id="log-title" style="margin-bottom:12px">Call log</h2>
+    <div class="table-wrap" id="log-body" style="max-height:60vh;overflow:auto"></div>
+    <form method="dialog" style="margin-top:12px"><button class="btn">Close</button></form>
+  </dialog>
+
+  <script type="module" src="js/forecast.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Approvals · Harvest-Call</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Domine:wght@500;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <main class="page">
+    <div class="page-head">
+      <div>
+        <h1 id="title">Approve gap-fill deals</h1>
+        <p>Every offer the agent made waits here. No deal is final until you approve it; the farmer then hears the confirmation by voice.</p>
+      </div>
+    </div>
+
+    <section class="card" id="meter-card" aria-labelledby="meter-title" aria-live="polite">
+      <div class="card-head" style="align-items:baseline">
+        <h2 id="meter-title">Gap meter</h2>
+        <span id="meter-text" style="font-size:16px"></span>
+      </div>
+      <div class="meter" role="progressbar" aria-labelledby="meter-title" id="meter"><i id="meter-fill" style="width:0"></i></div>
+      <div id="meter-done"></div>
+    </section>
+
+    <section class="card offers-card" aria-label="Offers from the agent">
+      <div id="offers"></div>
+      <div class="offers-foot" id="offers-foot"></div>
+    </section>
+  </main>
+  <script type="module" src="js/approvals.js"></script>
+</body>
+</html>
