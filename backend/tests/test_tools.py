@@ -1,5 +1,6 @@
 import random
 
+import pytest
 from google.genai import types
 
 from app import services
@@ -107,6 +108,19 @@ def test_end_call_and_bad_input(store, settings):
     assert "error" in h.dispatch("get_reference_price", {"crop": "durian"})
     h.dispatch("end_call", {"outcome": "completed", "summary": "1.6 t for W4.", "transcript_consent": True})
     assert session.ended and session.consent and h.last_ui == {"consent": True}
+
+
+def test_farmer_who_says_stop_is_never_queued_again(store, settings):
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect")
+    services.finish_call(store, settings, call_id, ended_cleanly=True, outcome="stopped",
+                         summary="Asked not to be called again.", consent=False, transcript=[])
+    assert store.get("farmers", "f01")["do_not_call"] is True
+
+    services.start_campaign(store, settings, "collect")
+    assert not any(c["farmer_id"] == "f01" for c in store.list("calls") if c["status"] == "queued")
+
+    with pytest.raises(services.ServiceError):
+        services.call_now(store, "f01")
 
 
 def test_prompt_has_disclosure_two_step_read_back_and_no_limits(store, settings):

@@ -46,6 +46,13 @@ class Settings:
     cors_origins: tuple[str, ...]
     firebase_web_config: str | None  # JSON string, passed to the dashboard
 
+    # VA-8 stretch goal: the real phone channel. All four must be set to dial out;
+    # see services.twilio_ready and DECISIONS.md's "Adding a Twilio channel".
+    twilio_account_sid: str | None
+    twilio_auth_token: str | None
+    twilio_from_number: str | None
+    public_base_url: str | None  # this service's own https URL, e.g. the Cloud Run URL
+
 
 @lru_cache
 def get_settings() -> Settings:
@@ -84,4 +91,8 @@ def get_settings() -> Settings:
             o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()
         ),
         firebase_web_config=os.environ.get("FIREBASE_WEB_CONFIG") or None,
+        twilio_account_sid=os.environ.get("TWILIO_ACCOUNT_SID") or None,
+        twilio_auth_token=os.environ.get("TWILIO_AUTH_TOKEN") or None,
+        twilio_from_number=os.environ.get("TWILIO_FROM_NUMBER") or None,
+        public_base_url=os.environ.get("PUBLIC_BASE_URL") or None,
     )

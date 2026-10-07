@@ -15,8 +15,9 @@ from pydantic import BaseModel, Field
 
 from . import seed_data, services
 from .config import Settings, get_settings
-from .live_session import run_call
+from .live_session import BrowserChannel, run_call
 from .store import COLLECTIONS, Store, make_store
+from .twilio_channel import TwilioChannel
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("harvest")
@@ -26,7 +27,7 @@ class LimitsIn(BaseModel):
     floor_price: float = Field(gt=0)
     ceiling_price: float = Field(gt=0)
     reference_price: float = Field(gt=0)
-    first_premium_pct: float = 2.0
+    first_premium_pct: float = 4.0  # matches rules_engine.Limits' default
     step_pct: float = 2.0
 
 
@@ -39,6 +40,10 @@ class CampaignIn(BaseModel):
 
 
 class CallNowIn(BaseModel):
+    kind: str | None = None
+
+
+class DialIn(BaseModel):
     kind: str | None = None
 
 
@@ -166,6 +171,11 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def farmer_call(farmer_id: str, body: CallNowIn | None = None):
         return {"call_id": services.call_now(store, farmer_id, body.kind if body else None)}
 
+    @app.post("/api/farmers/{farmer_id}/dial", dependencies=[Depends(planner)])
+    def farmer_dial(farmer_id: str, body: DialIn | None = None):
+        """VA-8: place a real outbound call over Twilio instead of waiting for a browser answer."""
+        return {"call_id": services.dial_now(store, settings, farmer_id, body.kind if body else None)}
+
     @app.post("/api/offers/{offer_id}/approve", dependencies=[Depends(planner)])
     def approve(offer_id: str):
         return services.decide_offer(store, settings, offer_id, approve=True)
@@ -195,7 +205,41 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.websocket("/ws/call/{call_id}")
     async def call_ws(ws: WebSocket, call_id: str):
-        await run_call(ws, store, settings, call_id)
+        await run_call(BrowserChannel(ws), store, settings, call_id, expected_channel="browser")
+
+    # ----- Twilio (VA-8): the real phone leg -----
+
+    @app.post("/twilio/voice", include_in_schema=False)
+    async def twilio_voice(request: Request, call_id: str):
+        if not services.twilio_ready(settings):
+            raise HTTPException(404, "Twilio is not configured.")
+        form = await request.form()
+        base = settings.public_base_url.rstrip("/")
+        full_url = f"{base}/twilio/voice?call_id={call_id}"
+        # Validate against the configured public URL, never the request Cloud Run
+        # hands the app - Cloud Run terminates TLS and rewrites the host, so a
+        # signature checked against request.url always fails behind it.
+        from twilio.request_validator import RequestValidator
+
+        validator = RequestValidator(settings.twilio_auth_token)
+        signature = request.headers.get("X-Twilio-Signature", "")
+        if not validator.validate(full_url, dict(form), signature):
+            raise HTTPException(403, "Invalid Twilio signature.")
+
+        call = store.get("calls", call_id)
+        if not call or call.get("status") != "queued" or call.get("channel") != "twilio":
+            twiml = ("<?xml version='1.0' encoding='UTF-8'?><Response>"
+                     "<Say>Sorry, this call could not be connected.</Say><Hangup/></Response>")
+            return Response(content=twiml, media_type="text/xml")
+
+        stream_url = f"{base}/twilio/stream/{call_id}".replace("https://", "wss://").replace("http://", "ws://")
+        twiml = ('<?xml version="1.0" encoding="UTF-8"?>'
+                 f'<Response><Connect><Stream url="{stream_url}" /></Connect></Response>')
+        return Response(content=twiml, media_type="text/xml")
+
+    @app.websocket("/twilio/stream/{call_id}")
+    async def twilio_stream(ws: WebSocket, call_id: str):
+        await run_call(TwilioChannel(ws), store, settings, call_id, expected_channel="twilio")
 
     if settings.static_dir:
         app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="web")

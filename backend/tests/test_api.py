@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from google.genai import types
 
-from app import live_session, main
+from app import live_session, main, services
 from app.main import create_app
 
 
@@ -245,3 +245,151 @@ def test_dropped_call_retries_once(client, store, monkeypatch):
         events, _ = drain(ws)
     assert events[-1]["retry_queued"] is False
     assert not [c for c in store.list("calls") if c["farmer_id"] == "f01" and c["status"] == "queued"]
+
+
+def twilio_settings(settings, **extra):
+    return dataclasses.replace(settings, twilio_account_sid="AC_test", twilio_auth_token="test-token",
+                               twilio_from_number="+15550000000", public_base_url="https://gw.example.test",
+                               **extra)
+
+
+def test_dial_now_requires_twilio_config(store, settings):
+    with pytest.raises(services.ServiceError):
+        services.dial_now(store, settings, "f01")
+
+
+def test_dial_now_refuses_do_not_call_farmer(store, settings):
+    store.set("farmers", "f01", {"do_not_call": True}, merge=True)
+    with pytest.raises(services.ServiceError):
+        services.dial_now(store, twilio_settings(settings), "f01")
+
+
+def test_dial_now_places_a_twilio_call_and_queues_it(store, settings, monkeypatch):
+    created = []
+
+    class FakeCalls:
+        def create(self, **kw):
+            created.append(kw)
+            return type("FakeCall", (), {"sid": "CA_fake"})()
+
+    class FakeClient:
+        def __init__(self, sid, token):
+            self.calls = FakeCalls()
+
+    monkeypatch.setattr("twilio.rest.Client", FakeClient)
+    s = twilio_settings(settings)
+    call_id = services.dial_now(store, s, "f01")
+
+    call = store.get("calls", call_id)
+    assert call["channel"] == "twilio" and call["status"] == "queued"
+    stored_phone = store.get("farmers", "f01")["phone"]
+    assert " " in stored_phone  # seed_data formats it for display, e.g. "+62 810 0000 1000"
+    assert created[0]["to"] == "+" + "".join(c for c in stored_phone if c.isdigit())  # E.164, no spaces
+    assert " " not in created[0]["to"]
+    assert created[0]["from_"] == s.twilio_from_number
+    assert created[0]["url"] == f"https://gw.example.test/twilio/voice?call_id={call_id}"
+
+
+def test_dial_now_rolls_back_the_queued_call_on_twilio_failure(store, settings, monkeypatch):
+    class FakeCalls:
+        def create(self, **kw):
+            raise RuntimeError("Twilio said no")
+
+    class FakeClient:
+        def __init__(self, sid, token):
+            self.calls = FakeCalls()
+
+    monkeypatch.setattr("twilio.rest.Client", FakeClient)
+    before = len(store.list("calls"))
+    with pytest.raises(services.ServiceError):
+        services.dial_now(store, twilio_settings(settings), "f01")
+    assert len(store.list("calls")) == before
+
+
+def test_twilio_voice_webhook_validates_signature(settings, store):
+    from twilio.request_validator import RequestValidator
+
+    s = twilio_settings(settings)
+    app = create_app(s, store)
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect", channel="twilio")
+    url = f"https://gw.example.test/twilio/voice?call_id={call_id}"
+    form = {"CallSid": "CA123", "From": "+15550000001", "To": "+15550000000", "CallStatus": "in-progress"}
+    good_sig = RequestValidator(s.twilio_auth_token).compute_signature(url, form)
+
+    with TestClient(app) as c:
+        bad = c.post(f"/twilio/voice?call_id={call_id}", data=form, headers={"X-Twilio-Signature": "wrong"})
+        assert bad.status_code == 403
+
+        ok = c.post(f"/twilio/voice?call_id={call_id}", data=form, headers={"X-Twilio-Signature": good_sig})
+        assert ok.status_code == 200 and "<Connect><Stream" in ok.text
+        assert f"/twilio/stream/{call_id}" in ok.text
+
+
+def test_twilio_voice_webhook_404s_when_not_configured(client):
+    r = client.post("/twilio/voice?call_id=does-not-matter", data={})
+    assert r.status_code == 404
+
+
+def test_twilio_voice_webhook_apologises_for_an_unknown_call(settings, store):
+    from twilio.request_validator import RequestValidator
+
+    s = twilio_settings(settings)
+    app = create_app(s, store)
+    url = "https://gw.example.test/twilio/voice?call_id=no-such-call"
+    good_sig = RequestValidator(s.twilio_auth_token).compute_signature(url, {})
+    with TestClient(app) as c:
+        r = c.post("/twilio/voice?call_id=no-such-call", data={}, headers={"X-Twilio-Signature": good_sig})
+        assert r.status_code == 200 and "<Hangup/>" in r.text
+
+
+def test_twilio_stream_runs_the_same_call_over_mulaw(store, settings, fake_voice):
+    import base64
+
+    from starlette.websockets import WebSocketDisconnect
+
+    from app.audio_codec import pcm16_to_mulaw
+
+    s = twilio_settings(settings)
+    app = create_app(s, store)
+    call_id = services.queue_call(store, store.get("farmers", "b001"), "gap_fill", gap_week=3,
+                                  channel="twilio")
+    events = []
+    with TestClient(app) as c:
+        with c.websocket_connect(f"/twilio/stream/{call_id}") as ws:
+            ws.send_text(json.dumps({"event": "start", "start": {"streamSid": "MZ1"}}))
+            payload = base64.b64encode(pcm16_to_mulaw(b"\x01\x00" * 160)).decode()
+            ws.send_text(json.dumps({"event": "media", "media": {"payload": payload}}))
+            # Twilio has no screen for "ended"/"error" control messages (send_control
+            # only ever forwards "interrupted" as Twilio's own clear event) - the call
+            # ending shows up as the socket closing, not as a final text message.
+            try:
+                while True:
+                    events.append(json.loads(ws.receive_text()))
+            except WebSocketDisconnect:
+                pass
+    assert any(e.get("event") == "media" for e in events)  # the agent's greeting, as mu-law frames
+    assert store.get("calls", call_id)["status"] == "done"
+
+
+def test_twilio_stream_refuses_a_browser_channel_call(store, settings):
+    from starlette.websockets import WebSocketDisconnect
+
+    s = twilio_settings(settings)
+    app = create_app(s, store)
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect")  # default channel: browser
+    with TestClient(app) as c, pytest.raises(WebSocketDisconnect):
+        with c.websocket_connect(f"/twilio/stream/{call_id}") as ws:
+            ws.receive_text()  # the mismatch error is sent to run_call's channel, but
+            # TwilioChannel has nowhere to show it - the socket just closes, same as a
+            # real phone call would just disconnect rather than speak an internal error.
+    assert store.get("calls", call_id)["status"] == "queued"  # refused before anything ran
+
+
+def test_non_browser_channel_is_refused(store, settings):
+    """No adapter exists yet for a non-browser channel; /ws/call must say so, not hang."""
+    farmer = store.list("farmers")[0]
+    call_id = services.queue_call(store, farmer, "collect", channel="twilio")
+    app = create_app(settings, store)
+    with TestClient(app) as c, c.websocket_connect(f"/ws/call/{call_id}") as ws:
+        msg = json.loads(ws.receive()["text"])
+    assert msg["type"] == "error" and "twilio" in msg["message"]

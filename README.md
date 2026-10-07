@@ -90,6 +90,7 @@ WebSockets to the Cloud Run URL directly, because Hosting rewrites do not carry 
 | `backend/app/store.py` | `MemoryStore` (local and tests) and `FirestoreStore` |
 | `backend/app/seed_data.py` | Synthetic farmers, harvests, limits and the rival quote |
 | `backend/app/forecast_job.py` | Cloud Run job entry point |
+| `backend/app/twilio_channel.py`, `backend/app/audio_codec.py` | VA-8 stretch goal: the real phone channel and its mu-law codec (see `DECISIONS.md`) |
 | `web/setup.html`, `web/index.html`, `web/approvals.html` (+ `web/js/*.js`) | Planner pages: setup, live forecast, approvals |
 | `web/call.html`, `web/js/call.js`, `web/js/audio-worklets.js` | Browser call client: 16 kHz mic capture, 24 kHz playback, barge-in |
 
@@ -114,6 +115,10 @@ WebSockets to the Cloud Run URL directly, because Hosting rewrites do not carry 
 See `.env.example`. The main settings are `GOOGLE_API_KEY` (or Vertex AI variables),
 `STORE_BACKEND`, `LIVE_MODEL`, `DEMO_LANGUAGE`, `MILL_NAME`, `PLAN_START`,
 `TARGET_KG_PER_WEEK`, `GAP_TOLERANCE` and `PLANNER_TOKEN`.
+
+The real phone channel (VA-8, off by default) needs `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+`TWILIO_FROM_NUMBER` and `PUBLIC_BASE_URL` all set — see `DECISIONS.md`. With those set,
+`POST /api/farmers/{id}/dial` places a real outbound call instead of waiting for a browser answer.
 
 The Live model name changes often. If the default is retired, set `LIVE_MODEL` to the
 current native-audio model listed in the Gemini API docs.

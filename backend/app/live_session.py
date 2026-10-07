@@ -14,7 +14,7 @@ import asyncio
 import contextlib
 import json
 import logging
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Protocol
 
 from fastapi import WebSocket
 from google.genai import types
@@ -34,6 +34,67 @@ WRAP_UP_NUDGE = ("(The call is close to its time limit. Summarise what was agree
                  "then say goodbye.)")
 
 Translate = Callable[[str, str], Awaitable[str | None]]
+
+
+class Channel(Protocol):
+    """One call's audio + control link, independent of what is carrying it.
+
+    run_call() only ever talks to this interface, so a second implementation
+    (e.g. Twilio Media Streams) plugs in without touching the negotiation code
+    below. Audio is always 16 kHz mono PCM16 in, 24 kHz mono PCM16 out — a
+    Twilio adapter (8 kHz mu-law) transcodes at its own edge, not here.
+    """
+
+    async def accept(self) -> None: ...
+
+    async def recv(self) -> bytes | dict | None:
+        """One browser mic chunk (PCM16 bytes), a control message (dict), or
+        None once the far end is gone."""
+        ...
+
+    async def send_audio(self, pcm16: bytes) -> None: ...
+
+    async def send_control(self, payload: dict) -> None: ...
+
+    async def close(self) -> None: ...
+
+
+class BrowserChannel:
+    """Wraps a FastAPI WebSocket for the in-browser call client.
+
+    The browser already sends/receives raw 16k/24k PCM16 (see the module
+    docstring), so this is a thin pass-through — all the real adapting work
+    for a future channel belongs in that channel's own class, not here.
+    """
+
+    def __init__(self, ws: WebSocket) -> None:
+        self._ws = ws
+
+    async def accept(self) -> None:
+        await self._ws.accept()
+
+    async def recv(self) -> bytes | dict | None:
+        msg = await self._ws.receive()
+        if msg["type"] == "websocket.disconnect":
+            return None
+        if msg.get("bytes") is not None:
+            return msg["bytes"]
+        if msg.get("text") is not None:
+            with contextlib.suppress(ValueError):
+                return json.loads(msg["text"])
+        return {}
+
+    async def send_audio(self, pcm16: bytes) -> None:
+        with contextlib.suppress(Exception):
+            await self._ws.send_bytes(pcm16)
+
+    async def send_control(self, payload: dict) -> None:
+        with contextlib.suppress(Exception):
+            await self._ws.send_json(payload)
+
+    async def close(self) -> None:
+        with contextlib.suppress(Exception):
+            await self._ws.close()
 
 
 class Transcript:
@@ -114,19 +175,27 @@ def confirm_details(store: Store, settings: Settings, offer: dict | None) -> dic
             "from_week": o.get("from_week"), "decided_by": o.get("decided_by")}
 
 
-async def run_call(ws: WebSocket, store: Store, settings: Settings, call_id: str,
+async def run_call(channel: Channel, store: Store, settings: Settings, call_id: str,
                    connect: Callable[[str, types.LiveConnectConfig], Any] | None = None,
-                   translate: Translate | None = None) -> None:
-    await ws.accept()
+                   translate: Translate | None = None, expected_channel: str = "browser") -> None:
+    await channel.accept()
     call = store.get("calls", call_id)
     if not call or call.get("status") != "queued":
-        await ws.send_json({"type": "error", "message": "This call is not waiting to be answered."})
-        await ws.close()
+        await channel.send_control({"type": "error", "message": "This call is not waiting to be answered."})
+        await channel.close()
         return
     farmer = store.get("farmers", call["farmer_id"])
     if not farmer:
-        await ws.send_json({"type": "error", "message": "Farmer not found."})
-        await ws.close()
+        await channel.send_control({"type": "error", "message": "Farmer not found."})
+        await channel.close()
+        return
+    if call.get("channel", "browser") != expected_channel:
+        # The caller (main.py) says which channel its endpoint is for; a call queued
+        # for a different one needs that channel's own entry point, not this one.
+        await channel.send_control({"type": "error",
+                                    "message": f"This call is on the {call.get('channel', 'browser')!r} "
+                                               f"channel, not {expected_channel!r}."})
+        await channel.close()
         return
 
     offer = store.get("offers", call["offer_id"]) if call.get("offer_id") else None
@@ -147,8 +216,7 @@ async def run_call(ws: WebSocket, store: Store, settings: Settings, call_id: str
     pending_translations: set[asyncio.Task] = set()
 
     async def send(payload: dict) -> None:
-        with contextlib.suppress(Exception):
-            await ws.send_json(payload)
+        await channel.send_control(payload)
 
     async def translate_line(index: int) -> None:
         text = " ".join(transcript.lines[index]["text"].split())
@@ -182,15 +250,13 @@ async def run_call(ws: WebSocket, store: Store, settings: Settings, call_id: str
 
             async def upstream() -> None:
                 while True:
-                    msg = await ws.receive()
-                    if msg["type"] == "websocket.disconnect":
+                    msg = await channel.recv()
+                    if msg is None:
                         return
-                    if msg.get("bytes"):
-                        await live.send_realtime_input(audio=types.Blob(data=msg["bytes"], mime_type=INPUT_MIME))
-                    elif msg.get("text"):
-                        with contextlib.suppress(ValueError):
-                            if json.loads(msg["text"]).get("type") == "hangup":
-                                return
+                    if isinstance(msg, bytes):
+                        await live.send_realtime_input(audio=types.Blob(data=msg, mime_type=INPUT_MIME))
+                    elif isinstance(msg, dict) and msg.get("type") == "hangup":
+                        return
 
             async def downstream() -> None:
                 spoke_after_end = False
@@ -214,8 +280,7 @@ async def run_call(ws: WebSocket, store: Store, settings: Settings, call_id: str
                                 if part.inline_data and part.inline_data.data:
                                     if session.ended:
                                         spoke_after_end = True
-                                    with contextlib.suppress(Exception):
-                                        await ws.send_bytes(part.inline_data.data)
+                                    await channel.send_audio(part.inline_data.data)
                         if sc.input_transcription and sc.input_transcription.text:
                             await caption("farmer", sc.input_transcription.text)
                         if sc.output_transcription and sc.output_transcription.text:
@@ -266,5 +331,4 @@ async def run_call(ws: WebSocket, store: Store, settings: Settings, call_id: str
                     "kind": call["kind"], "consent": final.get("consent"),
                     "retry_queued": bool(final.get("retry_queued")),
                     "deal": confirm_details(store, settings, offer) if call["kind"] == "confirm" else None})
-        with contextlib.suppress(Exception):
-            await ws.close()
+        await channel.close()

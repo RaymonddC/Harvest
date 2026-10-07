@@ -243,12 +243,14 @@ def offer_from_rival_quote(store: Store, settings: Settings, quote_id: str) -> d
 # ---------- calls and campaigns ----------
 
 def queue_call(store: Store, farmer: dict, kind: str, gap_week: int | None = None,
-               offer_id: str | None = None, attempt: int = 1) -> str:
+               offer_id: str | None = None, attempt: int = 1, channel: str = "browser") -> str:
+    # "channel" names what carries the call's audio: "browser" (the only one built) today,
+    # "twilio" once a real-phone adapter exists. See live_session.Channel for the seam.
     return store.add("calls", {
         "farmer_id": farmer["id"], "farmer_name": farmer.get("name", farmer["id"]),
         "kind": kind, "status": "queued", "attempt": attempt, "gap_week": gap_week,
-        "offer_id": offer_id, "created_at": now_iso(), "started_at": None, "ended_at": None,
-        "summary": None, "outcome": None, "transcript": None, "consent": None,
+        "offer_id": offer_id, "channel": channel, "created_at": now_iso(), "started_at": None,
+        "ended_at": None, "summary": None, "outcome": None, "transcript": None, "consent": None,
     })
 
 
@@ -273,6 +275,7 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect") -> d
         gap_week = gap["week"]
     else:
         raise ServiceError("Campaign kind must be collect or gap_fill.")
+    targets = [f for f in targets if not f.get("do_not_call")]
     for farmer in sorted(targets, key=lambda f: f["id"]):
         if not _open_call_for(store, farmer["id"], kind):
             queue_call(store, farmer, kind, gap_week=gap_week)
@@ -291,9 +294,48 @@ def call_now(store: Store, farmer_id: str, kind: str | None = None) -> str:
     farmer = store.get("farmers", farmer_id)
     if not farmer:
         raise ServiceError("Farmer not found.")
+    if farmer.get("do_not_call"):
+        raise ServiceError("This farmer asked not to be called again.")
     gap = first_gap_week(store)
     kind = kind or "collect"
     return queue_call(store, farmer, kind, gap_week=gap["week"] if gap else None)
+
+
+def twilio_ready(settings: Settings) -> bool:
+    return bool(settings.twilio_account_sid and settings.twilio_auth_token
+               and settings.twilio_from_number and settings.public_base_url)
+
+
+def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None = None) -> str:
+    """Place a real outbound call (VA-8). Same preconditions as call_now, plus Twilio config."""
+    if not twilio_ready(settings):
+        raise ServiceError("Twilio is not configured (need TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, "
+                           "TWILIO_FROM_NUMBER and PUBLIC_BASE_URL).")
+    farmer = store.get("farmers", farmer_id)
+    if not farmer:
+        raise ServiceError("Farmer not found.")
+    if farmer.get("do_not_call"):
+        raise ServiceError("This farmer asked not to be called again.")
+    phone = (farmer.get("phone") or "").strip()
+    if not phone:
+        raise ServiceError("This farmer has no phone number on record.")
+    # Stored/displayed as "+62 810 0000 1000" (seed_data._phone, and whatever a planner
+    # types into the upload CSV) - Twilio's Calls API wants strict E.164, no separators.
+    to_number = "+" + "".join(c for c in phone if c.isdigit())
+    gap = first_gap_week(store)
+    call_id = queue_call(store, farmer, kind or "collect", gap_week=gap["week"] if gap else None,
+                         channel="twilio")
+    from twilio.rest import Client  # imported lazily: only needed once Twilio is actually configured
+
+    client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
+    voice_url = f"{settings.public_base_url.rstrip('/')}/twilio/voice?call_id={call_id}"
+    try:
+        client.calls.create(to=to_number, from_=settings.twilio_from_number,
+                            url=voice_url, method="POST")
+    except Exception as e:
+        store.delete("calls", call_id)
+        raise ServiceError(f"Twilio call failed: {e}") from e
+    return call_id
 
 
 def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly: bool,
@@ -314,12 +356,16 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
     }, merge=True)
     if status == "done" and call.get("kind") == "confirm" and call.get("offer_id"):
         store.set("offers", call["offer_id"], {"confirmed_by_voice": True}, merge=True)
+    if outcome == "stopped":
+        # The farmer explicitly asked not to be called again; honour it for every future campaign.
+        store.set("farmers", call["farmer_id"], {"do_not_call": True}, merge=True)
     if status == "dropped" and call.get("attempt", 1) < settings.max_call_attempts:
         farmer = store.get("farmers", call["farmer_id"])
         if farmer:
             store.set("calls", call_id, {"retry_queued": True}, merge=True)
             queue_call(store, farmer, call["kind"], gap_week=call.get("gap_week"),
-                       offer_id=call.get("offer_id"), attempt=call.get("attempt", 1) + 1)
+                       offer_id=call.get("offer_id"), attempt=call.get("attempt", 1) + 1,
+                       channel=call.get("channel", "browser"))
 
 
 def upload_farmers(store: Store, settings: Settings, csv_text: str) -> dict:

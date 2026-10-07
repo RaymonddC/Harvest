@@ -6,6 +6,10 @@
 # a secret named gemini-api-key in Secret Manager.
 #
 #   PROJECT=my-project REGION=asia-southeast1 FIREBASE_WEB_CONFIG='{"apiKey":...}' deploy/deploy.sh
+#
+# VA-8 stretch goal (the real phone channel): also set TWILIO_ACCOUNT_SID and
+# TWILIO_FROM_NUMBER, and first create a secret named twilio-auth-token:
+#   gcloud secrets create twilio-auth-token --data-file=- <<< "$TWILIO_AUTH_TOKEN"
 set -euo pipefail
 
 : "${PROJECT:?Set PROJECT to your GCP project id}"
@@ -16,6 +20,11 @@ MILL_NAME="${MILL_NAME:-Koperasi Sawit Maju}"
 PLANNER_NAME="${PLANNER_NAME:-Dewi}"
 DEMO_LANGUAGE="${DEMO_LANGUAGE:-Bahasa Indonesia}"
 PLANNER_TOKEN="${PLANNER_TOKEN:-}"
+# VA-8 stretch goal: set all three to enable the real-phone channel. PUBLIC_BASE_URL
+# is set automatically below once the Cloud Run URL is known - no need to pass it.
+TWILIO_ACCOUNT_SID="${TWILIO_ACCOUNT_SID:-}"
+TWILIO_AUTH_TOKEN="${TWILIO_AUTH_TOKEN:-}"
+TWILIO_FROM_NUMBER="${TWILIO_FROM_NUMBER:-}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 gcloud config set project "$PROJECT" >/dev/null
@@ -39,6 +48,13 @@ gcloud run jobs deploy "$JOB" --source "$ROOT/backend" --region "$REGION" \
 
 URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.url)')"
 echo "Gateway: $URL"
+
+if [[ -n "$TWILIO_ACCOUNT_SID" && -n "$TWILIO_AUTH_TOKEN" && -n "$TWILIO_FROM_NUMBER" ]]; then
+  echo "Wiring up the Twilio channel (PUBLIC_BASE_URL=$URL)..."
+  gcloud run services update "$SERVICE" --region "$REGION" --set-env-vars \
+    "^@^PUBLIC_BASE_URL=$URL@TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID@TWILIO_FROM_NUMBER=$TWILIO_FROM_NUMBER" \
+    --set-secrets TWILIO_AUTH_TOKEN=twilio-auth-token:latest
+fi
 
 # Point the dashboard at the gateway. WebSockets do not pass through Hosting rewrites,
 # so the browser talks to Cloud Run directly.

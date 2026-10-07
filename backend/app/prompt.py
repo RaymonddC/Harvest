@@ -122,7 +122,7 @@ def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_we
         dw = offer.get("deliver_week") or 1
         parts.append(CONFIRM.format(
             kg=offer["kg"], crop=crop_label(offer["crop"]), price=offer["price_per_kg"],
-            currency=offer.get("currency", "THB"), deliver_label=fc.week_label(dw),
+            currency=offer.get("currency", "IDR"), deliver_label=fc.week_label(dw),
             deliver_start=fc.week_start(dw, settings.plan_start).strftime("%A %d %B")))
     elif kind == "gap_fill" and gap_week:
         who = "supplier" if farmer.get("type") == "supplier" else "farmer"
