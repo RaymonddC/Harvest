@@ -66,7 +66,8 @@ A second, independent gate sits in front of `dial_now` itself: `REAL_CALLS_ENABL
 and `REAL_CALL_ALLOWLIST` (comma-separated numbers — the only ones `dial_now` will ever actually
 call). Being Twilio-configured is not enough on its own; both of these must also allow it. Set them
 deliberately before testing — they're env vars, not a dashboard toggle, on purpose: nothing to
-misclick live in front of an audience.
+misclick live in front of an audience. For production (call anyone, not just test numbers), set
+`REAL_CALL_ALLOWLIST=*` — the same wildcard convention `CORS_ORIGINS` already uses in this file.
 
 Known, accepted gap: Twilio doesn't sign the Media Streams WebSocket handshake itself (only the
 `/twilio/voice` webhook that sets it up) — `/twilio/stream/{call_id}`'s only protection is the

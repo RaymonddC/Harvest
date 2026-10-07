@@ -278,6 +278,17 @@ def test_dial_now_refuses_a_number_not_on_the_allowlist(store, settings):
         services.dial_now(store, s, "f01")
 
 
+def test_dial_now_wildcard_allowlist_allows_any_number(store, settings, monkeypatch):
+    # REAL_CALL_ALLOWLIST=* (same convention as CORS_ORIGINS): production, not a
+    # specific test number - any farmer's number is allowed through.
+    monkeypatch.setattr("twilio.rest.Client", type("FakeClient", (), {
+        "__init__": lambda self, sid, token: setattr(self, "calls", type("C", (), {
+            "create": lambda self, **kw: type("R", (), {"sid": "CA_fake"})()})())}))
+    s = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=("*",))
+    call_id = services.dial_now(store, s, "f01")
+    assert store.get("calls", call_id)["channel"] == "twilio"
+
+
 def test_dial_now_refuses_do_not_call_farmer(store, settings):
     store.set("farmers", "f01", {"do_not_call": True}, merge=True)
     with pytest.raises(services.ServiceError, match="asked not to be called"):

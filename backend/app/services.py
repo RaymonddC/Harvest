@@ -325,9 +325,10 @@ def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None 
     # Stored/displayed as "+62 810 0000 1000" (seed_data._phone, and whatever a planner
     # types into the upload CSV) - Twilio's Calls API wants strict E.164, no separators.
     to_number = normalize_phone(phone)
-    if to_number not in settings.real_call_allowlist:
+    if "*" not in settings.real_call_allowlist and to_number not in settings.real_call_allowlist:
         raise ServiceError(f"{to_number} is not on the real-call allowlist (REAL_CALL_ALLOWLIST). "
-                           "This is a safety gate, not a bug - add the number there first.")
+                           "This is a safety gate, not a bug - add the number there, or set it to "
+                           "\"*\" to allow any number (production).")
     gap = first_gap_week(store)
     call_id = queue_call(store, farmer, kind or "collect", gap_week=gap["week"] if gap else None,
                          channel="twilio")

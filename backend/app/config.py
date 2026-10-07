@@ -63,7 +63,10 @@ class Settings:
     # every real call unless BOTH of these allow it. Deliberately env-only, not a
     # dashboard toggle - nothing to misclick live in front of an audience.
     real_calls_enabled: bool
-    real_call_allowlist: tuple[str, ...]  # E.164, normalized; only these may ever be dialed
+    # E.164, normalized; only these may ever be dialed. "*" (same convention as
+    # CORS_ORIGINS above) means no restriction - every number is allowed. Empty
+    # (the default) means none are: a real call needs this set explicitly either way.
+    real_call_allowlist: tuple[str, ...]
 
 
 @lru_cache
@@ -109,6 +112,8 @@ def get_settings() -> Settings:
         public_base_url=os.environ.get("PUBLIC_BASE_URL") or None,
         real_calls_enabled=_bool("REAL_CALLS_ENABLED", False),
         real_call_allowlist=tuple(
-            normalize_phone(n) for n in os.environ.get("REAL_CALL_ALLOWLIST", "").split(",") if n.strip()
+            n if n == "*" else normalize_phone(n)
+            for n in (n.strip() for n in os.environ.get("REAL_CALL_ALLOWLIST", "").split(","))
+            if n
         ),
     )
