@@ -80,7 +80,8 @@ printf '%s' "$GEMINI_KEY" | gcloud secrets create gemini-api-key --data-file=-
 unset GEMINI_KEY
 ```
 
-**B7. Let the Cloud Run service read Firestore and that secret.**
+**B7. Let Cloud Run and Cloud Build use what they need.** The build runs as the same account, which
+is why it also needs the build roles.
 ```bash
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT --format='value(projectNumber)')
 RUNTIME_SA=$PROJECT_NUMBER-compute@developer.gserviceaccount.com
@@ -88,7 +89,13 @@ gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$RUNTIME
   --role=roles/datastore.user --condition=None
 gcloud secrets add-iam-policy-binding gemini-api-key --member=serviceAccount:$RUNTIME_SA \
   --role=roles/secretmanager.secretAccessor
+for role in roles/cloudbuild.builds.builder roles/storage.objectViewer \
+            roles/artifactregistry.writer roles/logging.logWriter; do
+  gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$RUNTIME_SA \
+    --role=$role --condition=None --quiet >/dev/null
+done
 ```
+Wait a minute before deploying so the permissions take effect.
 
 **B8. Tell the Firebase CLI which project to use.**
 ```bash
@@ -103,11 +110,9 @@ Part B is done. You never repeat it for this project.
 
 ## Part C. Deploy (in Cloud Shell, 5 to 10 minutes)
 
-**C1. Choose a planner password.** It protects the approve, reject and campaign buttons.
-```bash
-export PLANNER_TOKEN=choose-a-password-here
-```
-Remember it. You type it into the dashboard once, and every later deploy must use the same one.
+**C1. Nothing to choose.** There is no password. The site opens on a page where you pick a role:
+Planner (can change things), Viewer (read only) or Farmer (the call page). The script creates the
+signing key for you.
 
 **C2. Run the deploy script.**
 ```bash
@@ -134,8 +139,10 @@ You should see `{"ok":true,"store":"firestore", ...}`.
 - Approvals: `https://YOUR-PROJECT-ID.web.app/approvals.html`
 - Call client: `https://YOUR-PROJECT-ID.web.app/call.html` (allow the microphone; use headphones)
 
-**D3. Try the demo.** On the setup page click *Start campaign*. When you press a button the
-dashboard asks for the planner password from C1. Then follow the demo walk-through in the README.
+**D3. Try the demo.** Any page sends you to the sign-in page first. Pick **Planner**, open the setup
+page and click *Start campaign*. Then follow the demo walk-through in the README. To watch without
+being able to change anything pick **Viewer**; to answer calls pick **Farmer**. *Switch role* in the
+header gets you back to the sign-in page.
 
 ---
 
@@ -144,7 +151,7 @@ dashboard asks for the planner password from C1. Then follow the demo walk-throu
 For a code change, run this from the `Harvest` folder in Cloud Shell:
 ```bash
 git pull
-export PROJECT=your-project-id REGION=asia-southeast1 PLANNER_TOKEN=the-same-password
+export PROJECT=your-project-id REGION=asia-southeast1
 SEED_DEMO_DATA=false SKIP_API_ENABLE=true bash deploy/deploy.sh
 git checkout web/config.js
 ```
@@ -175,5 +182,6 @@ To remove everything, delete the project in the console (*IAM and admin, Setting
 | `addfirebase` fails with `403 Firebase Management API has not been used` | `gcloud services enable firebase.googleapis.com cloudresourcemanager.googleapis.com`, wait a minute, run B5 again. |
 | Firebase says the project is not a Firebase project | Run B5 again. |
 | Health check returns an error, or the logs mention Firestore permissions | Run B7 again. |
+| `compute@developer.gserviceaccount.com does not have storage.objects.get access` during the deploy | The build roles from B7 are missing. Run B7 again, wait a minute, re-run the deploy. |
 | Voice call fails straight away | The secret is missing or the key is wrong (B6). Check `gcloud run services logs read harvest-gateway --region $REGION --limit 50`. |
 | Organization policy blocks `--allow-unauthenticated` | Your Google account belongs to a company or school that forbids public Cloud Run services. Use a personal Google account and project. |

@@ -5,3 +5,4 @@ google-cloud-firestore>=2.16
 pydantic>=2.7
 twilio>=9
 python-multipart>=0.0.9
+PyJWT>=2.8

@@ -21,7 +21,9 @@ JOB="${JOB:-harvest-forecast}"
 MILL_NAME="${MILL_NAME:-Koperasi Sawit Maju}"
 PLANNER_NAME="${PLANNER_NAME:-Dewi}"
 DEMO_LANGUAGE="${DEMO_LANGUAGE:-Bahasa Indonesia}"
-PLANNER_TOKEN="${PLANNER_TOKEN:-}"
+# Signs the sign-in tokens. Set it to keep people signed in across deploys; when empty a fresh
+# random one is made, so a redeploy only asks everyone to pick their role again.
+JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}"
 # VA-8 stretch goal: set all three to enable the real-phone channel. PUBLIC_BASE_URL
 # is set automatically below once the Cloud Run URL is known - no need to pass it.
 TWILIO_ACCOUNT_SID="${TWILIO_ACCOUNT_SID:-}"
@@ -45,7 +47,7 @@ fi
 # "^@^" switches gcloud's list delimiter to @, because the Firebase config JSON contains commas.
 ENV_VARS="^@^STORE_BACKEND=firestore@GOOGLE_CLOUD_PROJECT=$PROJECT@SEED_ON_START=false"
 ENV_VARS="$ENV_VARS@MILL_NAME=$MILL_NAME@PLANNER_NAME=$PLANNER_NAME@DEMO_LANGUAGE=$DEMO_LANGUAGE"
-[[ -n "$PLANNER_TOKEN" ]] && ENV_VARS="$ENV_VARS@PLANNER_TOKEN=$PLANNER_TOKEN"
+ENV_VARS="$ENV_VARS@JWT_SECRET=$JWT_SECRET"
 if [[ -n "${FIREBASE_WEB_CONFIG:-}" ]]; then ENV_VARS="$ENV_VARS@FIREBASE_WEB_CONFIG=$FIREBASE_WEB_CONFIG"; fi
 
 # WebSocket calls: long timeout, session affinity, one warm instance for the demo.
@@ -70,14 +72,12 @@ fi
 # Point the dashboard at the gateway. WebSockets do not pass through Hosting rewrites,
 # so the browser talks to Cloud Run directly.
 FB="${FIREBASE_WEB_CONFIG:-null}"
-NEEDS_TOKEN=$([[ -n "$PLANNER_TOKEN" ]] && echo true || echo false)
 cat > "$ROOT/web/config.js" <<JS
 window.HARVEST_CONFIG = {
   apiBase: "$URL",
   millName: "$MILL_NAME",
   plannerName: "$PLANNER_NAME",
   firebase: $FB,
-  needsToken: $NEEDS_TOKEN,
 };
 JS
 
@@ -85,7 +85,10 @@ JS
 
 if [[ "$SEED_DEMO_DATA" == "true" ]]; then
   echo "Seeding demo data (this replaces everything in Firestore)..."
-  curl -fsS -X POST "$URL/api/demo/reset" ${PLANNER_TOKEN:+-H "X-Planner-Token: $PLANNER_TOKEN"} >/dev/null
+  # Resetting is a planner action: sign in as the planner (no password in demo mode) to get a token.
+  TOKEN="$(curl -fsS -X POST "$URL/api/auth/login" -H 'Content-Type: application/json' \
+    -d '{"role":"planner"}' | python3 -c 'import sys, json; print(json.load(sys.stdin)["token"])')"
+  curl -fsS -X POST "$URL/api/demo/reset" -H "Authorization: Bearer $TOKEN" >/dev/null
 else
   echo "Skipping demo data (SEED_DEMO_DATA=false)."
 fi

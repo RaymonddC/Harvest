@@ -86,13 +86,6 @@ def test_upload_farmers(client, store):
     assert client.post("/api/farmers/upload", json={"csv": "a,b\n1,2"}).status_code == 400
 
 
-def test_planner_token(settings, store):
-    app = create_app(dataclasses.replace(settings, planner_token="s3cret"), store)
-    with TestClient(app) as c:
-        assert c.post("/api/campaign/stop").status_code == 401
-        assert c.post("/api/campaign/stop", headers={"X-Planner-Token": "s3cret"}).status_code == 200
-
-
 def test_csv_download(client):
     r = client.get("/api/forecast.csv")
     assert r.status_code == 200 and r.text.startswith("week,")
