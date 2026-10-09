@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import secrets
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -46,7 +47,9 @@ class Settings:
     max_call_attempts: int
     max_call_seconds: int
     caption_translate_to: str | None  # e.g. "English"; None turns caption translation off
-    planner_token: str | None
+    auth_required: bool  # False leaves every planner action open (scripts, local experiments)
+    jwt_secret: str  # signs sign-in tokens; set it in the cloud or each instance signs differently
+    jwt_ttl_seconds: int
     seed_on_start: bool
     static_dir: Path | None
     cors_origins: tuple[str, ...]
@@ -99,7 +102,9 @@ def get_settings() -> Settings:
         max_call_attempts=int(os.environ.get("MAX_CALL_ATTEMPTS", "2")),
         max_call_seconds=int(os.environ.get("MAX_CALL_SECONDS", "360")),
         caption_translate_to=os.environ.get("CAPTION_TRANSLATE_TO", "English") or None,
-        planner_token=os.environ.get("PLANNER_TOKEN") or None,
+        auth_required=_bool("AUTH_REQUIRED", True),
+        jwt_secret=os.environ.get("JWT_SECRET") or secrets.token_hex(32),
+        jwt_ttl_seconds=int(os.environ.get("JWT_TTL_SECONDS", str(12 * 3600))),
         seed_on_start=_bool("SEED_ON_START", store_backend == "memory"),
         static_dir=static_dir,
         cors_origins=tuple(

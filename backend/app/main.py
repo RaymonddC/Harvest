@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import seed_data, services
+from . import auth, seed_data, services
 from .config import Settings, get_settings
 from .live_session import BrowserChannel, run_call
 from .store import COLLECTIONS, Store, make_store
@@ -37,6 +37,10 @@ class CsvIn(BaseModel):
 
 class CampaignIn(BaseModel):
     kind: str = "collect"
+
+
+class LoginIn(BaseModel):
+    role: str
 
 
 class CallNowIn(BaseModel):
@@ -64,9 +68,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"],
                        allow_headers=["*"])
 
-    def planner(x_planner_token: str | None = Header(default=None)) -> None:
-        if settings.planner_token and x_planner_token != settings.planner_token:
-            raise HTTPException(401, "Planner token required.")
+    planner = auth.planner_dependency(settings)
 
     @app.exception_handler(services.ServiceError)
     async def service_error(_: Request, exc: services.ServiceError):
@@ -81,9 +83,22 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     @app.get("/config.js", include_in_schema=False)
     def config_js():
         cfg = {"apiBase": "", "millName": settings.mill_name, "plannerName": settings.planner_name,
-               "firebase": json.loads(settings.firebase_web_config) if settings.firebase_web_config else None,
-               "needsToken": bool(settings.planner_token)}
+               "firebase": json.loads(settings.firebase_web_config) if settings.firebase_web_config else None}
         return Response(f"window.HARVEST_CONFIG = {json.dumps(cfg)};", media_type="application/javascript")
+
+    # ----- demo sign-in: pick a role, no password -----
+
+    @app.post("/api/auth/login")
+    def login(body: LoginIn):
+        if body.role not in auth.ROLES:
+            raise HTTPException(400, f"Role must be one of: {', '.join(auth.ROLES)}.")
+        token, exp = auth.mint_token(settings, body.role)
+        return {"token": token, "role": body.role, "name": auth.display_name(settings, body.role), "exp": exp}
+
+    @app.get("/api/auth/me")
+    def me(authorization: str | None = Header(default=None)):
+        claims = auth.read_token(settings, authorization)
+        return {"role": claims["role"], "name": claims.get("name"), "exp": claims["exp"]}
 
     # ----- read model -----
 

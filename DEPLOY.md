@@ -1,5 +1,8 @@
 # Deploying Harvest to Google Cloud
 
+For a short, ordered walkthrough that starts from nothing, use [DEPLOY-STEPS.md](DEPLOY-STEPS.md).
+This guide is the reference behind it.
+
 This guide covers three things: running it locally (what a friend needs), deploying it to
 Google Cloud by hand, and deploying it automatically on every push to `main`.
 
@@ -58,7 +61,10 @@ Things to know:
 
 ## 4. One-time Google Cloud setup
 
-Do this once per project. Replace the values at the top.
+Do this once per project. Replace the values at the top. Run it in
+[Google Cloud Shell](https://console.cloud.google.com) (the `>_` icon in the console, where `gcloud`
+is preinstalled and signed in), or install the gcloud CLI and `firebase-tools` on your own machine
+first (see step 6).
 
 ```bash
 export PROJECT=my-project-id
@@ -79,7 +85,9 @@ gcloud config set project $PROJECT
 
 3. **Add Firebase to the project.** In https://console.firebase.google.com choose
    *Add project* and pick the existing Google Cloud project, or run
-   `npx firebase-tools projects:addfirebase $PROJECT`. Hosting needs this.
+   `gcloud services enable firebase.googleapis.com cloudresourcemanager.googleapis.com`, wait a
+   minute, then `npx firebase-tools projects:addfirebase $PROJECT`. Hosting needs this. Without the
+   API enabled the command fails with `403 Firebase Management API has not been used`.
 
 4. **Store the Gemini API key:**
    ```bash
@@ -96,6 +104,12 @@ gcloud config set project $PROJECT
      --role=roles/datastore.user --condition=None
    gcloud secrets add-iam-policy-binding gemini-api-key --member=serviceAccount:$RUNTIME_SA \
      --role=roles/secretmanager.secretAccessor
+   # the source build also runs as this account
+   for role in roles/cloudbuild.builds.builder roles/storage.objectViewer \
+               roles/artifactregistry.writer roles/logging.logWriter; do
+     gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$RUNTIME_SA \
+       --role=$role --condition=None --quiet >/dev/null
+   done
    ```
 
 6. **Install the CLIs** on the machine you deploy from: the
@@ -118,12 +132,12 @@ gcloud config set project $PROJECT
 cd Harvest
 PROJECT=$PROJECT REGION=$REGION \
 FIREBASE_WEB_CONFIG='{"apiKey":"...","authDomain":"...","projectId":"..."}' \
-PLANNER_TOKEN=choose-a-password \
 bash deploy/deploy.sh
 ```
 
-`FIREBASE_WEB_CONFIG` is optional. `PLANNER_TOKEN` is optional but recommended: without it
-anyone with the URL can approve offers.
+`FIREBASE_WEB_CONFIG` is optional. There is no password: the site opens on a page where you pick
+a role (Planner, Viewer or Farmer). `JWT_SECRET` is optional too; the script makes one if you
+don't pass it.
 
 The script, in order: enables the APIs, deploys the gateway, deploys the forecast job,
 writes the gateway URL into `web/config.js`, deploys Hosting and Firestore rules, and seeds
@@ -147,15 +161,16 @@ safe to repeat. Three behaviours to know:
   Firestore collection first. That is right for the first deploy. For any later deploy set
   `SEED_DEMO_DATA=false` so live data survives. (The CI workflow already does.)
 - **`--set-env-vars` replaces all variables.** The script passes the full set on every run,
-  so always run it with the same `PLANNER_TOKEN`, `MILL_NAME` and so on. Running it without
-  `PLANNER_TOKEN` removes the token from the service.
+  so always run it with the same `MILL_NAME` and so on. A new `JWT_SECRET` (made automatically
+  when you pass none) signs everyone out; they just pick their role again. Pass the same
+  `JWT_SECRET` every time to avoid that.
 - **`web/config.js` is rewritten** with the Cloud Run URL. It shows up as a modified file in
   git afterwards. Do not commit it, or the local default (`apiBase: ""`) is lost.
 
 Manual redeploy after a code change:
 
 ```bash
-PROJECT=$PROJECT REGION=$REGION PLANNER_TOKEN=... SEED_DEMO_DATA=false SKIP_API_ENABLE=true \
+PROJECT=$PROJECT REGION=$REGION SEED_DEMO_DATA=false SKIP_API_ENABLE=true \
 bash deploy/deploy.sh
 git checkout web/config.js
 ```
@@ -219,7 +234,7 @@ In the repository: *Settings, Secrets and variables, Actions*.
 |---|---|---|
 | Secret | `WIF_PROVIDER` | the `WIF_PROVIDER` line printed above |
 | Secret | `WIF_SERVICE_ACCOUNT` | the `WIF_SERVICE_ACCOUNT` line printed above |
-| Secret | `PLANNER_TOKEN` | the same token you used in the first deploy |
+| Secret | `JWT_SECRET` | optional; a long random string (`openssl rand -hex 32`). Without it each deploy signs everyone out |
 | Variable | `GCP_PROJECT` | your project id |
 | Variable | `GCP_REGION` | e.g. `asia-southeast1` (defaults to that if empty) |
 | Variable | `FIREBASE_WEB_CONFIG` | the JSON from section 4 step 7, or leave unset |
@@ -245,8 +260,9 @@ workflow's `env:` block, as `deploy.sh` already reads them.
 ## 8. Day-to-day operations
 
 - **Logs:** `gcloud run services logs read harvest-gateway --region $REGION --limit 100`
-- **Reset the demo data:** `curl -X POST $URL/api/demo/reset -H "X-Planner-Token: $PLANNER_TOKEN"`
-  (wipes Firestore, then reloads the seed).
+- **Reset the demo data:** sign in as Planner and press *Reset demo data* on the Setup page, or
+  `TOKEN=$(curl -s -X POST $URL/api/auth/login -H 'Content-Type: application/json' -d '{"role":"planner"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')`
+  then `curl -X POST $URL/api/demo/reset -H "Authorization: Bearer $TOKEN"`. It wipes Firestore, then reloads the seed.
 - **Rotate the Gemini key:**
   `printf '%s' "$NEW_KEY" | gcloud secrets versions add gemini-api-key --data-file=-`, then
   redeploy so the service picks up `latest`.
@@ -270,14 +286,18 @@ workflow's `env:` block, as `deploy.sh` already reads them.
 | Logs show `GOOGLE_API_KEY` missing or the voice call fails immediately | The secret does not exist, the runtime account cannot read it, or the key is wrong. |
 | `firebase deploy` says the project is not a Firebase project, or hosting is not set up | Section 4 step 3 was skipped. |
 | `firebase deploy` fails with 403 in CI | The deployer lacks `roles/firebasehosting.admin` or `roles/firebaserules.admin`. |
-| Dashboard loads but actions fail with 401 | `PLANNER_TOKEN` is set; enter it in the dialog the dashboard shows. |
+| Actions fail with 401, or the login page keeps reappearing | The session expired or `JWT_SECRET` changed or differs between instances. Pick the role again; set one `JWT_SECRET` for the service. |
+| Buttons say "You are signed in as a viewer" | Use *Switch role* in the header and pick Planner. |
 | Dashboard shows old data after redeploy | Hosting caches; `config.js` is set to `no-cache` in `firebase.json`, but hard refresh once. |
 | The gateway has the wrong settings after a redeploy | The run used different env values than the last one. Re-run with the full set. |
 
 ## 10. Security notes
 
-- `PLANNER_TOKEN` is stored as a plain Cloud Run environment variable. For anything beyond a
-  demo, move it to Secret Manager and use `--set-secrets` as with the Gemini key.
+- Sign-in is demo mode: there is no password, so anyone who opens the URL can pick Planner. It
+  only keeps honest users from clicking the wrong thing. Replace `/api/auth/login` with a real
+  identity check (Firebase Auth) before any real data goes in.
+- `JWT_SECRET` is stored as a plain Cloud Run environment variable. For anything beyond a demo,
+  move it to Secret Manager and use `--set-secrets` as with the Gemini key.
 - The gateway is deployed with `--allow-unauthenticated` (the browser must reach it) and CORS
   is `*` by default. Set `CORS_ORIGINS` to your Hosting URL for anything real.
 - Firestore reads are public for the dashboard and the data is synthetic. Add Firebase Auth
