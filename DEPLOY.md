@@ -1,5 +1,8 @@
 # Deploying Harvest to Google Cloud
 
+For a short, ordered walkthrough that starts from nothing, use [DEPLOY-STEPS.md](DEPLOY-STEPS.md).
+This guide is the reference behind it.
+
 This guide covers three things: running it locally (what a friend needs), deploying it to
 Google Cloud by hand, and deploying it automatically on every push to `main`.
 
@@ -58,7 +61,10 @@ Things to know:
 
 ## 4. One-time Google Cloud setup
 
-Do this once per project. Replace the values at the top.
+Do this once per project. Replace the values at the top. Run it in
+[Google Cloud Shell](https://console.cloud.google.com) (the `>_` icon in the console, where `gcloud`
+is preinstalled and signed in), or install the gcloud CLI and `firebase-tools` on your own machine
+first (see step 6).
 
 ```bash
 export PROJECT=my-project-id

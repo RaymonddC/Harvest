@@ -62,8 +62,8 @@ retried once.
 
 ## Deploy
 
-Full guide (one-time setup, local setup for a friend, automatic deploys on push to `main`):
-[DEPLOY.md](DEPLOY.md). The short version:
+Step-by-step walkthrough: [DEPLOY-STEPS.md](DEPLOY-STEPS.md). Full guide (local setup for a friend,
+automatic deploys on push to `main`): [DEPLOY.md](DEPLOY.md). The short version:
 
 ```bash
 gcloud secrets create gemini-api-key --data-file=- <<< "$GOOGLE_API_KEY"
