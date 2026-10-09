@@ -1,4 +1,4 @@
-import { ROLE_LABEL, cfg, getSession, signIn } from "./data.js";
+import { ROLE_LABEL, cfg, getSession, icon, signIn } from "./data.js";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -8,6 +8,7 @@ const notice = $("notice");
 const next = /^[a-z]+\.html$/.test(params.get("next") || "") ? params.get("next") : "index.html";
 const HOME = { planner: next, viewer: next, farmer: "call.html" };
 
+document.querySelectorAll("[data-icon]").forEach((n) => n.replaceChildren(icon(n.dataset.icon, n.classList.contains("mark") ? 18 : 20)));
 $("planner-desc").textContent = `${cfg.plannerName}, the mill's planner. Starts call campaigns, sets price limits, approves or rejects deals.`;
 
 if (params.get("expired")) {

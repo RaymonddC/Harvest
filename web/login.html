@@ -7,34 +7,38 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/app.css">
   <script src="config.js"></script>
 </head>
 <body class="login-page">
   <main class="login">
-    <div>
-      <div class="brand">Harvest-Call</div>
-      <h1 style="margin-top:16px">Choose how you want to enter</h1>
-      <p class="muted" style="margin-top:8px;font-size:16px">Demo mode: there is no password, just pick a role. All data is synthetic.</p>
+    <div class="login-head">
+      <div class="brand"><span class="mark" data-icon="leaf"></span>Harvest-Call</div>
+      <h1>Choose how you want to enter</h1>
+      <p class="muted">Demo mode: there is no password, just pick a role. All data is synthetic.</p>
     </div>
 
     <p class="banner error" id="notice" role="alert" hidden></p>
 
     <div class="roles" role="group" aria-label="Roles">
-      <button class="role-tile" data-role="planner">
+      <button class="role-tile main" data-role="planner">
+        <span class="role-icon" data-icon="forecast"></span>
         <span class="role-name">Planner</span>
         <span class="role-desc" id="planner-desc">The mill's planner. Starts call campaigns, sets price limits, approves or rejects deals.</span>
-        <span class="role-go">Open the live forecast →</span>
+        <span class="role-go">Open the live forecast</span>
       </button>
       <button class="role-tile" data-role="viewer">
+        <span class="role-icon" data-icon="eye"></span>
         <span class="role-name">Viewer</span>
         <span class="role-desc">A guest. Watch the forecast, the offers and the calls, but change nothing.</span>
-        <span class="role-go">Open the live forecast →</span>
+        <span class="role-go">Open the live forecast</span>
       </button>
       <button class="role-tile" data-role="farmer">
+        <span class="role-icon" data-icon="phone"></span>
         <span class="role-name">Farmer</span>
         <span class="role-desc">Answer the agent's phone calls in this browser, playing the farmer.</span>
-        <span class="role-go">Open the call client →</span>
+        <span class="role-go">Open the call client</span>
       </button>
     </div>
     <p class="small muted" id="current" hidden></p>

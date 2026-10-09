@@ -14,6 +14,23 @@ function focusWeek() {
   return gap ? gap.week : null;
 }
 
+// Where the price sits between the floor and the ceiling. A request above the ceiling
+// lands in the red stretch past the ceiling mark.
+function priceSpot(price, l, cur) {
+  const span = l.ceiling_price - l.floor_price || 1;
+  const top = Math.max(l.ceiling_price, price) + span * 0.25;
+  const at = (p) => `${Math.min(Math.max((p - l.floor_price) / (top - l.floor_price), 0), 1) * 100}%`;
+  const over = price > l.ceiling_price;
+  const under = price < l.floor_price;
+  const where = over ? "above the ceiling" : under ? "below the floor" : "inside the range";
+  return el("div", { class: `spot ${over || under ? "out" : ""}`, role: "img",
+    "aria-label": `${plainPrice(price, cur)}, ${where}: floor ${plainPrice(l.floor_price, cur)}, ceiling ${plainPrice(l.ceiling_price, cur)}`,
+    title: `Floor ${plainPrice(l.floor_price, cur)} · ceiling ${plainPrice(l.ceiling_price, cur)}` },
+    el("i", { class: "ok", style: `width:${at(l.ceiling_price)}` }),
+    el("i", { class: "cap", style: `left:${at(l.ceiling_price)}` }),
+    el("i", { class: "dot", style: `left:${at(price)}` }));
+}
+
 function detail(o) {
   const n = o.negotiation || {};
   const cur = o.currency || "IDR";
@@ -84,7 +101,8 @@ function render() {
     return el("div", { class: `offer is-${o.status}` },
       el("div", { class: "who" }, avatar(o.farmer_name, o.kind === "supplier" ? "ink" : ""), el("div", {}, el("b", {}, o.farmer_name), el("span", {}, detail(o)))),
       el("div", { class: "fig" }, el("span", {}, "Volume"), el("b", { class: "num" }, `${(o.kg / 1000).toFixed(1)} t`)),
-      el("div", { class: "fig" }, el("span", {}, `Price, ${cur}/kg`), el("b", { class: "num" }, plainPrice(o.price_per_kg, cur))),
+      el("div", { class: "fig" }, el("span", {}, `Price, ${cur}/kg`), el("b", { class: "num" }, plainPrice(o.price_per_kg, cur)),
+        l ? priceSpot(price, l, cur) : null),
       el("div", { class: "acts" }, acts),
       o.status === "escalated" && !inLimits ? el("p", { class: "warn" }, `Above the ceiling of ${plainPrice(l ? l.ceiling_price : 0, cur)}. Raise the ceiling on the Setup page to approve, or reject.`) : null);
   });
@@ -102,7 +120,7 @@ function render() {
   const l = state.limits[0];
   const anyOut = offers.some((o) => o.status === "escalated");
   $("offers-foot").textContent = l
-    ? `${anyOut ? "Offers marked Needs planner asked for more than the ceiling. All others are" : "All offers are"} inside the floor (${plainPrice(l.floor_price, l.currency)}) and ceiling (${plainPrice(l.ceiling_price, l.currency)}). Synthetic data.`
+    ? `${anyOut ? "Offers marked Needs planner asked for more than the ceiling. All others are" : "All offers are"} inside the floor (${plainPrice(l.floor_price, l.currency)}) and ceiling (${plainPrice(l.ceiling_price, l.currency)}). The small bar under each price runs from the floor to the ceiling (black mark); red past it is above the ceiling. Synthetic data.`
     : "";
 }
 
