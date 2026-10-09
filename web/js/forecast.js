@@ -78,8 +78,10 @@ function renderChart(rows) {
     const line = el("div", { class: "target" });
     const bars = el("div", { class: "bars" }, rows.map((r) => {
       const c = { value: el("span", {}), small: el("small", {}, el("span", {})), bar: el("div", { class: "bar" }),
-        pend: el("div", { class: "pend" }) };
-      c.col = el("div", { class: "col" }, el("div", { class: "val num" }, c.value, c.small), c.pend, c.bar);
+        pend: el("div", { class: "pend" }), tip: el("div", { class: "tip", role: "tooltip", id: `tip-${r.week}` }) };
+      // Hover, keyboard focus or a tap opens the week's breakdown.
+      c.col = el("div", { class: "col", tabindex: "0", "aria-describedby": `tip-${r.week}` },
+        el("div", { class: "val num" }, c.value, c.small), c.pend, c.bar, c.tip);
       cols[r.week] = c;
       return c.col;
     }));
@@ -108,7 +110,17 @@ function renderChart(rows) {
     c.pend.title = `${fmtT(r.pending_kg)} t waiting for approval`;
     c.small.hidden = !r.pending_kg;
     c.small.firstChild.textContent = `+${fmtT(r.pending_kg)} pending`;
-    c.value.textContent = r.is_gap ? `${fmtT(r.expected_kg)} · ${fmtT(r.gap_kg)} t short` : fmtT(r.expected_kg);
+    const line = (label, kg, extra = "") => el("div", {}, el("span", {}, label), el("b", { class: "num" }, `${fmtT(kg)} t${extra}`));
+    c.tip.replaceChildren(...[
+      el("strong", {}, `${r.label} · ${new Date(r.week_start + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`),
+      line("Firm answers", r.firm_kg),
+      r.unsure_weighted_kg ? line(r.unsure_count ? `${r.unsure_count} unsure, counted half` : "Unsure, counted half", r.unsure_weighted_kg) : null,
+      r.approved_in_kg ? line("Approved deals", r.approved_in_kg) : null,
+      r.pending_kg ? line("Waiting for approval", r.pending_kg) : null,
+      el("div", { class: "sum" }, el("span", {}, "Expected"), el("b", { class: "num" }, `${fmtT(r.expected_kg)} of ${fmtT(target)} t`)),
+      el("p", { class: r.is_gap ? "short" : "fine" }, r.is_gap ? `${fmtT(r.gap_kg)} t short of the target` : r.gap_kg ? `${fmtT(r.gap_kg)} t under target, within the gap threshold` : "At or above the target")].filter(Boolean));
+    // On a phone the shortfall moves out of the pill (the KPI card above still shows it).
+    c.value.replaceChildren(fmtT(r.expected_kg), r.is_gap ? el("span", { class: "short" }, ` · ${fmtT(r.gap_kg)} t short`) : "");
   }
 }
 

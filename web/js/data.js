@@ -247,7 +247,7 @@ export function mountShell(active) {
   const head = main?.querySelector(".page-head");
   const workspace = el("div", { class: "workspace" });
   if (head) workspace.append(el("div", { class: "topbar" }, head));
-  document.body.classList.add("app");
+  document.body.classList.add("app", "loading"); // "loading" shows placeholders until the first state
   document.body.prepend(side, workspace);
   if (main) workspace.append(main);
 
@@ -259,12 +259,14 @@ export function mountShell(active) {
   }
   return {
     update(state) {
+      document.body.classList.remove("loading");
       const n = state.offers.filter((o) => ["pending", "escalated"].includes(o.status)).length;
       count.hidden = !n;
       count.textContent = String(n);
       links.approvals.setAttribute("aria-label", n ? `Approvals, ${n} waiting` : "Approvals");
     },
     status(s) {
+      if (s === "error") document.body.classList.remove("loading"); // no data is coming, so stop the placeholders
       banner.hidden = s === "live";
       banner.className = "banner" + (s === "error" ? " error" : "");
       banner.textContent = s === "error" ? "Cannot reach the live data. Check the backend URL in config.js, then reload."
