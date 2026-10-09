@@ -9,7 +9,7 @@
 | Target | 100 t per week; a week is a gap below 80 t (`GAP_TOLERANCE=0.2`) | Matches the wireframe |
 | Buyer | "Koperasi Sawit Maju" (fictional), planner "Dewi" | `MILL_NAME`, `PLANNER_NAME` |
 | Live model | `gemini-2.5-flash-native-audio-preview-09-2025` | Check it is still current before recording; set `LIVE_MODEL` |
-| Dashboard auth | Optional shared `PLANNER_TOKEN`; Firestore reads are public because the data is synthetic | Fine for the demo; add Firebase Auth before any real data |
+| Dashboard auth | Demo sign-in: `login.html` hands out a signed role token (planner, viewer or farmer), no password. Only planner actions are checked on the server (`app/auth.py`); reads, Firestore reads and the call client stay open because the data is synthetic | Fine for the demo, anyone can pick Planner. Replace `/api/auth/login` with Firebase Auth before any real data |
 
 ## Data model additions
 

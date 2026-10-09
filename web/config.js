@@ -5,5 +5,4 @@ window.HARVEST_CONFIG = {
   millName: "Koperasi Sawit Maju",
   plannerName: "Dewi",
   firebase: null,
-  needsToken: false,
 };

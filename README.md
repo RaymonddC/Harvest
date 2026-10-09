@@ -62,15 +62,14 @@ retried once.
 
 ## Deploy
 
-Full guide (one-time setup, local setup for a friend, automatic deploys on push to `main`):
-[DEPLOY.md](DEPLOY.md). The short version:
+Step-by-step walkthrough: [DEPLOY-STEPS.md](DEPLOY-STEPS.md). Full guide (local setup for a friend,
+automatic deploys on push to `main`): [DEPLOY.md](DEPLOY.md). The short version:
 
 ```bash
 gcloud secrets create gemini-api-key --data-file=- <<< "$GOOGLE_API_KEY"
 cp .firebaserc.example .firebaserc   # set your project id
 PROJECT=my-project REGION=asia-southeast1 \
 FIREBASE_WEB_CONFIG='{"apiKey":"...","projectId":"my-project",...}' \
-PLANNER_TOKEN=choose-one \
 deploy/deploy.sh
 ```
 
@@ -117,7 +116,7 @@ WebSockets to the Cloud Run URL directly, because Hosting rewrites do not carry 
 
 See `.env.example`. The main settings are `GOOGLE_API_KEY` (or Vertex AI variables),
 `STORE_BACKEND`, `LIVE_MODEL`, `DEMO_LANGUAGE`, `MILL_NAME`, `PLAN_START`,
-`TARGET_KG_PER_WEEK`, `GAP_TOLERANCE` and `PLANNER_TOKEN`.
+`TARGET_KG_PER_WEEK`, `GAP_TOLERANCE`, `AUTH_REQUIRED` and `JWT_SECRET`.
 
 The real phone channel (VA-8, off by default) needs `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
 `TWILIO_FROM_NUMBER` and `PUBLIC_BASE_URL` all set — see `DECISIONS.md`. With those set,

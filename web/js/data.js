@@ -3,7 +3,7 @@
 // events from the backend. Writes always go through the backend API (Firestore rules
 // block client writes).
 
-export const cfg = Object.assign({ apiBase: "", firebase: null, millName: "the cooperative", plannerName: "Planner", needsToken: false },
+export const cfg = Object.assign({ apiBase: "", firebase: null, millName: "the cooperative", plannerName: "Planner" },
   window.HARVEST_CONFIG || {});
 
 const COLLECTIONS = ["farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns"];
@@ -17,21 +17,40 @@ export function wsUrl(path) {
   return (location.protocol === "https:" ? "wss://" : "ws://") + location.host + path;
 }
 
-function token() {
-  try { return localStorage.getItem("plannerToken") || ""; } catch { return ""; }
+// ---------- demo sign-in: the browser keeps the role token the backend handed out ----------
+
+const SESSION_KEY = "harvestSession";
+export const ROLE_LABEL = { planner: "Planner", viewer: "Viewer", farmer: "Farmer" };
+
+export function getSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    if (s && s.token && s.exp * 1000 > Date.now()) return s;
+  } catch { /* storage blocked or corrupt: treated as signed out */ }
+  return null;
 }
-export function setToken(value) {
-  try { localStorage.setItem("plannerToken", value); } catch { /* storage blocked */ }
+export function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch { /* storage blocked */ }
+}
+export async function signIn(role) {
+  const session = await api("/api/auth/login", { body: { role }, auth: false });
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch { /* checked below */ }
+  if (!getSession()) throw new Error("This browser blocks storage, so the sign-in cannot be kept. Allow site data and try again.");
+  return session;
+}
+function toLogin(expired) {
+  const page = location.pathname.split("/").pop() || "index.html";
+  location.replace(`login.html?next=${encodeURIComponent(page)}${expired ? "&expired=1" : ""}`);
 }
 
 export class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
 }
 
-export async function api(path, { method = "POST", body } = {}) {
+export async function api(path, { method = "POST", body, auth = true } = {}) {
   const headers = { "Content-Type": "application/json" };
-  const t = token();
-  if (t) headers["X-Planner-Token"] = t;
+  const session = auth ? getSession() : null;
+  if (session) headers.Authorization = `Bearer ${session.token}`;
   const res = await fetch(apiUrl(path), { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await res.text();
   let data = null;
@@ -159,36 +178,28 @@ export function toast(message, isError = false) {
   toastTimer = setTimeout(() => { t.hidden = true; }, isError ? 6000 : 3200);
 }
 
-// Run a planner action; on 401 ask for the token.
+// Run a planner action. Viewers are told why nothing happens; an expired session goes back to sign-in.
 export async function act(fn, okMessage) {
+  const session = getSession();
+  if (session && session.role !== "planner") {
+    toast("You are signed in as a viewer. Switch to the Planner role to change anything.", true);
+    return undefined;
+  }
   try {
     const result = await fn();
     if (okMessage) toast(typeof okMessage === "function" ? okMessage(result) : okMessage);
     return result;
   } catch (err) {
-    if (err.status === 401) { askToken(); return undefined; }
+    if (err.status === 401) { clearSession(); toLogin(true); return undefined; }
     toast(err.message, true);
     return undefined;
   }
 }
 
-function askToken() {
-  let d = document.getElementById("token-dialog");
-  if (!d) {
-    d = el("dialog", { id: "token-dialog", "aria-labelledby": "token-title" },
-      el("h2", { id: "token-title" }, "Planner token"),
-      el("p", { class: "muted", style: "margin:8px 0 12px" }, "This dashboard asks for the planner token before it changes anything."),
-      el("input", { type: "password", id: "token-input", "aria-label": "Planner token" }),
-      el("div", { style: "margin-top:12px;display:flex;gap:8px" },
-        el("button", { class: "btn solid", onclick: () => { setToken(document.getElementById("token-input").value.trim()); d.close(); toast("Token saved. Try again."); } }, "Save"),
-        el("button", { class: "btn", onclick: () => d.close() }, "Cancel")));
-    document.body.append(d);
-  }
-  d.showModal();
-}
-
 // Shared header: brand, three pages, workspace and planner. Returns update(state).
 export function mountShell(active) {
+  const session = getSession();
+  if (!session) toLogin(false);
   const pages = [["setup", "setup.html", "Setup"], ["forecast", "index.html", "Live forecast"], ["approvals", "approvals.html", "Approvals"]];
   const links = {};
   const nav = el("nav", { "aria-label": "Planner pages" }, pages.map(([key, href, label]) => {
@@ -197,10 +208,15 @@ export function mountShell(active) {
   }));
   const header = el("header", { class: "site-header" }, el("div", { class: "inner" },
     el("a", { class: "brand", href: "index.html" }, "Harvest-Call"), nav,
-    el("span", { class: "who" }, `${cfg.millName} · Planner: ${cfg.plannerName}`)));
+    el("span", { class: "who" }, `${cfg.millName} · ${session ? `${session.name} (${ROLE_LABEL[session.role]})` : "Signed out"} · `,
+      el("a", { href: "login.html" }, "Switch role"))));
   document.body.prepend(header);
   const banner = el("div", { class: "banner", hidden: true, role: "status" });
   document.querySelector("main")?.prepend(banner);
+  if (session && session.role !== "planner") {
+    document.querySelector("main")?.prepend(el("div", { class: "banner", role: "note" },
+      "View only. You can watch the forecast, offers and calls, but anything that changes data is blocked. Use Switch role to sign in as the Planner."));
+  }
   return {
     update(state) {
       const n = state.offers.filter((o) => ["pending", "escalated"].includes(o.status)).length;
