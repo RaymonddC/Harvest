@@ -187,20 +187,27 @@ def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool)
         raise ServiceError("Offer not found.")
     if offer["status"] not in ("pending", "escalated"):
         raise ServiceError(f"Offer is already {offer['status']}.")
+    changes = {}
     if approve:
+        # An escalated offer is approved at the price the farmer asked for, not the ceiling
+        # the agent quoted, so the limits must cover that request.
+        escalated = offer["status"] == "escalated" and offer.get("requested_price") is not None
+        price = offer["requested_price"] if escalated else offer["price_per_kg"]
         limits = get_limits(store, offer["crop"])
-        if not limits.within(offer["price_per_kg"]):
+        if not limits.within(price):
             raise ServiceError("Price is outside the current floor and ceiling. "
                                "Raise the limits first, or reject the offer.")
+        if escalated:
+            changes = {"price_per_kg": price, "quoted_price": offer["price_per_kg"]}
     status = "approved" if approve else "rejected"
-    store.set("offers", offer_id, {"status": status, "decided_at": now_iso(),
+    store.set("offers", offer_id, {**changes, "status": status, "decided_at": now_iso(),
                                    "decided_by": settings.planner_name}, merge=True)
     recompute_forecast(store, settings)
     if approve:
         farmer = store.get("farmers", offer["farmer_id"])
         if farmer:
             queue_call(store, farmer, kind="confirm", offer_id=offer_id)
-    return {**offer, "status": status}
+    return {**offer, **changes, "status": status}
 
 
 def undo_offer(store: Store, settings: Settings, offer_id: str) -> dict:
@@ -219,9 +226,12 @@ def undo_offer(store: Store, settings: Settings, offer_id: str) -> dict:
         if c["status"] == "queued":
             store.delete("calls", c["id"])
     back = "escalated" if (offer.get("negotiation") or {}).get("escalated") else "pending"
-    store.set("offers", offer_id, {"status": back, "decided_at": None, "decided_by": None}, merge=True)
+    changes = {"status": back, "decided_at": None, "decided_by": None}
+    if back == "escalated" and offer.get("quoted_price") is not None:
+        changes.update(price_per_kg=offer["quoted_price"], quoted_price=None)
+    store.set("offers", offer_id, changes, merge=True)
     recompute_forecast(store, settings)
-    return {**offer, "status": back}
+    return {**offer, **changes}
 
 
 def offer_from_rival_quote(store: Store, settings: Settings, quote_id: str) -> dict:

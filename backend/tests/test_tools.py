@@ -92,6 +92,31 @@ def test_escalation_records_request_without_pending_offer(store, settings):
     assert ok["status"] == "pending"
 
 
+def test_escalated_offer_needs_limits_that_cover_the_request(store, settings):
+    h, _ = make(store, settings, farmer_id="b002", kind="gap_fill")
+    h.dispatch("check_offer", {"crop": "palm", "kg": 1600})
+    h.dispatch("check_offer", {"crop": "palm", "kg": 1600, "farmer_counter_price": 3600})
+    h.dispatch("save_offer", {"crop": "palm", "kg": 1600, "price_per_kg": 3600, "escalate": True})
+    offer = store.list("offers")[0]
+    # The stored price is the ceiling, but the farmer asked for 3,600, so approval is refused.
+    with pytest.raises(services.ServiceError, match="outside the current floor and ceiling"):
+        services.decide_offer(store, settings, offer["id"], approve=True)
+    assert store.get("offers", offer["id"])["status"] == "escalated"
+
+    old = store.get("limits", "palm")
+    services.set_limits(store, "palm", floor=old["floor_price"], ceiling=3600,
+                        reference=old["reference_price"])
+    approved = services.decide_offer(store, settings, offer["id"], approve=True)
+    saved = store.get("offers", offer["id"])
+    assert approved["price_per_kg"] == 3600
+    assert saved["status"] == "approved" and saved["price_per_kg"] == 3600 and saved["quoted_price"] == 3350
+
+    # Undo puts it back to escalated at the quoted ceiling.
+    services.undo_offer(store, settings, offer["id"])
+    saved = store.get("offers", offer["id"])
+    assert saved["status"] == "escalated" and saved["price_per_kg"] == 3350 and saved["requested_price"] == 3600
+
+
 def test_no_offers_without_gap_or_on_confirm_calls(store, settings):
     h, _ = make(store, settings, gap_week=None)
     assert "error" in h.dispatch("check_offer", {"crop": "palm", "kg": 100})
