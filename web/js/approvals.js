@@ -1,4 +1,4 @@
-import { act, api, el, fmtT, mountShell, pill, plainPrice, subscribe } from "./data.js";
+import { act, api, avatar, el, fmtT, mountShell, pill, plainPrice, subscribe } from "./data.js";
 
 const $ = (id) => document.getElementById(id);
 const shell = mountShell("approvals");
@@ -49,7 +49,7 @@ function render() {
     const awaiting = state.calls.filter((c) => c.kind === "confirm" && c.status === "queued").length;
     $("meter-done").replaceChildren(...(remaining < 50 && original > 0 ? [el("div", { class: "meter-done" },
       el("span", {}, `Week ${week} gap closed. ${awaiting ? "Confirmation calls are ready to go out." : "Confirmations are done."}`),
-      el("a", { class: "btn solid", href: "call.html", target: "_blank", rel: "noopener" }, "Hear a confirmation call"))]
+      el("a", { class: "btn leaf", href: "call.html", target: "_blank", rel: "noopener" }, "Hear a confirmation call"))]
       : !row.is_gap && closed > 0 ? [el("p", { class: "sub" }, `Week ${week} is no longer flagged as a gap. ${fmtT(remaining)} t is still below the target.`)] : []));
   } else {
     $("meter-card").hidden = true;
@@ -62,7 +62,9 @@ function render() {
   const quotes = state.rival_quotes.filter((q) => !state.offers.some((o) => o.source === `rival_quote:${q.id}` && ["pending", "approved"].includes(o.status)));
   const rows = offers.map((o) => {
     const l = limits[o.crop];
-    const inLimits = l && o.price_per_kg >= l.floor_price && o.price_per_kg <= l.ceiling_price;
+    // An escalated offer is approved at the farmer's requested price, so that is what must fit.
+    const price = o.status === "escalated" && o.requested_price != null ? o.requested_price : o.price_per_kg;
+    const inLimits = l && price >= l.floor_price && price <= l.ceiling_price;
     const cur = o.currency || "IDR";
     let acts;
     if (o.status === "pending" || o.status === "escalated") {
@@ -80,7 +82,7 @@ function render() {
       ];
     }
     return el("div", { class: `offer is-${o.status}` },
-      el("div", { class: "who" }, el("b", {}, o.farmer_name), el("span", {}, detail(o))),
+      el("div", { class: "who" }, avatar(o.farmer_name, o.kind === "supplier" ? "ink" : ""), el("div", {}, el("b", {}, o.farmer_name), el("span", {}, detail(o)))),
       el("div", { class: "fig" }, el("span", {}, "Volume"), el("b", { class: "num" }, `${(o.kg / 1000).toFixed(1)} t`)),
       el("div", { class: "fig" }, el("span", {}, `Price, ${cur}/kg`), el("b", { class: "num" }, plainPrice(o.price_per_kg, cur))),
       el("div", { class: "acts" }, acts),
@@ -88,7 +90,7 @@ function render() {
   });
   for (const q of quotes) {
     rows.push(el("div", { class: "offer" },
-      el("div", { class: "who" }, el("b", {}, q.supplier_name), el("span", {}, `Logged quote for week ${q.deliver_week}, not used yet`)),
+      el("div", { class: "who" }, avatar(q.supplier_name, "ink"), el("div", {}, el("b", {}, q.supplier_name), el("span", {}, `Logged quote for week ${q.deliver_week}, not used yet`))),
       el("div", { class: "fig" }, el("span", {}, "Volume"), el("b", { class: "num" }, `${(q.kg / 1000).toFixed(1)} t`)),
       el("div", { class: "fig" }, el("span", {}, `Price, ${q.currency || "IDR"}/kg`), el("b", { class: "num" }, plainPrice(q.price_per_kg, q.currency || "IDR"))),
       el("div", { class: "acts" }, el("button", { class: "btn", onclick: () => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added as a pending offer.") }, "Add as offer"))));

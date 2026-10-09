@@ -1,4 +1,4 @@
-import { act, api, apiUrl, callChip, cfg, cropLabel, el, fmtPrice, fmtT, KIND_WORD, mountShell, pill, subscribe } from "./data.js";
+import { act, api, apiUrl, avatar, callChip, cfg, cropLabel, el, fmtPrice, fmtT, icon, KIND_WORD, mountShell, pill, subscribe } from "./data.js";
 
 const $ = (id) => document.getElementById(id);
 const shell = mountShell("forecast");
@@ -66,11 +66,11 @@ function renderChart(rows) {
   $("legend-target").textContent = `Target ${fmtT(target)} t`;
   const max = Math.max(target * 1.15, ...rows.map((r) => r.expected_kg + r.pending_kg));
   const pct = (kg) => `${(kg / max) * 100}%`;
-  const line = el("div", { class: "target" });
+  const line = el("div", { class: "target", "data-label": `Target ${fmtT(target)} t` });
   line.style.bottom = pct(target);
   const bars = el("div", { class: "bars" }, rows.map((r) => {
-    const col = el("div", { class: "col" });
-    col.append(el("div", { class: "val num" }, el("span", {}, r.is_gap ? `${fmtT(r.expected_kg)} · gap` : fmtT(r.expected_kg)),
+    const col = el("div", { class: `col ${r.is_gap ? "is-gap" : ""}` });
+    col.append(el("div", { class: "val num" }, el("span", {}, r.is_gap ? `${fmtT(r.expected_kg)} · ${fmtT(r.gap_kg)} t short` : fmtT(r.expected_kg)),
       r.pending_kg ? el("small", {}, el("span", {}, `+${fmtT(r.pending_kg)} pending`)) : null));
     if (r.pending_kg) {
       const p = el("div", { class: "pend", title: `${fmtT(r.pending_kg)} t waiting for approval` });
@@ -107,7 +107,8 @@ function renderNote(rows) {
   }
   const text = polishedNote ? polishedNote.gap_note : gap.note;
   const by = polishedNote && polishedNote.gap_note_by === "gemini" ? "Note drafted by Gemini." : "Note built from today's call answers.";
-  box.replaceChildren(el("strong", {}, `Why week ${gap.week} is short: `), text, " ", el("span", { class: "muted" }, by));
+  box.replaceChildren(el("span", { class: "spark" }, icon("spark", 15)),
+    el("div", {}, el("strong", { style: "display:block" }, `Why week ${gap.week} is short`), text, " ", el("span", { class: "muted" }, by)));
 }
 
 function renderGap(rows) {
@@ -131,23 +132,24 @@ function renderGap(rows) {
   const top = list.slice(0, 3);
   const rest = list.slice(3);
   $("gap-card").replaceChildren(
-    el("div", { class: "eyebrow" }, "Gap alert"),
-    el("h2", { class: "serif", style: "font-size:26px" }, `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short`),
+    el("span", { class: "eyebrow" }, `Gap alert · week ${gap.week}`),
+    el("h2", { style: "font-size:22px" }, `${fmtT(gap.gap_kg)} t to fill`),
     el("p", {}, text),
     list.length || quotes.length ? el("div", { class: "list-card" },
-      top.map((p) => el("div", { class: "li" }, el("span", {}, `${p.name}${p.village ? ` · ${p.village}` : ""}`), el("strong", {}, `${fmtT(p.kg)} t`))),
-      rest.length ? el("div", { class: "li muted" }, el("span", {}, `${rest.length} more farmer${rest.length > 1 ? "s" : ""}`),
-        el("strong", { style: "color:var(--ink)" }, `${fmtT(rest.reduce((s, p) => s + p.kg, 0))} t`)) : null,
-      quotes.map((q) => el("div", { class: "li sep" },
-        el("span", {}, `${q.supplier_name}, logged quote ${fmtPrice(q.price_per_kg, q.currency || "IDR")}`),
+      top.map((p) => el("div", { class: "li" }, avatar(p.name, "sm"), el("span", {}, `${p.name}${p.village ? ` · ${p.village}` : ""}`), el("strong", {}, `${fmtT(p.kg)} t`))),
+      rest.length ? el("div", { class: "li" }, el("span", { class: "avatar sm grey", "aria-hidden": "true" }, `+${rest.length}`),
+        el("span", { class: "muted" }, `${rest.length} more farmer${rest.length > 1 ? "s" : ""}`),
+        el("strong", {}, `${fmtT(rest.reduce((s, p) => s + p.kg, 0))} t`)) : null,
+      quotes.map((q) => el("div", { class: "li sep" }, avatar(q.supplier_name, "sm ink"),
+        el("span", {}, `${q.supplier_name}, quote ${fmtPrice(q.price_per_kg, q.currency || "IDR")}`),
         el("span", { style: "display:flex;gap:8px;align-items:center" },
           used(q) ? pill("Offer added", "mint")
-            : el("button", { class: "btn", style: "min-height:36px;padding:0 10px;font-size:13px",
+            : el("button", { class: "btn sm",
               onclick: () => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added to approvals.") }, "Add as offer"),
           el("strong", {}, `${fmtT(q.kg)} t`))))) : null,
-    el("button", { class: "btn solid big block", disabled: !list.length && !state.farmers.some((f) => f.type === "supplier"),
+    el("button", { class: "btn leaf big block", disabled: !list.length && !state.farmers.some((f) => f.type === "supplier"),
       onclick: () => act(() => api("/api/campaign/start", { body: { kind: "gap_fill" } }),
-        (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`) }, "Start gap-fill calls"),
+        (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`) }, icon("phone", 16), "Start gap-fill calls"),
   );
 }
 
@@ -159,12 +161,13 @@ function renderCalls() {
   const row = (c) => {
     const chip = callChip(c);
     const label = c.kind === "collect" ? c.farmer_name : `${c.farmer_name} · ${KIND_WORD[c.kind].replace(" call", "")}`;
+    const av = avatar(c.farmer_name, `sm ${c.status === "on_call" ? "" : "grey"}`);
     return c.status === "on_call"
-      ? el("div", { class: "row" }, el("span", { class: "name" }, label), pill(chip.text, chip.cls))
-      : el("button", { class: "row", onclick: () => showCall(c) }, el("span", { class: "name" }, label), pill(chip.text, chip.cls));
+      ? el("div", { class: "row" }, av, el("span", { class: "name" }, label), pill(chip.text, chip.cls))
+      : el("button", { class: "row", onclick: () => showCall(c) }, av, el("span", { class: "name" }, label), pill(chip.text, chip.cls));
   };
   const items = [...onCall.map(row), ...finished.map(row)];
-  if (queued.length) items.push(el("div", { class: "row" }, el("span", { class: "name" },
+  if (queued.length) items.push(el("div", { class: "row" }, el("span", { class: "avatar sm grey", "aria-hidden": "true" }, String(queued.length)), el("span", { class: "name" },
     queued.length === 1 ? queued[0].farmer_name : `${queued.length} farmers`), pill("Queued")));
   $("calls").replaceChildren(...(items.length ? items
     : [el("p", { class: "muted" }, "No calls yet. Start the campaign on the Setup page.")]));

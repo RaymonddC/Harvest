@@ -62,3 +62,29 @@
 .btn.end:hover { background: #941f18; color: #fff; }
 .deal .serif { font-size: 18px; font-weight: 700; }
 .summary-box { background: var(--ink-2); border-radius: 12px; padding: 14px; font-size: 15px; }
+
+/* ---------- design A skin for the call client (10 Oct) ---------- */
+.call-page { background: #0E1512; }
+.call-page .ai-badge { background: rgba(47, 191, 127, 0.14); color: #7FE0B4; }
+.caller { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; }
+.call-page .mint-text { color: #B9C2BD; }
+.incoming li { background: #1C2722; border-radius: 14px; }
+.stages li::before { background: #26332D; }
+.stages li.done::before { background: #2FBF7F; }
+.stages li.now::before { background: #F5C766; }
+.call-page .bubble.agent { background: var(--leaf); color: #FFFFFF; align-self: flex-end; border-radius: 14px 14px 4px 14px; }
+.call-page .bubble.agent .who, .call-page .bubble.agent .tr { color: #CDEBDD; }
+.call-page .bubble.farmer { background: #1C2722; color: #FFFFFF; border: 0; align-self: flex-start; border-radius: 14px 14px 14px 4px; }
+.call-page .bubble.farmer .who { color: #7FE0B4; }
+.call-page .bubble.farmer .tr { color: #9AA59F; }
+.panel { border-radius: 16px; }
+.panel .title { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 800; }
+.track .base { background: var(--line-2); }
+.track .band { background: var(--leaf-mid); }
+.controls .btn { border-radius: 14px; }
+.btn.outline-mint { border-color: #26332D; background: #1C2722; color: #FFFFFF; }
+.btn.outline-mint:hover, .btn.outline-mint[aria-pressed="true"] { background: #26332D; }
+.btn.end { background: #E5484D; border-color: #E5484D; }
+.btn.end:hover { background: #C93C40; }
+.summary-box { background: #1C2722; border-radius: 14px; }
+.back-link { color: #7FE0B4; }

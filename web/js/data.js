@@ -187,24 +187,65 @@ function askToken() {
   d.showModal();
 }
 
-// Shared header: brand, three pages, workspace and planner. Returns update(state).
+// Two-letter initials for avatar chips: "Pak Rahmat" -> "PR", "Rival supplier" -> "RS".
+export function initials(name = "") {
+  const words = name.replace(/[^\p{L}\s]/gu, " ").trim().split(/\s+/).filter(Boolean);
+  return ((words[0] || "?")[0] + (words.length > 1 ? words[words.length - 1][0] : "")).toUpperCase();
+}
+export const avatar = (name, cls = "") => el("span", { class: `avatar ${cls}`.trim(), "aria-hidden": "true" }, initials(name));
+
+// Inline stroke icons, so the pages need no icon font.
+const ICON_PATHS = {
+  leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+  setup: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  forecast: '<path d="M3 3v18h18"/><path d="M7 16v-5"/><path d="M12 16V8"/><path d="M17 16v-9"/>',
+  approvals: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  spark: '<path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+};
+export function icon(name, size = 18) {
+  const span = el("span", { class: "icon", "aria-hidden": "true", style: "display:inline-grid;place-items:center" });
+  span.innerHTML = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[name] || ""}</svg>`;
+  return span;
+}
+
+// Shared frame: sidebar (brand, workspace, pages, planner) and a top bar that takes the
+// page's .page-head. Returns update(state) and status(s).
 export function mountShell(active) {
   const pages = [["setup", "setup.html", "Setup"], ["forecast", "index.html", "Live forecast"], ["approvals", "approvals.html", "Approvals"]];
   const links = {};
+  const count = el("span", { class: "count", hidden: true });
   const nav = el("nav", { "aria-label": "Planner pages" }, pages.map(([key, href, label]) => {
-    links[key] = el("a", { href, "aria-current": key === active ? "page" : null }, label);
+    links[key] = el("a", { href, "aria-current": key === active ? "page" : null }, icon(key), el("span", { class: "label" }, label),
+      key === "approvals" ? count : null);
     return links[key];
   }));
-  const header = el("header", { class: "site-header" }, el("div", { class: "inner" },
-    el("a", { class: "brand", href: "index.html" }, "Harvest-Call"), nav,
-    el("span", { class: "who" }, `${cfg.millName} · Planner: ${cfg.plannerName}`)));
-  document.body.prepend(header);
+  const side = el("aside", { class: "side" },
+    el("a", { class: "brand", href: "index.html" }, el("span", { class: "mark" }, icon("leaf", 18)), "Harvest-Call"),
+    el("div", { class: "workspace-card" }, el("span", {}, "Workspace"), el("b", {}, cfg.millName)),
+    nav,
+    el("div", { class: "spacer" }),
+    el("div", { class: "planner" }, avatar(cfg.plannerName, "ink"),
+      el("div", {}, el("b", {}, cfg.plannerName), el("span", {}, "Supply planner"))));
+
+  const main = document.querySelector("main");
+  const head = main?.querySelector(".page-head");
+  const workspace = el("div", { class: "workspace" });
+  if (head) workspace.append(el("div", { class: "topbar" }, head));
+  document.body.classList.add("app");
+  document.body.prepend(side, workspace);
+  if (main) workspace.append(main);
+
   const banner = el("div", { class: "banner", hidden: true, role: "status" });
-  document.querySelector("main")?.prepend(banner);
+  main?.prepend(banner);
   return {
     update(state) {
       const n = state.offers.filter((o) => ["pending", "escalated"].includes(o.status)).length;
-      links.approvals.textContent = n ? `Approvals · ${n} pending` : "Approvals";
+      count.hidden = !n;
+      count.textContent = String(n);
+      links.approvals.setAttribute("aria-label", n ? `Approvals, ${n} waiting` : "Approvals");
     },
     status(s) {
       banner.hidden = s === "live";
