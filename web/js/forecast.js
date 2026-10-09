@@ -5,29 +5,9 @@ const shell = mountShell("forecast");
 let state = null;
 let noteKey = "";
 let polishedNote = null;
-let chartEls = null; // the drawn chart, kept so updates animate in place
+let chartEls = null; // the drawn chart, kept so updates move bars instead of redrawing them
 let gapWasOpen = false;
-const calm = matchMedia("(prefers-reduced-motion: reduce)");
 const okDefault = [...$("ok-card").childNodes];
-
-// Count a number from its old value to the new one; the final text is always exact.
-function countTo(node, from, to, format) {
-  node.format = format; // the latest label wording, used by a count already running
-  if (from === to && node.counting) return; // a running count already ends on this value
-  node.textContent = format(to);
-  if (calm.matches || document.hidden || from === to) return;
-  const start = performance.now();
-  const run = node.counting = {};
-  const step = (now) => {
-    if (node.counting !== run) return;
-    const t = Math.min((now - start) / 700, 1);
-    if (t === 1) node.counting = null;
-    node.textContent = node.format(from + (to - from) * (1 - (1 - t) ** 3));
-    if (t < 1) requestAnimationFrame(step);
-  };
-  node.textContent = format(from);
-  requestAnimationFrame(step);
-}
 
 $("csv").href = apiUrl("/api/forecast.csv");
 $("call-log-open").onclick = () => { renderLog(); $("log-dialog").showModal(); };
@@ -90,8 +70,8 @@ function renderChart(rows) {
   $("legend-target").textContent = `Target ${fmtT(target)} t`;
   const max = Math.max(target * 1.15, ...rows.map((r) => r.expected_kg + r.pending_kg));
   const pct = (kg) => `${(kg / max) * 100}%`;
-  // The chart is built once per set of weeks and then updated in place, so heights,
-  // colours and numbers move from their old values and the planner sees what a call changed.
+  // Built once per set of weeks: the bars grow up from the axis on first draw, and later
+  // updates only slide each bar to its new height.
   const key = rows.map((r) => r.week).join(",");
   if (!chartEls || chartEls.key !== key || !area.contains(chartEls.chart)) {
     const cols = {};
@@ -108,8 +88,10 @@ function renderChart(rows) {
       return cols[r.week].label = el("span", {}, r.label,
         el("small", {}, d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })));
     }));
-    chartEls = { key, cols, line, chart: el("div", { class: "chart", role: "img" }, line, bars) };
+    chartEls = { key, cols, line, chart: el("div", { class: "chart enter", role: "img" }, line, bars) };
     area.replaceChildren(chartEls.chart, labels);
+    void area.offsetHeight; // start every bar at zero so the first heights grow from the axis
+    setTimeout(() => chartEls && chartEls.chart.classList.remove("enter"), 1200);
   }
   const { cols, line, chart } = chartEls;
   line.dataset.label = `Target ${fmtT(target)} t`;
@@ -117,7 +99,6 @@ function renderChart(rows) {
   chart.setAttribute("aria-label", rows.map((r) => `${r.label} ${fmtT(r.expected_kg)} tonnes${r.is_gap ? ", gap" : ""}`).join("; "));
   for (const r of rows) {
     const c = cols[r.week];
-    const before = c.shown;
     c.col.classList.toggle("is-gap", r.is_gap);
     c.label.className = r.is_gap ? "gap" : "";
     c.bar.classList.toggle("gap", r.is_gap);
@@ -127,14 +108,7 @@ function renderChart(rows) {
     c.pend.title = `${fmtT(r.pending_kg)} t waiting for approval`;
     c.small.hidden = !r.pending_kg;
     c.small.firstChild.textContent = `+${fmtT(r.pending_kg)} pending`;
-    const fmt = (kg) => (r.is_gap ? `${fmtT(kg)} · ${fmtT(r.gap_kg)} t short` : fmtT(kg));
-    countTo(c.value, before ? before.expected : r.expected_kg, r.expected_kg, fmt);
-    if (before && (before.expected !== r.expected_kg || before.pending !== r.pending_kg || before.gap !== r.is_gap)) {
-      c.col.classList.remove("bump");
-      void c.col.offsetWidth; // restart the ring animation
-      c.col.classList.add("bump");
-    }
-    c.shown = { expected: r.expected_kg, pending: r.pending_kg, gap: r.is_gap };
+    c.value.textContent = r.is_gap ? `${fmtT(r.expected_kg)} · ${fmtT(r.gap_kg)} t short` : fmtT(r.expected_kg);
   }
 }
 
