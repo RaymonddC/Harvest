@@ -85,7 +85,9 @@ gcloud config set project $PROJECT
 
 3. **Add Firebase to the project.** In https://console.firebase.google.com choose
    *Add project* and pick the existing Google Cloud project, or run
-   `npx firebase-tools projects:addfirebase $PROJECT`. Hosting needs this.
+   `gcloud services enable firebase.googleapis.com cloudresourcemanager.googleapis.com`, wait a
+   minute, then `npx firebase-tools projects:addfirebase $PROJECT`. Hosting needs this. Without the
+   API enabled the command fails with `403 Firebase Management API has not been used`.
 
 4. **Store the Gemini API key:**
    ```bash

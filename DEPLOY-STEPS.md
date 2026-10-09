@@ -52,7 +52,8 @@ gcloud config set project $PROJECT
 **B3. Turn on the services and create the database.**
 ```bash
 gcloud services enable run.googleapis.com firestore.googleapis.com secretmanager.googleapis.com \
-  cloudbuild.googleapis.com artifactregistry.googleapis.com logging.googleapis.com
+  cloudbuild.googleapis.com artifactregistry.googleapis.com logging.googleapis.com \
+  firebase.googleapis.com cloudresourcemanager.googleapis.com
 gcloud firestore databases create --location=$REGION --type=firestore-native
 ```
 If it says the database already exists, that is fine.
@@ -69,7 +70,8 @@ If `firebase: command not found` appears later, run `export PATH=$PATH:$(npm pre
 ```bash
 firebase projects:addfirebase $PROJECT
 ```
-If it says the project already has Firebase, that is fine.
+If it says the project already has Firebase, that is fine. If it fails with `403 ... Firebase Management
+API has not been used`, the API from B3 is not active yet: wait a minute and run it again.
 
 **B6. Save the Gemini key in Secret Manager.**
 ```bash
@@ -170,6 +172,7 @@ To remove everything, delete the project in the console (*IAM and admin, Setting
 | `billing account ... not found` or Cloud Run API cannot be enabled | Billing is not linked to the project (A3). |
 | `PERMISSION_DENIED` from `gcloud` | Make sure you are signed in as the account that owns the project: `gcloud auth list`. |
 | `firebase: command not found` | `export PATH=$PATH:$(npm prefix -g)/bin` |
+| `addfirebase` fails with `403 Firebase Management API has not been used` | `gcloud services enable firebase.googleapis.com cloudresourcemanager.googleapis.com`, wait a minute, run B5 again. |
 | Firebase says the project is not a Firebase project | Run B5 again. |
 | Health check returns an error, or the logs mention Firestore permissions | Run B7 again. |
 | Voice call fails straight away | The secret is missing or the key is wrong (B6). Check `gcloud run services logs read harvest-gateway --region $REGION --limit 50`. |
