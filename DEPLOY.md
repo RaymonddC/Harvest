@@ -288,7 +288,7 @@ workflow's `env:` block, as `deploy.sh` already reads them.
 | `firebase deploy` fails with 403 in CI | The deployer lacks `roles/firebasehosting.admin` or `roles/firebaserules.admin`. |
 | Actions fail with 401, or the login page keeps reappearing | The session expired or `JWT_SECRET` changed or differs between instances. Pick the role again; set one `JWT_SECRET` for the service. |
 | Buttons say "You are signed in as a viewer" | Use *Switch role* in the header and pick Planner. |
-| Dashboard shows old data after redeploy | Hosting caches; `config.js` is set to `no-cache` in `firebase.json`, but hard refresh once. |
+| Dashboard shows old pages or no role picker after a redeploy | Browsers cache. Pages, scripts and styles are served with `no-cache` (see `firebase.json`), but a copy fetched before that setting existed can stay for up to an hour: hard refresh (Ctrl+Shift+R) once. |
 | The gateway has the wrong settings after a redeploy | The run used different env values than the last one. Re-run with the full set. |
 
 ## 10. Security notes
