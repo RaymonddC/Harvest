@@ -29,11 +29,18 @@ TWILIO_AUTH_TOKEN="${TWILIO_AUTH_TOKEN:-}"
 TWILIO_FROM_NUMBER="${TWILIO_FROM_NUMBER:-}"
 REAL_CALLS_ENABLED="${REAL_CALLS_ENABLED:-false}"
 REAL_CALL_ALLOWLIST="${REAL_CALL_ALLOWLIST:-}"
+# Seeding wipes every Firestore collection and reloads the demo data. Leave it on for the first
+# deploy, turn it off (SEED_DEMO_DATA=false) for every redeploy and in CI so live data survives.
+SEED_DEMO_DATA="${SEED_DEMO_DATA:-true}"
+# One-time API enablement needs more permission than a deploy; CI sets SKIP_API_ENABLE=true.
+SKIP_API_ENABLE="${SKIP_API_ENABLE:-false}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 gcloud config set project "$PROJECT" >/dev/null
-gcloud services enable run.googleapis.com firestore.googleapis.com secretmanager.googleapis.com \
-  cloudbuild.googleapis.com artifactregistry.googleapis.com logging.googleapis.com
+if [[ "$SKIP_API_ENABLE" != "true" ]]; then
+  gcloud services enable run.googleapis.com firestore.googleapis.com secretmanager.googleapis.com \
+    cloudbuild.googleapis.com artifactregistry.googleapis.com logging.googleapis.com
+fi
 
 # "^@^" switches gcloud's list delimiter to @, because the Firebase config JSON contains commas.
 ENV_VARS="^@^STORE_BACKEND=firestore@GOOGLE_CLOUD_PROJECT=$PROJECT@SEED_ON_START=false"
@@ -55,7 +62,7 @@ echo "Gateway: $URL"
 
 if [[ -n "$TWILIO_ACCOUNT_SID" && -n "$TWILIO_AUTH_TOKEN" && -n "$TWILIO_FROM_NUMBER" ]]; then
   echo "Wiring up the Twilio channel (PUBLIC_BASE_URL=$URL, REAL_CALLS_ENABLED=$REAL_CALLS_ENABLED)..."
-  gcloud run services update "$SERVICE" --region "$REGION" --set-env-vars \
+  gcloud run services update "$SERVICE" --region "$REGION" --update-env-vars \
     "^@^PUBLIC_BASE_URL=$URL@TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID@TWILIO_FROM_NUMBER=$TWILIO_FROM_NUMBER@REAL_CALLS_ENABLED=$REAL_CALLS_ENABLED@REAL_CALL_ALLOWLIST=$REAL_CALL_ALLOWLIST" \
     --set-secrets TWILIO_AUTH_TOKEN=twilio-auth-token:latest
 fi
@@ -76,6 +83,10 @@ JS
 
 (cd "$ROOT" && firebase deploy --only hosting,firestore:rules --project "$PROJECT")
 
-echo "Seeding demo data..."
-curl -fsS -X POST "$URL/api/demo/reset" ${PLANNER_TOKEN:+-H "X-Planner-Token: $PLANNER_TOKEN"} >/dev/null
+if [[ "$SEED_DEMO_DATA" == "true" ]]; then
+  echo "Seeding demo data (this replaces everything in Firestore)..."
+  curl -fsS -X POST "$URL/api/demo/reset" ${PLANNER_TOKEN:+-H "X-Planner-Token: $PLANNER_TOKEN"} >/dev/null
+else
+  echo "Skipping demo data (SEED_DEMO_DATA=false)."
+fi
 echo "Done. Dashboard: https://$PROJECT.web.app/setup.html  Call client: https://$PROJECT.web.app/call.html"

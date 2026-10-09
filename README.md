@@ -62,6 +62,9 @@ retried once.
 
 ## Deploy
 
+Full guide (one-time setup, local setup for a friend, automatic deploys on push to `main`):
+[DEPLOY.md](DEPLOY.md). The short version:
+
 ```bash
 gcloud secrets create gemini-api-key --data-file=- <<< "$GOOGLE_API_KEY"
 cp .firebaserc.example .firebaserc   # set your project id
