@@ -5,6 +5,29 @@ const shell = mountShell("forecast");
 let state = null;
 let noteKey = "";
 let polishedNote = null;
+let chartEls = null; // the drawn chart, kept so updates animate in place
+let gapWasOpen = false;
+const calm = matchMedia("(prefers-reduced-motion: reduce)");
+const okDefault = [...$("ok-card").childNodes];
+
+// Count a number from its old value to the new one; the final text is always exact.
+function countTo(node, from, to, format) {
+  node.format = format; // the latest label wording, used by a count already running
+  if (from === to && node.counting) return; // a running count already ends on this value
+  node.textContent = format(to);
+  if (calm.matches || document.hidden || from === to) return;
+  const start = performance.now();
+  const run = node.counting = {};
+  const step = (now) => {
+    if (node.counting !== run) return;
+    const t = Math.min((now - start) / 700, 1);
+    if (t === 1) node.counting = null;
+    node.textContent = node.format(from + (to - from) * (1 - (1 - t) ** 3));
+    if (t < 1) requestAnimationFrame(step);
+  };
+  node.textContent = format(from);
+  requestAnimationFrame(step);
+}
 
 $("csv").href = apiUrl("/api/forecast.csv");
 $("call-log-open").onclick = () => { renderLog(); $("log-dialog").showModal(); };
@@ -58,6 +81,7 @@ function renderKpis(rows) {
 function renderChart(rows) {
   const area = $("chart-area");
   if (!rows.length) {
+    chartEls = null;
     area.replaceChildren(el("div", { class: "empty" }, el("p", {}, "No forecast yet. Start a call campaign to collect harvest answers."),
       el("a", { class: "btn", href: "setup.html" }, "Go to setup")));
     return;
@@ -66,30 +90,52 @@ function renderChart(rows) {
   $("legend-target").textContent = `Target ${fmtT(target)} t`;
   const max = Math.max(target * 1.15, ...rows.map((r) => r.expected_kg + r.pending_kg));
   const pct = (kg) => `${(kg / max) * 100}%`;
-  const line = el("div", { class: "target", "data-label": `Target ${fmtT(target)} t` });
+  // The chart is built once per set of weeks and then updated in place, so heights,
+  // colours and numbers move from their old values and the planner sees what a call changed.
+  const key = rows.map((r) => r.week).join(",");
+  if (!chartEls || chartEls.key !== key || !area.contains(chartEls.chart)) {
+    const cols = {};
+    const line = el("div", { class: "target" });
+    const bars = el("div", { class: "bars" }, rows.map((r) => {
+      const c = { value: el("span", {}), small: el("small", {}, el("span", {})), bar: el("div", { class: "bar" }),
+        pend: el("div", { class: "pend" }) };
+      c.col = el("div", { class: "col" }, el("div", { class: "val num" }, c.value, c.small), c.pend, c.bar);
+      cols[r.week] = c;
+      return c.col;
+    }));
+    const labels = el("div", { class: "xlabels", "aria-hidden": "true" }, rows.map((r) => {
+      const d = new Date(r.week_start + "T00:00:00");
+      return cols[r.week].label = el("span", {}, r.label,
+        el("small", {}, d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })));
+    }));
+    chartEls = { key, cols, line, chart: el("div", { class: "chart", role: "img" }, line, bars) };
+    area.replaceChildren(chartEls.chart, labels);
+  }
+  const { cols, line, chart } = chartEls;
+  line.dataset.label = `Target ${fmtT(target)} t`;
   line.style.bottom = pct(target);
-  const bars = el("div", { class: "bars" }, rows.map((r) => {
-    const col = el("div", { class: `col ${r.is_gap ? "is-gap" : ""}` });
-    col.append(el("div", { class: "val num" }, el("span", {}, r.is_gap ? `${fmtT(r.expected_kg)} · ${fmtT(r.gap_kg)} t short` : fmtT(r.expected_kg)),
-      r.pending_kg ? el("small", {}, el("span", {}, `+${fmtT(r.pending_kg)} pending`)) : null));
-    if (r.pending_kg) {
-      const p = el("div", { class: "pend", title: `${fmtT(r.pending_kg)} t waiting for approval` });
-      p.style.height = pct(r.pending_kg);
-      col.append(p);
+  chart.setAttribute("aria-label", rows.map((r) => `${r.label} ${fmtT(r.expected_kg)} tonnes${r.is_gap ? ", gap" : ""}`).join("; "));
+  for (const r of rows) {
+    const c = cols[r.week];
+    const before = c.shown;
+    c.col.classList.toggle("is-gap", r.is_gap);
+    c.label.className = r.is_gap ? "gap" : "";
+    c.bar.classList.toggle("gap", r.is_gap);
+    c.bar.style.height = pct(r.expected_kg);
+    c.pend.hidden = !r.pending_kg;
+    c.pend.style.height = pct(r.pending_kg);
+    c.pend.title = `${fmtT(r.pending_kg)} t waiting for approval`;
+    c.small.hidden = !r.pending_kg;
+    c.small.firstChild.textContent = `+${fmtT(r.pending_kg)} pending`;
+    const fmt = (kg) => (r.is_gap ? `${fmtT(kg)} · ${fmtT(r.gap_kg)} t short` : fmtT(kg));
+    countTo(c.value, before ? before.expected : r.expected_kg, r.expected_kg, fmt);
+    if (before && (before.expected !== r.expected_kg || before.pending !== r.pending_kg || before.gap !== r.is_gap)) {
+      c.col.classList.remove("bump");
+      void c.col.offsetWidth; // restart the ring animation
+      c.col.classList.add("bump");
     }
-    const bar = el("div", { class: `bar ${r.is_gap ? "gap" : ""}` });
-    bar.style.height = pct(r.expected_kg);
-    col.append(bar);
-    return col;
-  }));
-  const chart = el("div", { class: "chart", role: "img",
-    "aria-label": rows.map((r) => `${r.label} ${fmtT(r.expected_kg)} tonnes${r.is_gap ? ", gap" : ""}`).join("; ") }, line, bars);
-  const labels = el("div", { class: "xlabels", "aria-hidden": "true" }, rows.map((r) => {
-    const d = new Date(r.week_start + "T00:00:00");
-    return el("span", { class: r.is_gap ? "gap" : "" }, r.label,
-      el("small", {}, d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })));
-  }));
-  area.replaceChildren(chart, labels);
+    c.shown = { expected: r.expected_kg, pending: r.pending_kg, gap: r.is_gap };
+  }
 }
 
 function renderNote(rows) {
@@ -113,8 +159,25 @@ function renderNote(rows) {
 
 function renderGap(rows) {
   const gap = rows.find((r) => r.is_gap);
+  // No gap left while approved offers exist: those offers closed it.
+  const approved = state.offers.filter((o) => o.status === "approved" && o.deliver_week);
+  const coveredWeek = !gap && approved.length ? approved[approved.length - 1].deliver_week : null;
   $("gap-card").hidden = !gap;
-  $("ok-card").hidden = !!gap || !rows.length;
+  const ok = $("ok-card");
+  ok.hidden = !!gap || !rows.length;
+  const okKey = coveredWeek === null ? "" : String(coveredWeek);
+  if (ok.dataset.covered !== okKey) {
+    ok.dataset.covered = okKey;
+    ok.classList.toggle("covered", coveredWeek !== null);
+    // Celebrate only when the gap closed while this page was open.
+    ok.classList.toggle("pop", coveredWeek !== null && gapWasOpen);
+    ok.replaceChildren(...(coveredWeek === null ? okDefault.map((n) => n.cloneNode(true)) : [
+      el("span", { class: "covered-mark" }, icon("check", 22)),
+      el("div", { class: "eyebrow" }, "Gap closed"),
+      el("h2", { style: "font-size:22px" }, `Week ${coveredWeek} is covered`),
+      el("p", {}, "Approved offers filled the gap. Every week is now within the gap threshold of the target.")]));
+  }
+  gapWasOpen = !!gap;
   if (!gap) return;
   const list = gap.shortlist || [];
   const farmersKg = list.reduce((s, p) => s + p.kg, 0);

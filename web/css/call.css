@@ -88,3 +88,13 @@
 .btn.end:hover { background: #C93C40; }
 .summary-box { background: #1C2722; border-radius: 14px; }
 .back-link { color: #7FE0B4; }
+
+/* ---------- who is speaking ---------- */
+.voices { display: flex; gap: 10px; }
+.voice { flex: 1 1 0; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; border-radius: 12px; background: #1C2722; color: #9AA59F; font-size: 13px; font-weight: 700; transition: background-color .2s, color .2s; }
+.voice .eq { display: flex; align-items: center; gap: 3px; height: 22px; }
+.voice .eq i { display: block; width: 4px; height: 22px; border-radius: 2px; background: currentColor; transform: scaleY(.18); transition: transform .08s linear; }
+#voice-agent.on { background: rgba(22, 119, 78, .35); color: #7FE0B4; }
+#voice-you.on { background: rgba(245, 199, 102, .16); color: #F5C766; }
+.mic-hint { font-size: 13px; color: #F5C766; background: rgba(245, 199, 102, .1); border-radius: 10px; padding: 10px 12px; margin: 0; }
+.mic-hint[hidden] { display: none; }

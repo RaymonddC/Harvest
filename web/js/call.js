@@ -8,6 +8,7 @@ $("ai-badge-text").textContent = `AI agent calling for ${cfg.millName}`;
 
 let state = { calls: [], farmers: [] };
 let active = null; // the call in progress
+const calm = matchMedia("(prefers-reduced-motion: reduce)");
 
 function show(view) {
   for (const v of ["waiting", "call", "ended"]) $(`view-${v}`).hidden = v !== view;
@@ -76,7 +77,11 @@ async function answer(call) {
 
   capture.port.onmessage = (e) => {
     if (e.data.pcm && ws.readyState === WebSocket.OPEN && !active?.muted) ws.send(e.data.pcm);
+    if (e.data.level !== undefined) hearYou(e.data.level);
   };
+  $("mic-hint").hidden = true;
+  active.heardAt = 0;
+  active.voiceTimer = setInterval(showVoices, 80);
 
   ws.onmessage = (e) => {
     if (e.data instanceof ArrayBuffer) return play(e.data);
@@ -90,6 +95,35 @@ async function answer(call) {
     else if (msg.type === "ended") finish(msg);
   };
   ws.onclose = () => { if (active && !active.ended) finish({ status: "dropped", kind: call.kind }); };
+}
+
+// ---------- who is speaking: mic level for the farmer, playback for the agent ----------
+
+function hearYou(rms) {
+  if (!active) return;
+  // Speech RMS sits around 0.02-0.2; map it to 0..1 on a log-ish scale.
+  active.micLevel = active.muted ? 0 : Math.min(1, Math.max(0, (Math.log10(rms + 1e-4) + 3) / 2.2));
+  if (active.micLevel > 0.35) active.heardAt = Date.now();
+}
+
+function showVoices() {
+  if (!active) return;
+  const talking = active.playEnd > active.ctx.currentTime + 0.05;
+  const you = active.micLevel || 0;
+  const t = performance.now() / 1000;
+  const set = (id, on, level) => {
+    const box = $(id);
+    box.classList.toggle("on", on);
+    box.querySelectorAll("i").forEach((bar, k) => {
+      const wave = calm.matches ? [0.6, 0.9, 1, 0.8, 0.55][k] : 0.55 + 0.45 * Math.sin(t * 9 + k * 1.3);
+      bar.style.transform = `scaleY(${on ? Math.max(0.18, level * wave) : 0.18})`;
+    });
+  };
+  set("voice-agent", talking, 0.85);
+  set("voice-you", you > 0.35, you);
+  // After the agent's greeting, a mic that never picks anything up is the usual reason a call goes nowhere.
+  const quietFor = Date.now() - (active.heardAt || active.startedAt);
+  $("mic-hint").hidden = !active.connected || active.muted || quietFor < 12000;
 }
 
 function clock() {
@@ -233,6 +267,7 @@ function finish(msg) {
   meta("Ending…");
   setTimeout(() => {
     clearInterval(a.timer);
+    clearInterval(a.voiceTimer);
     a.stream.getTracks().forEach((t) => t.stop());
     a.ctx.close();
     if (a.ws.readyState <= WebSocket.OPEN) a.ws.close();
