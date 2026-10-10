@@ -4,6 +4,19 @@ Every setting the project reads, and where each one lives. A test (`backend/test
 fails if the backend starts reading a variable that is missing from this file or from
 `.env.example`, so keep them in step.
 
+## Adding a new setting
+
+1. Read it in code: `backend/app/config.py` for the backend, `deploy/deploy.sh` for deploy-time
+   settings, or `.github/workflows/deploy.yml` for GitHub secrets and variables.
+2. Add it to the matching template: `.env.example` (backend) or `deploy/deploy.env.example` (deploy).
+   Use an empty value, or a commented line if it has a default.
+3. Add a row to the table below, with its default and whether it is a secret.
+4. If it is a secret, store it in Secret Manager or GitHub secrets, never in a committed file.
+5. If the cloud service needs it, pass it through `deploy/deploy.sh` and, for automatic deploys,
+   through `.github/workflows/deploy.yml` plus a row in the GitHub table.
+
+`backend/tests/test_env.py` fails when step 2 or 3 is missed for any of the three places.
+
 ## Where settings live
 
 | Where | File or place | Committed? | Used by |

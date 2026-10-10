@@ -43,3 +43,23 @@ def test_dotenv_fills_gaps_but_never_overrides(tmp_path, monkeypatch):
 
 def test_a_missing_dotenv_is_fine(tmp_path):
     config._load_dotenv((tmp_path,))
+
+
+def test_every_deploy_setting_is_in_deploy_env_example_and_env_md():
+    script = (ROOT / "deploy" / "deploy.sh").read_text()
+    names = set(re.findall(r"\$\{([A-Z][A-Z0-9_]+)[:?-]", script))
+    assert {"PROJECT", "REGION", "SEED_DEMO_DATA"} <= names  # the scan itself works
+    example = (ROOT / "deploy" / "deploy.env.example").read_text()
+    reference = (ROOT / "ENV.md").read_text()
+    for name in sorted(names):
+        assert re.search(rf"^#?\s*{name}=", example, re.M), f"{name} is missing from deploy/deploy.env.example"
+        assert f"`{name}`" in reference, f"{name} is missing from ENV.md"
+
+
+def test_every_github_secret_and_variable_is_in_env_md():
+    workflow = (ROOT / ".github" / "workflows" / "deploy.yml").read_text()
+    names = set(re.findall(r"(?:vars|secrets)\.([A-Z][A-Z0-9_]+)", workflow))
+    assert {"WIF_PROVIDER", "GCP_PROJECT"} <= names  # the scan itself works
+    reference = (ROOT / "ENV.md").read_text()
+    for name in sorted(names):
+        assert f"`{name}`" in reference, f"{name} is missing from ENV.md"
