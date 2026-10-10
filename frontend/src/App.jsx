@@ -9,6 +9,7 @@ import { Toasts } from "./toast.jsx";
 const Forecast = lazy(() => import("./pages/Forecast.jsx"));
 const Setup = lazy(() => import("./pages/Setup.jsx"));
 const Approvals = lazy(() => import("./pages/Approvals.jsx"));
+const Users = lazy(() => import("./pages/Users.jsx"));
 const Login = lazy(() => import("./pages/Login.jsx"));
 
 // An old .html address goes to its route, keeping the query (login's ?next= and ?expired=).
@@ -28,6 +29,7 @@ export default function App() {
               <Route path="/" element={<Forecast />} />
               <Route path="/setup" element={<Setup />} />
               <Route path="/approvals" element={<Approvals />} />
+              <Route path="/users" element={<Users />} />
               <Route path="/login" element={<Login />} />
               {Object.entries(OLD_URLS).map(([file, to]) => <Route key={file} path={`/${file}`} element={<OldUrl to={to} />} />)}
               <Route path="*" element={<Navigate to="/" replace />} />

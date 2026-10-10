@@ -1,4 +1,5 @@
 import { useState } from "react";
+import FarmerForm from "../components/setup/FarmerForm.jsx";
 import FarmerList from "../components/setup/FarmerList.jsx";
 import FarmersStep from "../components/setup/FarmersStep.jsx";
 import PriceRange from "../components/setup/PriceRange.jsx";
@@ -12,6 +13,7 @@ export default function Setup() {
   const { state } = useLive();
   const act = useAct();
   const [unsaved, setUnsaved] = useState(false);
+  const [farmerForm, setFarmerForm] = useState(null); // {} to add, a farmer to edit, null when closed
   const farmers = state ? state.farmers.filter((f) => f.type !== "supplier")
     .sort((a, b) => Number(!!b.to_call) - Number(!!a.to_call) || a.id.localeCompare(b.id)) : [];
   const toCall = state ? state.farmers.filter((f) => f.to_call).length : 0;
@@ -38,11 +40,12 @@ export default function Setup() {
   return (
     <Shell title="Setup" head={head}>
       <div className="steps">
-        <FarmersStep farmers={farmers} toCall={toCall} />
+        <FarmersStep farmers={farmers} toCall={toCall} onAdd={() => setFarmerForm({})} />
         <PriceRange l={l} onDirty={setUnsaved} />
         {state ? <StartCalling state={state} toCall={toCall} /> : <section className="card dark"><div className="stats" id="campaign-lines" /></section>}
       </div>
-      {state && <FarmerList farmers={farmers} />}
+      {state && <FarmerList farmers={farmers} onEdit={setFarmerForm} />}
+      <FarmerForm farmer={farmerForm} onClose={() => setFarmerForm(null)} />
       <p className="small muted">All data is synthetic. <button className="btn sm" type="button" style={{ marginLeft: 8 }} onClick={() => act(() => api("/api/demo/reset"), "Demo data reset.")}>Reset demo data</button></p>
     </Shell>
   );

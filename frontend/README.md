@@ -7,11 +7,12 @@ Vite + React single-page app for the planner pages (task C-04):
 | `/` | Live forecast |
 | `/setup` | Setup (3 steps) |
 | `/approvals` | Approvals |
-| `/login` | Demo role picker |
+| `/users` | Users and roles (only for someone with the `users.admin` right) |
+| `/login` | Demo sign-in: pick a person |
 
 Moving between pages does not reload: the live data connection (`/api/stream`) opens once and
 is shared. Each page is its own chunk, loaded the first time it is opened. The old addresses
-(`index.html`, `setup.html`, `approvals.html`, `login.html`, with their `?next=`) redirect to
+(`index.html`, `setup.html`, `approvals.html`, `users.html`, `login.html`, with their `?next=`) redirect to
 the routes, so the call client's links and old bookmarks still work.
 
 ## Layout
@@ -20,12 +21,12 @@ the routes, so the call client's links and old bookmarks still work.
 src/
   App.jsx          routes, old-URL redirects, lazy pages
   live.jsx         one shared live-state connection (useLive)
-  toast.jsx        Sonner toasts and useAct (viewer guard, 401 back to sign-in, Undo on the toast)
+  toast.jsx        Sonner toasts and useAct (watch-only guard, 401 back to sign-in, Undo on the toast)
   Shell.jsx        sidebar / phone tab bar, top bar, banners
   ui.jsx           Icon, Avatar, Pill, Dialog (Radix)
   react.css        styles for the toasts, dialogs and chart tooltip
   lib.js           re-exports from web/js/data.js, the page list
-  pages/           Forecast, Setup, Approvals, Login
+  pages/           Forecast, Setup, Approvals, Users, Login
   components/      the pieces of each page (forecast/, setup/, approvals/)
 ```
 
@@ -41,8 +42,9 @@ What is shared with `web/` (not copied):
 - `web/css/app.css`: the design tokens and all styles.
 - `web/js/data.js`: the API, demo sign-in, live stream and formatting.
 
-The call client (`call.html`, task B-03) stays vanilla JS in `web/`. `npm run build` copies it into
-`dist/` with `config.js` and the favicon, so one folder serves every page.
+The call client (`call.html`, task B-03) and `mic-test.html` stay vanilla JS in `web/`. `npm run build`
+copies them into `dist/` with `config.js`, the favicon and `farmers-template.csv`, so one folder serves
+every page.
 
 ## Run locally
 
