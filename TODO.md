@@ -58,7 +58,12 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
 
 ## Open: the microphone is silent on real devices (10 Oct, not solved)
 
-10. **The call connects and the agent speaks, but the browser's microphone stays silent.** The "You"
+10. **Root cause found 2026-10-10, fix pushed (confirm on a real call).** `web/js/audio-worklets.js` re-created
+    its buffer with the length of the buffer it had just sent, which is 0 once sent, so the microphone
+    produced one chunk and stopped (the call page said `chunks made: 1, sent: 0`). Test:
+    `tests/test_worklet.py`. The notes below are the investigation before that.
+
+    **The call connects and the agent speaks, but the browser's microphone stays silent.** The "You"
     meter does not move, the page warns `No sound from "Default" yet`, the agent never gets an answer
     and there is no farmer transcript. Seen on the live site and locally, on Windows (Brave) and on
     Android (Brave and Chrome).

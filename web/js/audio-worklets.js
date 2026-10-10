@@ -9,7 +9,8 @@ class PcmCapture extends AudioWorkletProcessor {
     this.step = sampleRate / target;
     this.pos = 0;
     this.prev = 0;
-    this.chunk = new Int16Array(target / 25);
+    this.size = target / 25;  // samples per 40 ms chunk; kept apart because a sent buffer becomes empty
+    this.chunk = new Int16Array(this.size);
     this.n = 0;
     this.levelAcc = 0;
     this.levelN = 0;
@@ -20,10 +21,10 @@ class PcmCapture extends AudioWorkletProcessor {
     this.chunk[this.n++] = s < 0 ? s * 0x8000 : s * 0x7fff;
     this.levelAcc += s * s;
     this.levelN++;
-    if (this.n === this.chunk.length) {
+    if (this.n === this.size) {
       const out = this.chunk;
       this.port.postMessage({ pcm: out.buffer }, [out.buffer]);
-      this.chunk = new Int16Array(out.length);
+      this.chunk = new Int16Array(this.size);
       this.n = 0;
       this.port.postMessage({ level: Math.sqrt(this.levelAcc / this.levelN) });
       this.levelAcc = 0;
