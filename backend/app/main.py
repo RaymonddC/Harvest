@@ -31,6 +31,16 @@ class LimitsIn(BaseModel):
     step_pct: float = 2.0
 
 
+class FarmerIn(BaseModel):
+    name: str = ""
+    phone: str = ""
+    crop: str = ""
+    language: str = ""
+    village: str = ""
+    usual_kg_week: float | None = None
+    can_pull_forward: bool = False
+
+
 class CsvIn(BaseModel):
     csv: str
 
@@ -169,6 +179,12 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                                   body.first_premium_pct, body.step_pct)
         services.recompute_forecast(store, settings)
         return doc
+
+    @app.post("/api/farmers", dependencies=[Depends(planner)])
+    def add_farmer(body: FarmerIn):
+        row = body.model_dump()
+        row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
+        return {"id": services.add_farmer(store, row)}
 
     @app.post("/api/farmers/upload", dependencies=[Depends(planner)])
     def upload(body: CsvIn):

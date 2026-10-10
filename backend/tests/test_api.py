@@ -86,6 +86,30 @@ def test_upload_farmers(client, store):
     assert client.post("/api/farmers/upload", json={"csv": "a,b\n1,2"}).status_code == 400
 
 
+def test_upload_reports_skipped_lines_and_keeps_good_ones(client, store):
+    csv = ("name,phone,crop,language,usual_kg_week\n"
+           "Pak Baik,+62 812 0000 8888,karet,Bahasa Indonesia,300\n"
+           "Pak Salah,+62 812 0000 9999,tomato,Bahasa Indonesia,10\n"
+           "Ibu Pendek,123,palm,Bahasa Indonesia,10\n")
+    r = client.post("/api/farmers/upload", json={"csv": csv}).json()
+    assert r["added"] == 1 and len(r["skipped"]) == 2
+    assert "Line 3" in r["skipped"][0] and "tomato" in r["skipped"][0]
+    assert any(f["name"] == "Pak Baik" and f["crop"] == "rubber" and f["usual_kg_week"] == 300
+               for f in store.list("farmers"))
+
+
+def test_add_farmer_validates_and_does_not_duplicate(client, store):
+    body = {"name": "Ibu Baru", "phone": "+62 812 0000 1234", "crop": "coffee",
+            "language": "Bahasa Indonesia", "village": "Dumai", "usual_kg_week": 120}
+    fid = client.post("/api/farmers", json=body).json()["id"]
+    assert store.get("farmers", fid)["crop"] == "coffee" and store.get("farmers", fid)["to_call"] is True
+    client.post("/api/farmers", json={**body, "name": "Ibu Baru 2"})  # same phone: update, not a duplicate
+    assert [f["name"] for f in store.list("farmers") if f["phone"] == body["phone"]] == ["Ibu Baru 2"]
+    assert client.post("/api/farmers", json={**body, "crop": "tomato"}).status_code == 400
+    assert client.post("/api/farmers", json={**body, "phone": "12"}).status_code == 400
+    assert client.post("/api/farmers", json={"name": "X"}).status_code == 400
+
+
 def test_csv_download(client):
     r = client.get("/api/forecast.csv")
     assert r.status_code == 200 and r.text.startswith("week,")

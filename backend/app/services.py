@@ -9,7 +9,7 @@ import io
 
 from . import forecast as fc
 from .config import Settings, normalize_phone
-from .rules_engine import Limits, LimitsError, normalize_crop, premium_pct
+from .rules_engine import CROP_LABELS, Limits, LimitsError, normalize_crop, premium_pct
 from .store import Store
 
 CALL_STATUSES = ("queued", "on_call", "done", "dropped", "declined")
@@ -386,23 +386,47 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
                        channel=call.get("channel", "browser"))
 
 
+def add_farmer(store: Store, row: dict) -> str:
+    """Validate one farmer row and save it. The id comes from the phone number, so the same
+    phone again updates that farmer instead of adding a duplicate."""
+    row = {k.strip().lower(): str(v if v is not None else "").strip() for k, v in row.items() if k}
+    missing = [c for c in ("name", "phone", "crop", "language") if not row.get(c)]
+    if missing:
+        raise ServiceError(f"Missing: {', '.join(missing)}.")
+    digits = normalize_phone(row["phone"])[1:]
+    if not 7 <= len(digits) <= 15:
+        raise ServiceError(f"The phone number {row['phone']!r} does not look right.")
+    crop = normalize_crop(row["crop"])
+    if crop not in CROP_LABELS:
+        raise ServiceError(f"Unknown crop {row['crop']!r}. Use one of: {', '.join(CROP_LABELS)}.")
+    try:
+        usual = max(0, int(float(row.get("usual_kg_week") or 0)))
+    except ValueError:
+        raise ServiceError("usual_kg_week must be a number.") from None
+    fid = row.get("id") or "u" + hashlib.sha1(digits.encode()).hexdigest()[:8]
+    store.set("farmers", fid, {
+        "name": row["name"], "phone": row["phone"], "crop": crop,
+        "language": row["language"], "village": row.get("village", ""),
+        "type": row.get("type", "farmer") or "farmer", "usual_kg_week": usual,
+        "can_pull_forward": row.get("can_pull_forward", "").lower() in ("1", "yes", "true"),
+        "to_call": True,
+    })
+    return fid
+
+
 def upload_farmers(store: Store, settings: Settings, csv_text: str) -> dict:
     reader = csv.DictReader(io.StringIO(csv_text.strip()))
     required = {"name", "phone", "crop", "language"}
     if not reader.fieldnames or not required <= {f.strip().lower() for f in reader.fieldnames}:
-        raise ServiceError("CSV needs the columns: name, phone, crop, language (village optional).")
-    added = 0
-    for row in reader:
-        row = {k.strip().lower(): (v or "").strip() for k, v in row.items() if k}
-        if not row.get("name") or not row.get("phone"):
+        raise ServiceError("CSV needs the columns: name, phone, crop, language "
+                           "(optional: village, usual_kg_week, can_pull_forward).")
+    added, skipped = 0, []
+    for number, row in enumerate(reader, start=2):  # line 1 is the header
+        if not any((v or "").strip() for v in row.values() if isinstance(v, str)):
             continue
-        fid = row.get("id") or "u" + hashlib.sha1(row["phone"].encode()).hexdigest()[:8]
-        store.set("farmers", fid, {
-            "name": row["name"], "phone": row["phone"], "crop": normalize_crop(row["crop"]),
-            "language": row["language"], "village": row.get("village", ""),
-            "type": row.get("type", "farmer") or "farmer",
-            "can_pull_forward": row.get("can_pull_forward", "").lower() in ("1", "yes", "true"),
-            "to_call": True,
-        })
-        added += 1
-    return {"added": added}
+        try:
+            add_farmer(store, row)
+            added += 1
+        except ServiceError as e:
+            skipped.append(f"Line {number}: {e}")
+    return {"added": added, "skipped": skipped}

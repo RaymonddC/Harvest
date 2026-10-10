@@ -15,7 +15,18 @@ $("upload-send").onclick = () => act(async () => {
   const r = await api("/api/farmers/upload", { body: { csv: $("upload-text").value } });
   $("upload-dialog").close();
   return r;
-}, (r) => `${r.added} farmers added.`);
+}, (r) => {
+  if (r.skipped?.length) alert(`${r.added} added. ${r.skipped.length} lines skipped:\n\n${r.skipped.slice(0, 8).join("\n")}`);
+  return `${r.added} farmers added.`;
+});
+$("add-open").onclick = () => $("add-dialog").showModal();
+$("add-cancel").onclick = () => $("add-dialog").close();
+$("add-form").onsubmit = (e) => {
+  e.preventDefault();
+  const d = Object.fromEntries(new FormData($("add-form")));
+  const body = { ...d, can_pull_forward: d.can_pull_forward === "on", usual_kg_week: d.usual_kg_week ? Number(d.usual_kg_week) : null };
+  act(() => api("/api/farmers", { body }), () => { $("add-dialog").close(); $("add-form").reset(); return "Farmer added."; });
+};
 $("reset").onclick = () => act(() => api("/api/demo/reset"), "Demo data reset.");
 
 const form = $("limits-form");

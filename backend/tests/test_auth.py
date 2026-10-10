@@ -62,6 +62,7 @@ def test_expired_token_is_refused(client, secured):
 def test_every_planner_action_is_protected(client):
     actions = [
         ("put", "/api/limits/palm", {"floor_price": 2900, "ceiling_price": 3350, "reference_price": 3100}),
+        ("post", "/api/farmers", {"name": "X", "phone": "+62 812 0000 1234", "crop": "palm", "language": "Bahasa Indonesia"}),
         ("post", "/api/farmers/upload", {"csv": "name,phone,crop,language\n"}),
         ("post", "/api/campaign/start", {"kind": "collect"}),
         ("post", "/api/campaign/stop", None),

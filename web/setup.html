@@ -30,6 +30,7 @@
           <span class="big" id="farmer-total">No farmers yet</span>
           <span class="sub" id="farmer-meta">Upload a CSV with name, phone, crop and language.</span>
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+            <button class="btn" id="add-open" type="button">Add farmer</button>
             <button class="btn" id="upload-open" type="button">Upload CSV</button>
             <a class="btn ghost" href="#farmer-list">See the list</a>
           </div>
@@ -95,14 +96,35 @@
 
   <dialog id="upload-dialog" aria-labelledby="upload-title">
     <h2 id="upload-title">Upload farmer list</h2>
-    <p class="muted" style="margin:8px 0">CSV with columns name, phone, crop, language. Optional: village, can_pull_forward.</p>
+    <p class="muted" style="margin:8px 0">One farmer per line. Required: name, phone, crop (palm, rubber or coffee), language. Optional: village, usual_kg_week, can_pull_forward (yes or no). <a href="farmers-template.csv" download>Download the template</a>, fill it in, then choose the file here.</p>
     <input type="file" id="upload-file" accept=".csv,text/csv" aria-label="CSV file" style="margin-bottom:8px">
-    <textarea id="upload-text" aria-label="CSV text">name,phone,crop,language,village
-Pak Contoh,+62 812 0000 5001,palm,Bahasa Indonesia,Sungai Lala</textarea>
+    <textarea id="upload-text" aria-label="CSV text">name,phone,crop,language,village,usual_kg_week,can_pull_forward
+Pak Contoh,+62 812 0000 5001,palm,Bahasa Indonesia,Sungai Lala,1500,yes</textarea>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="btn solid" id="upload-send">Upload</button>
       <form method="dialog"><button class="btn">Cancel</button></form>
     </div>
+  </dialog>
+
+  <dialog id="add-dialog" aria-labelledby="add-title">
+    <form id="add-form" method="dialog">
+      <h2 id="add-title">Add a farmer</h2>
+      <div style="display:grid;gap:10px;margin:12px 0">
+        <label class="field">Name <input type="text" name="name" required autocomplete="off"></label>
+        <label class="field">Phone <input name="phone" type="text" inputmode="tel" required placeholder="+62 812 0000 5001" autocomplete="off"></label>
+        <label class="field">Crop
+          <select name="crop"><option value="palm">Palm FFB</option><option value="rubber">Rubber</option><option value="coffee">Coffee</option></select>
+        </label>
+        <label class="field">Language <input type="text" name="language" required value="Bahasa Indonesia" autocomplete="off"></label>
+        <label class="field">Village <input type="text" name="village" autocomplete="off"></label>
+        <label class="field">Usual kg per week <input name="usual_kg_week" type="number" min="0" step="1" placeholder="optional"></label>
+        <label class="field" style="flex-direction:row;gap:8px;align-items:center;font-weight:400"><input name="can_pull_forward" type="checkbox"> Can bring the harvest forward</label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn solid" id="add-send" type="submit">Add farmer</button>
+        <button class="btn" type="button" id="add-cancel">Cancel</button>
+      </div>
+    </form>
   </dialog>
 
   <script type="module" src="js/setup.js"></script>
