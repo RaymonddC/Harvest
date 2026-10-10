@@ -42,3 +42,49 @@
 .hc-dialog select { min-height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface);
   font: inherit; font-weight: 600; color: var(--ink); width: 100%; }
 .hc-dialog input[type="checkbox"] { width: 18px; min-height: 18px; }
+
+/* ---------- chart: tonne axis and the missing tonnes of a gap week ---------- */
+.chart.has-axis { margin-left: 34px; background: none; }
+.xlabels.has-axis { margin-left: 34px; }
+.chart .axis { position: absolute; inset: 0; pointer-events: none; }
+.chart .axis .tick { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--line-2); }
+.chart .axis .tick:first-child { border-top: 0; }
+.chart .axis .tick span { position: absolute; right: calc(100% + 8px); top: -8px; font-size: 11px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chart .axis .unit { position: absolute; left: -26px; top: -22px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.chart .shortfall { position: absolute; left: 0; right: 0; z-index: -1; border: 2px dashed var(--amber); border-bottom: 0;
+  border-radius: 8px 8px 0 0; background: repeating-linear-gradient(135deg, rgba(227, 167, 47, .14) 0 6px, transparent 6px 12px);
+  transition: height .7s cubic-bezier(.2, .8, .2, 1), bottom .7s cubic-bezier(.2, .8, .2, 1); }
+@media (max-width: 520px) { .chart.has-axis, .xlabels.has-axis { margin-left: 26px; } }
+
+/* ---------- price range slider (Radix) ---------- */
+.price-slider { display: flex; flex-direction: column; gap: 6px; padding: 4px 2px 0; }
+.ps-root { position: relative; display: flex; align-items: center; height: 28px; touch-action: none; user-select: none; }
+.ps-track { position: relative; flex-grow: 1; height: 6px; border-radius: 3px; background: var(--line-2); }
+.ps-range { position: absolute; height: 100%; border-radius: 3px; background: var(--leaf-mid); }
+.ps-thumb { display: block; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: 3px solid var(--leaf);
+  box-shadow: 0 1px 3px rgba(16, 24, 20, .2); cursor: grab; }
+.ps-thumb:active { cursor: grabbing; }
+.ps-thumb.ref { width: 14px; height: 26px; border-radius: 5px; background: var(--ink); border-color: var(--ink); }
+.ps-thumb:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--leaf-soft); }
+.ps-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---------- approvals: offers beside the week summary ---------- */
+.approvals-cols .col-side { position: sticky; top: 20px; }
+.week-summary { gap: 14px; }
+.week-summary h2 { font-size: 15px; color: var(--muted); font-weight: 700; }
+.ws-big { display: flex; align-items: baseline; gap: 8px; }
+.ws-big b { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.ws-big span { font-size: 15px; color: var(--muted); font-weight: 600; }
+.meter.big { height: 14px; border-radius: 7px; }
+.ws-left { margin: -4px 0 0; font-size: 14px; font-weight: 700; color: var(--amber-text); }
+.ws-left.done { color: var(--leaf-deep); }
+.ws-stats { display: grid; gap: 8px; border-top: 1px solid var(--line-2); padding-top: 14px; }
+.ws-stat { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; }
+.ws-stat span { color: var(--muted); }
+.ws-stat b { font-weight: 800; }
+.ws-stat.amber b { color: var(--amber-text); }
+/* Roomier offer rows. */
+.offers-card .offer { padding: 18px 22px; gap: 14px 20px; }
+.offers-card .offer .who b { font-size: 16px; }
+.offers-card .offer .who span:not(.avatar) { font-size: 13.5px; }
+.offers-card .offer .fig b { font-size: 17px; }

@@ -44,7 +44,9 @@ export default function Approvals() {
 
   return (
     <Shell title="Approvals" head={head}>
-      <Meter state={state} week={week} />
+      {/* Offers on the left; the week's gap and totals stay in view on the right. */}
+      <div className="cols approvals-cols">
+      <div className="col-main">
       <section className="card offers-card" aria-label="Offers from the agent">
         <div id="offers">
           <AnimatePresence initial={false}>
@@ -69,6 +71,9 @@ export default function Approvals() {
           {l && `${anyOut ? "Offers marked Needs planner asked for more than the ceiling. All others are" : "All offers are"} inside the floor (${plainPrice(l.floor_price, l.currency)}) and ceiling (${plainPrice(l.ceiling_price, l.currency)}). The small bar under each price runs from the floor to the ceiling (black mark); red past it is above the ceiling. Synthetic data.`}
         </div>
       </section>
+      </div>
+      <div className="col-side"><Meter state={state} week={week} offers={state.offers} /></div>
+      </div>
     </Shell>
   );
 }

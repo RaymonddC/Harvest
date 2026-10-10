@@ -1,3 +1,4 @@
+import * as Slider from "@radix-ui/react-slider";
 import { useEffect, useState } from "react";
 import { api, cropLabel, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
@@ -21,6 +22,28 @@ function ladder(f, l) {
   return rungs;
 }
 
+// Lowest, market and highest price on one track. Drag a knob (or use the arrow keys) and the
+// boxes above follow; type in a box and the knob moves. The track spans a fifth below the saved
+// floor to a fifth above the saved ceiling, so it stays put while dragging.
+function PriceSlider({ form, l, onChange }) {
+  const inc = l.price_increment || 10;
+  const span = l.ceiling_price - l.floor_price || l.reference_price * 0.2;
+  const lo = Math.max(0, Math.floor((l.floor_price - span) / inc) * inc);
+  const hi = Math.ceil((l.ceiling_price + span) / inc) * inc;
+  const v = ["floor_price", "reference_price", "ceiling_price"].map((k) => Math.min(Math.max(Number(form[k]) || 0, lo), hi));
+  const names = ["Lowest price", "Market price today", "Highest price"];
+  return (
+    <div className="price-slider">
+      <Slider.Root className="ps-root" min={lo} max={hi} step={inc} value={v} minStepsBetweenThumbs={0}
+        onValueChange={([floor, ref, ceil]) => onChange({ floor_price: floor, reference_price: ref, ceiling_price: ceil })}>
+        <Slider.Track className="ps-track"><Slider.Range className="ps-range" /></Slider.Track>
+        {names.map((n, i) => <Slider.Thumb key={n} className={`ps-thumb ${i === 1 ? "ref" : ""}`} aria-label={n} />)}
+      </Slider.Root>
+      <div className="ps-scale" aria-hidden="true"><span>{plainPrice(lo, l.currency)}</span><span>{plainPrice(hi, l.currency)}</span></div>
+    </div>
+  );
+}
+
 const Field = ({ label, name, form, edit, step = "any" }) => (
   <label className="field">{label}<input type="number" step={step} required value={form?.[name] ?? ""} onChange={edit(name)} /></label>
 );
@@ -38,14 +61,13 @@ export default function PriceRange({ l, onDirty }) {
   }, [l, dirty]);
 
   const edit = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); setDirty(true); };
+  const slide = (values) => { setForm({ ...form, ...values }); setDirty(true); };
   const save = (e) => {
     e.preventDefault();
     const body = Object.fromEntries(FIELDS.map((k) => [k, Number(form[k])]));
     act(() => api(`/api/limits/${l.id}`, { method: "PUT", body }), () => { setDirty(false); return "Price range saved. The agent uses it from the next offer."; });
   };
   const rungs = form && l ? ladder(form, l) : null;
-  const refLeft = form && Number(form.ceiling_price) > Number(form.floor_price)
-    ? `${Math.min(Math.max((form.reference_price - form.floor_price) / (form.ceiling_price - form.floor_price), 0), 1) * 100}%` : "50%";
   const priced = !!l && !dirty;
 
   return (
@@ -58,7 +80,7 @@ export default function PriceRange({ l, onDirty }) {
         <Field label="Market today" name="reference_price" form={form} edit={edit} />
         <Field label="Highest" name="ceiling_price" form={form} edit={edit} />
       </div>
-      <div className="range" aria-hidden="true"><div className="rail" /><div className="knob lo" /><div className="ref" style={{ left: refLeft }} /><div className="knob hi" /></div>
+      {form && l && <PriceSlider form={form} l={l} onChange={slide} />}
       <span className="sub">{l && l.reference_source ? `Market price source: ${l.reference_source}` : ""}</span>
       <details>
         <summary>How the agent climbs the offer</summary>
