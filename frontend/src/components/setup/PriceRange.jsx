@@ -49,12 +49,10 @@ const Field = ({ label, name, form, edit, step = "any" }) => (
 );
 
 // Step 2: the floor, market and ceiling prices, and the offer ladder they make.
-// onDirty tells the page when there are unsaved edits (the step chips show it).
-export default function PriceRange({ l, onDirty }) {
+export default function PriceRange({ l }) {
   const act = useAct();
   const [form, setForm] = useState(null);
   const [dirty, setDirty] = useState(false);
-  useEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
   // Until the planner edits it, the form follows the saved limits.
   useEffect(() => {
     if (l && !dirty) setForm(Object.fromEntries(FIELDS.map((k) => [k, l[k]])));
@@ -71,7 +69,7 @@ export default function PriceRange({ l, onDirty }) {
   const priced = !!l && !dirty;
 
   return (
-    <form className="card" aria-labelledby="limits-title" onSubmit={save}>
+    <form className={`card ${priced ? "done" : ""}`} aria-labelledby="limits-title" onSubmit={save}>
       <StepTop n={2} done={priced} word={dirty ? "Unsaved" : priced ? "Done" : "To do"} />
       <div className="step-head"><h2 id="limits-title">Fair price range</h2>
         <span className="sub">{l ? `${cropLabel(l.crop)}, ${l.currency} per ${l.unit}. The agent can only offer inside this range, and farmers are never offered less than the lowest price.` : "The agent can only offer inside this range."}</span></div>

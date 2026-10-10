@@ -88,3 +88,27 @@
 .offers-card .offer .who b { font-size: 16px; }
 .offers-card .offer .who span:not(.avatar) { font-size: 13.5px; }
 .offers-card .offer .fig b { font-size: 17px; }
+
+/* ---------- KPI notes ---------- */
+.kpi .kpi-note { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.kpi.amber .kpi-note { color: var(--amber-text); }
+.kpi.mint .kpi-note { color: var(--leaf-deep); }
+
+/* ---------- Setup: a line joins each step to the next when the three sit in a row ---------- */
+@media (min-width: 1240px) {
+  .steps.linked > .card { position: relative; overflow: visible; }
+  .steps.linked > .card:not(:last-child)::after { content: ""; position: absolute; top: 37px; left: 100%; width: 20px; height: 3px;
+    border-radius: 2px; background: var(--line-strong); }
+  .steps.linked > .card.done:not(:last-child)::after { background: var(--leaf); }
+}
+
+/* ---------- sidebar: this week at a glance ---------- */
+.week-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--fill); }
+.week-card .wc-title { font-size: 12px; font-weight: 700; color: var(--muted); }
+.week-card .wc-row { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #3A4540; line-height: 1.35; }
+.week-card .wc-link { text-decoration: none; color: var(--amber-text); border-radius: 6px; }
+.week-card .wc-link:hover { color: var(--ink); }
+.week-card .wc-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.week-card .wc-dot.on { background: var(--leaf); }
+.week-card .wc-dot.amber { background: var(--amber); }
+@media (max-width: 860px) { .week-card { display: none; } }
