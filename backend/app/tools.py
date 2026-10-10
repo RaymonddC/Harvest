@@ -122,6 +122,7 @@ class CallSession:
     summary: str | None = None
     consent: bool | None = None
     saved_offer_ids: list[str] = field(default_factory=list)
+    read_back: dict[str, tuple[float, str]] = field(default_factory=dict)  # per crop: (kg, date) last read back
 
 
 def _weekday_label(date: dt.date, settings: Settings) -> str:
@@ -192,10 +193,17 @@ class ToolHandlers:
                                      "confidence": confidence.title(),
                                      "status": "saved" if confirmed_by_farmer else "waiting"}}
         if not confirmed_by_farmer:
+            self.session.read_back[crop_id] = (kg, date.isoformat())
             return {"saved": False, "status": "waiting_for_read_back",
                     "read_back": f"{round(kg):,} kg of {crop_label(crop_id)}, ready on {date:%A %d %B}.",
                     "say": "Read this back in the farmer's language and ask if it is right. If they "
                            "say yes, call record_harvest again with confirmed_by_farmer true."}
+        if self.session.read_back.get(crop_id) != (kg, date.isoformat()):
+            # Enforced here, not only in the prompt: the exact numbers must have been read back first.
+            self.last_ui = {"captured": {**self.last_ui["captured"], "status": "waiting"}}
+            return {"saved": False, "status": "read_back_required",
+                    "error": "Not saved. Call record_harvest with confirmed_by_farmer false and read "
+                             "these exact numbers back to the farmer first; save only after they say yes."}
         result = services.record_harvest(self.store, self.settings, self.session.farmer["id"], crop_id,
                                          kg, date.isoformat(), self.session.call_id, confidence)
         return {"saved": True, **result}

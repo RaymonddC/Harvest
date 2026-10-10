@@ -23,7 +23,9 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
    `escalate` and the floor on a below-floor counter. Either fix the README and the `tools.py`
    docstring, or stop returning the number.
 
-4. **Read-back before saving is a prompt rule only.** `record_harvest` saves if the model sends
+4. ~~**Read-back before saving is a prompt rule only.**~~ Fixed 2026-10-10: `CallSession.read_back`
+   remembers the last numbers read back per crop and `record_harvest` refuses to save different ones.
+   Test: `test_record_harvest_refuses_to_save_without_a_matching_read_back`. Original problem: `record_harvest` saves if the model sends
    `confirmed_by_farmer=true` without the unconfirmed call first. Fix: track the read-back in
    `CallSession` and refuse otherwise.
 

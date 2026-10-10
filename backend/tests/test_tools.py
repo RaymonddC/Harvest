@@ -30,13 +30,27 @@ def test_record_harvest_reads_back_before_saving(store, settings):
     assert store.get("harvests", "h-f01-palm") is None
 
 
+def test_record_harvest_refuses_to_save_without_a_matching_read_back(store, settings):
+    h, _ = make(store, settings)
+    args = {"crop": "palm", "kg": 1600, "ready_date": "2026-11-02", "confirmed_by_farmer": True}
+    assert h.dispatch("record_harvest", args)["saved"] is False  # never read back
+    h.dispatch("record_harvest", {**args, "confirmed_by_farmer": False})
+    assert h.dispatch("record_harvest", {**args, "kg": 2000})["saved"] is False  # numbers changed
+    assert store.get("harvests", "h-f01-palm") is None
+    assert h.dispatch("record_harvest", args)["saved"] is True
+
+
 def test_record_harvest_updates_forecast_and_replaces_corrections(store, settings):
     h, _ = make(store, settings)
     before = store.get("forecast", "W4")["expected_kg"]
+    h.dispatch("record_harvest", {"crop": "Palm FFB", "kg": 1600, "ready_date": "2026-11-02",
+                                  "confirmed_by_farmer": False})
     r = h.dispatch("record_harvest", {"crop": "Palm FFB", "kg": 1600, "ready_date": "2026-11-02",
                                       "confirmed_by_farmer": True})
     assert r["saved"] and r["week_label"] == "W4"
     assert store.get("forecast", "W4")["expected_kg"] == before + 1600
+    h.dispatch("record_harvest", {"crop": "palm", "kg": 1800, "ready_date": "2026-11-02",
+                                  "confirmed_by_farmer": False})
     h.dispatch("record_harvest", {"crop": "palm", "kg": 1800, "ready_date": "2026-11-02",
                                   "confidence": "unsure", "confirmed_by_farmer": True})
     assert store.get("forecast", "W4")["expected_kg"] == before + 900  # unsure counts half
