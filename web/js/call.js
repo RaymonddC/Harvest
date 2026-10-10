@@ -59,12 +59,14 @@ async function answer(call) {
   silent.gain.value = 0;
   source.connect(capture).connect(silent).connect(ctx.destination);
   const player = new AudioWorkletNode(ctx, "pcm-player", { outputChannelCount: [1] });
-  player.connect(ctx.destination);
+  const volume = ctx.createGain();
+  volume.gain.value = volumeGain(Number($("volume").value));
+  player.connect(volume).connect(ctx.destination);
 
   const ws = new WebSocket(wsUrl(`/ws/call/${call.id}`));
   ws.binaryType = "arraybuffer";
   const f = farmerOf(call);
-  active = { call, ws, ctx, stream, player, micName, startedAt: Date.now(), playEnd: 0, ended: false, muted: false,
+  active = { call, ws, ctx, stream, player, volume, micName, startedAt: Date.now(), playEnd: 0, ended: false, muted: false,
     stage: 0, lines: {}, village: f.village, language: f.language, gapWeek: call.gap_week };
 
   $("call-farmer").textContent = call.farmer_name;
@@ -353,6 +355,28 @@ function renderEnded(a, msg) {
   }
   $("ended-body").replaceChildren(...body);
 }
+
+// ---------- agent volume ----------
+// The slider is 0..100; squaring it gives finer control at the quiet end, where it is needed most.
+const VOLUME_KEY = "harvestCallVolume";
+const volumeGain = (percent) => (percent / 100) ** 2;
+
+function savedVolume() {
+  try {
+    const raw = localStorage.getItem(VOLUME_KEY);
+    const v = Number(raw);
+    return raw !== null && v >= 0 && v <= 100 ? v : 100;
+  } catch { return 100; }
+}
+
+$("volume").value = savedVolume();
+$("volume-out").textContent = `${$("volume").value}%`;
+$("volume").oninput = () => {
+  const v = Number($("volume").value);
+  $("volume-out").textContent = `${v}%`;
+  if (active) active.volume.gain.value = volumeGain(v);
+  try { localStorage.setItem(VOLUME_KEY, String(v)); } catch { /* storage blocked: the slider still works */ }
+};
 
 // A tap or click is a user gesture, which lets a paused audio engine start.
 document.addEventListener("pointerdown", () => { if (active && active.ctx.state !== "running") active.ctx.resume().catch(() => {}); });

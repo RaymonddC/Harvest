@@ -43,6 +43,11 @@
         <div class="voice" id="voice-agent"><span class="eq"><i></i><i></i><i></i><i></i><i></i></span>Agent</div>
         <div class="voice" id="voice-you"><span class="eq"><i></i><i></i><i></i><i></i><i></i></span>You</div>
       </div>
+      <label class="volume">
+        <span>Volume</span>
+        <input type="range" id="volume" min="0" max="100" value="100" aria-label="Agent volume">
+        <output id="volume-out" for="volume">100%</output>
+      </label>
       <p class="mic-note" id="mic-note" role="status" hidden></p>
       <div class="controls">
         <button class="btn outline-mint" id="mute" aria-pressed="false">Mute</button>

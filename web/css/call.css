@@ -98,6 +98,9 @@
 #voice-you.on { background: rgba(245, 199, 102, .16); color: #F5C766; }
 .mic-note { font-size: 13px; color: #F5C766; background: rgba(245, 199, 102, .1); border-radius: 10px; padding: 10px 12px; margin: 0; }
 .mic-note[hidden] { display: none; }
+.volume { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; color: #9AA59F; }
+.volume input { flex: 1 1 auto; min-height: 44px; accent-color: #CFE6DA; }
+.volume output { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ---------- captions: roomier lines for reading on screen ---------- */
 .captions { gap: 12px; max-height: 42vh; padding: 4px 2px 8px; scroll-padding-bottom: 8px;
