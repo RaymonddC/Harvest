@@ -70,9 +70,10 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
       its 3-second playback is clear; a plain voice-recorder app on the same phone; the Android
       permission (Settings, Apps, browser, Permissions, Microphone) and the microphone privacy switch;
       a wired headset; the Windows Sound input meter; another computer or phone; Firefox.
-    - **Next ideas:** add a "plain `{audio: true}`" option to `/mic-test.html` to rule out our
-      constraints (`channelCount`, echo cancellation, noise suppression, auto gain); log how many audio
-      chunks reach the server per call (the gateway already receives them in `live_session.upstream`).
+    - **Added 2026-10-10:** a "Plain" audio option in `/mic-test.html` (no constraints at all), and a
+      gateway log line per call, `microphone input: N chunks, B bytes, peak P of 32767`. Peak near 0
+      with many chunks means the browser sent silence. Read it with
+      `gcloud run services logs read harvest-gateway --region $REGION --limit 100 | grep microphone`.
     - **Tools that exist:** `/mic-test.html`, the Microphone name in the call page's warning, the
       Agent / You meters, and the Volume slider.
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import array
 import logging
 from typing import Any, Awaitable, Callable, Protocol
 
@@ -240,6 +241,8 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
         close_line(closed)
         await send({"type": "caption", "who": who, "text": text, "index": index})
 
+    mic = {"chunks": 0, "bytes": 0, "peak": 0}  # what the browser's microphone actually delivered
+
     try:
         async with connect(settings.live_model, build_live_config(settings, instruction)) as live:
             await send({"type": "connected", "farmer": farmer.get("name"), "village": farmer.get("village"),
@@ -254,6 +257,11 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                     if msg is None:
                         return
                     if isinstance(msg, bytes):
+                        mic["chunks"] += 1
+                        mic["bytes"] += len(msg)
+                        samples = array.array("h", msg[: len(msg) // 2 * 2])
+                        if samples:
+                            mic["peak"] = max(mic["peak"], max(map(abs, samples)))
                         await live.send_realtime_input(audio=types.Blob(data=msg, mime_type=INPUT_MIME))
                     elif isinstance(msg, dict) and msg.get("type") == "hangup":
                         return
@@ -318,6 +326,9 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
         log.exception("call %s failed", call_id)
         await send({"type": "error", "message": f"Voice session failed: {e}"})
     finally:
+        # A peak near 0 with many chunks means the browser sent silence (microphone problem, not Gemini).
+        log.info("call %s microphone input: %d chunks, %d bytes, peak %d of 32767",
+                 call_id, mic["chunks"], mic["bytes"], mic["peak"])
         if transcript.lines:
             close_line(len(transcript.lines) - 1)
         if pending_translations:

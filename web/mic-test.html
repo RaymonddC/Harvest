@@ -32,6 +32,7 @@
 
   <label>Audio processing
     <select id="mode">
+      <option value="plain">Plain: no options at all (the browser's own defaults)</option>
       <option value="all">Default: echo cancellation, noise suppression, auto gain (what calls use)</option>
       <option value="none">All off (the raw microphone)</option>
       <option value="echo">Echo cancellation only</option>
@@ -54,6 +55,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const MODES = {
+  plain: null,
   all: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
   none: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
   echo: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
@@ -71,7 +73,7 @@ async function start() {
   stop();
   rmsMax = peakMax = 0;
   $("verdict").textContent = "";
-  const audio = { channelCount: 1, ...MODES[$("mode").value] };
+  const audio = MODES[$("mode").value] ? { channelCount: 1, ...MODES[$("mode").value] } : {};
   if ($("device").value) audio.deviceId = { exact: $("device").value };
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio });
