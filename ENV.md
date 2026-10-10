@@ -4,6 +4,28 @@ Every setting the project reads, and where each one lives. A test (`backend/test
 fails if the backend starts reading a variable that is missing from this file or from
 `.env.example`, so keep them in step.
 
+## In production: where to change a setting
+
+Production has three places. Change a setting in the right one, never directly on the running service:
+
+| What | Where you change it | Takes effect |
+|---|---|---|
+| **Secrets** (the Gemini API key, the Twilio token) | **Google Cloud Secret Manager**: https://console.cloud.google.com/security/secret-manager?project=harvest-511117. Open the secret and add a new version. | After a redeploy. A running instance keeps the version it started with. |
+| **Settings the pipeline passes** (`LIVE_MODEL`, `GEMINI_BACKEND`, `GOOGLE_CLOUD_LOCATION`, `MILL_NAME`, `PLANNER_NAME`, `DEMO_LANGUAGE`, `FIREBASE_WEB_CONFIG`, `GCP_PROJECT`, `GCP_REGION`) | **GitHub** repository variables: https://github.com/RaymonddC/Harvest/settings/variables/actions. `JWT_SECRET`, `WIF_PROVIDER` and `WIF_SERVICE_ACCOUNT` are GitHub *secrets* instead: https://github.com/RaymonddC/Harvest/settings/secrets/actions | On the next deploy: push to `main`, or run *Deploy* in the Actions tab. |
+| **Everything else** (`TEXT_MODEL`, `VOICE_NAME`, `MAX_CALL_SECONDS`, the forecast numbers and so on) | The default in `backend/app/config.py`. There is no GitHub variable for these yet. To make one, follow "Adding a new setting" below. | After a merge to `main` redeploys it. |
+
+The deploy copies the GitHub values into the Cloud Run service's environment variables. So **the
+Cloud Run service shows what is running, but GitHub and Secret Manager are where you change it**.
+`deploy.sh` replaces every Cloud Run variable on each run, so anything you set directly on the
+service with `gcloud run services update` is wiped by the next deploy. Use that only for a quick
+test, and set the GitHub variable too if you want to keep it.
+
+To see what is live right now, without printing secrets:
+```bash
+gcloud run services describe harvest-gateway --region asia-southeast1 --format=yaml | grep -A1 "name: LIVE_MODEL"
+```
+No output means the service is using the default from the code.
+
 ## Adding a new setting
 
 1. Read it in code: `backend/app/config.py` for the backend, `deploy/deploy.sh` for deploy-time
@@ -31,39 +53,39 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 
 ## Backend settings (`.env` locally, Cloud Run variables in the cloud)
 
-| Variable | Default | Secret? | What it does |
-|---|---|---|---|
-| `GOOGLE_API_KEY` | none | Yes | Gemini API key, read by the Google SDK. Only used with `GEMINI_BACKEND=api_key`; then it comes from the `gemini-api-key` secret. Leave it unset when using Vertex AI, or it overrides the Vertex sign-in. Not needed for anything but the voice call. |
-| `LIVE_MODEL` | `gemini-2.5-flash-native-audio-preview-09-2025` | No | Gemini Live model for calls. Change it if Google retires the default. |
-| `TEXT_MODEL` | `gemini-3.8-flash` | No | Gemini model for caption translation and the plain-language forecast note. Google retired `gemini-2.5-flash` for new users (it answers 404), so if this one is retired too, set the name the error message suggests. Both features fall back quietly when it fails. |
-| `VOICE_NAME` | `Kore` | No | The agent's voice. |
-| `STORE_BACKEND` | `memory` | No | `memory` (local, in-process) or `firestore`. |
-| `GOOGLE_CLOUD_PROJECT` | none | No | Project id, needed when `STORE_BACKEND=firestore`. |
-| `SEED_ON_START` | true for `memory`, false for `firestore` | No | Reload the demo data on every start. |
-| `MILL_NAME` | `Koperasi Sawit Maju` | No | The buying mill, spoken by the agent and shown in the header. |
-| `PLANNER_NAME` | `Dewi` | No | The planner's name, shown in the header and on the Planner role. |
-| `DEMO_LANGUAGE` | `Bahasa Indonesia` | No | Language the agent speaks. |
-| `DEMO_CROP` | `palm` | No | Default crop. |
-| `CAPTION_TRANSLATE_TO` | `English` | No | Second caption line on the call screen. Empty turns it off. |
-| `PLAN_START` | next Monday | No | First Monday of the forecast horizon (`YYYY-MM-DD`). |
-| `FORECAST_WEEKS` | `5` | No | Weeks in the forecast. |
-| `TARGET_KG_PER_WEEK` | `100000` | No | The mill's weekly target. |
-| `GAP_TOLERANCE` | `0.2` | No | A week is a gap when supply is below target × (1 − this). |
-| `MAX_CALL_ATTEMPTS` | `2` | No | A dropped call is retried until this many attempts. |
-| `MAX_CALL_SECONDS` | `360` | No | Hard limit on one call. |
-| `AUTH_REQUIRED` | `true` | No | Planner actions need the planner role. `false` leaves them open. |
-| `JWT_SECRET` | a new random value each start | Yes | Signs sign-in tokens. Set a long random value (at least 32 characters) in the cloud. |
-| `JWT_TTL_SECONDS` | `43200` (12 hours) | No | How long a sign-in lasts. |
-| `HARVEST_NO_DOTENV` | unset | No | Set to `1` to ignore `.env` files entirely. The tests set it so a developer's own `.env` cannot change results. |
-| `STATIC_DIR` | the repo's `web/` folder | No | Pages the backend serves. Left unset in the cloud, where Firebase Hosting serves them. |
-| `CORS_ORIGINS` | `*` | No | Allowed browser origins, comma-separated. Set to your Hosting URL for anything real. |
-| `FIREBASE_WEB_CONFIG` | none | No | Firebase web config JSON. Turns on live Firestore listeners in the dashboard. |
-| `TWILIO_ACCOUNT_SID` | none | No | Real phone channel. |
-| `TWILIO_AUTH_TOKEN` | none | Yes | Real phone channel. In the cloud it comes from the `twilio-auth-token` secret. |
-| `TWILIO_FROM_NUMBER` | none | No | Real phone channel. |
-| `PUBLIC_BASE_URL` | none | No | The service's own https URL. `deploy.sh` sets it when Twilio is configured. |
-| `REAL_CALLS_ENABLED` | `false` | No | Safety gate: real calls need this on **and** the number on the allow list. |
-| `REAL_CALL_ALLOWLIST` | empty | No | Numbers a real call may dial. `*` allows any number. |
+| Variable | Default | Secret? | What it does | In production, change it in |
+|---|---|---|---|---|
+| `GOOGLE_API_KEY` | none | Yes | Gemini API key, read by the Google SDK. Only used with `GEMINI_BACKEND=api_key`; then it comes from the `gemini-api-key` secret. Leave it unset when using Vertex AI, or it overrides the Vertex sign-in. Not needed for anything but the voice call. | Secret Manager, secret `gemini-api-key`: add a new version, then redeploy |
+| `LIVE_MODEL` | `gemini-2.5-flash-native-audio-preview-09-2025` | No | Gemini Live model for calls. Change it if Google retires the default. | GitHub variable `LIVE_MODEL`, then redeploy |
+| `TEXT_MODEL` | `gemini-3.8-flash` | No | Gemini model for caption translation and the plain-language forecast note. Google retired `gemini-2.5-flash` for new users (it answers 404), so if this one is retired too, set the name the error message suggests. Both features fall back quietly when it fails. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `VOICE_NAME` | `Kore` | No | The agent's voice. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `STORE_BACKEND` | `memory` | No | `memory` (local, in-process) or `firestore`. | Set by `deploy.sh` (`firestore`); not changeable from GitHub |
+| `GOOGLE_CLOUD_PROJECT` | none | No | Project id, needed when `STORE_BACKEND=firestore`. | Set by `deploy.sh` from GitHub variable `GCP_PROJECT` |
+| `SEED_ON_START` | true for `memory`, false for `firestore` | No | Reload the demo data on every start. | Set by `deploy.sh` (`false`); not changeable from GitHub |
+| `MILL_NAME` | `Koperasi Sawit Maju` | No | The buying mill, spoken by the agent and shown in the header. | GitHub variable `MILL_NAME`, then redeploy |
+| `PLANNER_NAME` | `Dewi` | No | The planner's name, shown in the header and on the Planner role. | GitHub variable `PLANNER_NAME`, then redeploy |
+| `DEMO_LANGUAGE` | `Bahasa Indonesia` | No | Language the agent speaks. | GitHub variable `DEMO_LANGUAGE`, then redeploy |
+| `DEMO_CROP` | `palm` | No | Default crop. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `CAPTION_TRANSLATE_TO` | `English` | No | Second caption line on the call screen. Empty turns it off. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `PLAN_START` | next Monday | No | First Monday of the forecast horizon (`YYYY-MM-DD`). | Not settable from GitHub yet: the code default runs. See the rule above |
+| `FORECAST_WEEKS` | `5` | No | Weeks in the forecast. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `TARGET_KG_PER_WEEK` | `100000` | No | The mill's weekly target. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `GAP_TOLERANCE` | `0.2` | No | A week is a gap when supply is below target × (1 − this). | Not settable from GitHub yet: the code default runs. See the rule above |
+| `MAX_CALL_ATTEMPTS` | `2` | No | A dropped call is retried until this many attempts. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `MAX_CALL_SECONDS` | `360` | No | Hard limit on one call. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `AUTH_REQUIRED` | `true` | No | Planner actions need the planner role. `false` leaves them open. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `JWT_SECRET` | a new random value each start | Yes | Signs sign-in tokens. Set a long random value (at least 32 characters) in the cloud. | GitHub secret `JWT_SECRET`, then redeploy (everyone signs in again) |
+| `JWT_TTL_SECONDS` | `43200` (12 hours) | No | How long a sign-in lasts. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `HARVEST_NO_DOTENV` | unset | No | Set to `1` to ignore `.env` files entirely. The tests set it so a developer's own `.env` cannot change results. | Not used in production |
+| `STATIC_DIR` | the repo's `web/` folder | No | Pages the backend serves. Left unset in the cloud, where Firebase Hosting serves them. | Left unset in production (Firebase Hosting serves the pages) |
+| `CORS_ORIGINS` | `*` | No | Allowed browser origins, comma-separated. Set to your Hosting URL for anything real. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `FIREBASE_WEB_CONFIG` | none | No | Firebase web config JSON. Turns on live Firestore listeners in the dashboard. | GitHub variable `FIREBASE_WEB_CONFIG`, then redeploy |
+| `TWILIO_ACCOUNT_SID` | none | No | Real phone channel. | Only when running `deploy.sh` by hand (`deploy/deploy.env`); the GitHub workflow does not pass it yet |
+| `TWILIO_AUTH_TOKEN` | none | Yes | Real phone channel. In the cloud it comes from the `twilio-auth-token` secret. | Secret Manager, secret `twilio-auth-token`, created by hand |
+| `TWILIO_FROM_NUMBER` | none | No | Real phone channel. | Only when running `deploy.sh` by hand (`deploy/deploy.env`); the GitHub workflow does not pass it yet |
+| `PUBLIC_BASE_URL` | none | No | The service's own https URL. `deploy.sh` sets it when Twilio is configured. | Set by `deploy.sh` automatically |
+| `REAL_CALLS_ENABLED` | `false` | No | Safety gate: real calls need this on **and** the number on the allow list. | Only when running `deploy.sh` by hand (`deploy/deploy.env`); the GitHub workflow does not pass it yet |
+| `REAL_CALL_ALLOWLIST` | empty | No | Numbers a real call may dial. `*` allows any number. | Only when running `deploy.sh` by hand (`deploy/deploy.env`); the GitHub workflow does not pass it yet |
 
 Using Vertex AI instead of an API key (the cloud default): set `GOOGLE_GENAI_USE_VERTEXAI=true`,
 `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` and a Vertex `LIVE_MODEL`, and leave `GOOGLE_API_KEY`
