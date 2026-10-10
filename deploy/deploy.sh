@@ -2,8 +2,8 @@
 # Deploy the voice gateway (Cloud Run service), the forecast job (Cloud Run job),
 # Firestore rules and the dashboard (Firebase Hosting).
 #
-# Needs: gcloud and firebase CLIs, logged in; a Firestore database in Native mode;
-# a secret named gemini-api-key in Secret Manager.
+# Needs: gcloud and firebase CLIs, logged in; Node.js 18+ with npm (to build the dashboard);
+# a Firestore database in Native mode; a secret named gemini-api-key in Secret Manager.
 #
 #   PROJECT=my-project REGION=asia-southeast1 FIREBASE_WEB_CONFIG='{"apiKey":...}' deploy/deploy.sh
 #
@@ -110,6 +110,10 @@ window.HARVEST_CONFIG = {
 };
 JS
 
+# Build the React dashboard into frontend/dist. The build also copies the vanilla call client,
+# the microphone test and the config.js written above, so Hosting serves one folder.
+(cd "$ROOT/frontend" && npm ci --no-audit --no-fund && npm run build)
+
 (cd "$ROOT" && firebase deploy --only hosting,firestore:rules --project "$PROJECT")
 
 if [[ "$SEED_DEMO_DATA" == "true" ]]; then
@@ -121,4 +125,4 @@ if [[ "$SEED_DEMO_DATA" == "true" ]]; then
 else
   echo "Skipping demo data (SEED_DEMO_DATA=false)."
 fi
-echo "Done. Dashboard: https://$PROJECT.web.app/setup.html  Call client: https://$PROJECT.web.app/call.html"
+echo "Done. Dashboard: https://$PROJECT.web.app/setup  Call client: https://$PROJECT.web.app/call.html"
