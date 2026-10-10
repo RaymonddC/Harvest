@@ -105,7 +105,7 @@ WebSockets to the Cloud Run URL directly, because Hosting rewrites do not carry 
 | Read-back before saving (VA-3) | `record_harvest` runs twice: unconfirmed (returns the read-back sentence), then confirmed |
 | Floor and ceiling (G3) | `rules_engine.check_offer`; re-checked in `create_offer` and again on approval |
 | Out-of-limit requests go to the planner | `escalate` decision → offer saved as `escalated`; Approve stays disabled until the limits allow it |
-| Agent never sees the limits | Prompt and `get_reference_price` expose only the reference price |
+| Agent is not given the floor and ceiling | The prompt and `get_reference_price` carry only the reference price. `check_offer` returns just the next price the agent may say; that is the ceiling only when the farmer asks for more (the top of the ladder), and the floor only when the farmer counters below it. The agent never gets the range itself |
 | Reference price read aloud first | Prompt stage 4; `get_reference_price` returns the sentence to say |
 | Consent before a transcript is saved | `end_call(transcript_consent)`; the transcript is dropped when false |
 | Human approval on every deal | Offers start `pending`; only approved offers count in the forecast |

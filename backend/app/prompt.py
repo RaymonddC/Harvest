@@ -1,4 +1,5 @@
-"""System instruction for the voice agent. Price limits are deliberately absent."""
+"""System instruction for the voice agent. The floor and ceiling are deliberately absent;
+check_offer returns only the next price the agent may say."""
 
 from __future__ import annotations
 

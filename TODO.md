@@ -19,7 +19,9 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
    `declined` or `stopped` (so `escalated` and `wrong_person` count too). Fix: require an
    explicit outcome for confirm calls.
 
-3. **"Agent never sees the limits" is not strictly true.** `check_offer` returns the ceiling on
+3. ~~**"Agent never sees the limits" is not strictly true.**~~ Fixed 2026-10-10 by rewording the README
+   row and the `prompt.py` docstring: the agent only gets the next price it may say, never the range.
+   Original problem: `check_offer` returns the ceiling on
    `escalate` and the floor on a below-floor counter. Either fix the README and the `tools.py`
    docstring, or stop returning the number.
 
