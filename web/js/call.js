@@ -113,6 +113,7 @@ function hearYou(rms) {
   if (!active) return;
   // Map the RMS to 0..1 on a log-ish scale for the bars.
   active.micLevel = active.muted ? 0 : Math.min(1, Math.max(0, (Math.log10(rms + 1e-4) + 3) / 2.2));
+  active.maxLevel = Math.max(active.maxLevel || 0, rms);
   if (rms > 0.008) active.heardAt = Date.now();
 }
 
@@ -143,8 +144,9 @@ function micCheck() {
   } else if (active.muted) {
     note.textContent = "Muted: the agent cannot hear you.";
     note.hidden = false;
-  } else if (!active.heardAt && Date.now() - active.startedAt > 6000) {
-    note.textContent = `No sound from "${active.micName}" yet. Check that it is not muted in your system, and that the right microphone is chosen in the browser's site settings. (Audio chunks made: ${active.made || 0}, sent: ${active.sent || 0}, audio engine: ${active.ctx.state}, connection: ${["connecting", "open", "closing", "closed"][active.ws.readyState]}.)`;
+  } else if (!active.heardAt && Date.now() - active.startedAt > 6000
+             && active.playEnd < active.ctx.currentTime - 6) {  // 6 s of quiet after the agent stopped talking
+    note.textContent = `No sound from "${active.micName}" yet. Check that it is not muted in your system, and that the right microphone is chosen in the browser's site settings. (Loudest level so far: ${(active.maxLevel || 0).toFixed(4)}; speech is about 0.02 to 0.2. Audio chunks made: ${active.made || 0}, sent: ${active.sent || 0}, audio engine: ${active.ctx.state}, connection: ${["connecting", "open", "closing", "closed"][active.ws.readyState]}.)`;
     note.hidden = false;
   } else {
     note.hidden = true;
