@@ -27,7 +27,9 @@ function openFarmerForm(farmer) {
     f.elements.name.value = farmer.name || "";
     f.elements.phone.value = farmer.phone || "";
     f.elements.crop.value = farmer.crop || "palm";
-    f.elements.language.value = farmer.language || "";
+    const lang = f.elements.language;
+    if (farmer.language && ![...lang.options].some((o) => o.value === farmer.language)) lang.add(new Option(farmer.language, farmer.language));  // keep an older free-text value visible
+    lang.value = farmer.language || "Bahasa Indonesia";
     f.elements.village.value = farmer.village || "";
     f.elements.usual_kg_week.value = farmer.usual_kg_week || "";
     f.elements.can_pull_forward.checked = !!farmer.can_pull_forward;

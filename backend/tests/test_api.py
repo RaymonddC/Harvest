@@ -145,6 +145,22 @@ def test_cannot_delete_a_farmer_who_is_on_a_call(client, store):
     assert store.get("farmers", fid) is not None
 
 
+def test_language_must_be_one_of_the_supported_list(client, store):
+    body = {"name": "Pak Bahasa", "phone": "+62 812 0000 7001", "crop": "palm", "language": "Indonesian"}
+    fid = client.post("/api/farmers", json=body).json()["id"]
+    assert store.get("farmers", fid)["language"] == "Bahasa Indonesia"  # alias is normalised
+    r = client.post("/api/farmers", json={**body, "phone": "+62 812 0000 7002", "language": "Klingon"})
+    assert r.status_code == 400 and "Unknown language" in r.json()["detail"]
+
+
+def test_setup_page_language_options_match_the_backend():
+    import re
+    from pathlib import Path
+    html = (Path(__file__).resolve().parents[2] / "web/setup.html").read_text()
+    block = re.search(r'<select name="language"[^>]*>(.*?)</select>', html, re.S).group(1)
+    assert tuple(re.findall(r"<option>(.*?)</option>", block)) == services.LANGUAGES
+
+
 def test_csv_download(client):
     r = client.get("/api/forecast.csv")
     assert r.status_code == 200 and r.text.startswith("week,")

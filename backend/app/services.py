@@ -386,6 +386,26 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
                        channel=call.get("channel", "browser"))
 
 
+# The languages a farmer can be called in. The agent speaks whatever the name says, so a typo here
+# would make it speak the wrong thing; the dialog on the Setup page offers exactly this list.
+LANGUAGES = ("Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese")
+LANGUAGE_ALIASES = {"indonesian": "Bahasa Indonesia", "indonesia": "Bahasa Indonesia",
+                    "bahasa": "Bahasa Indonesia", "malay": "Bahasa Malaysia",
+                    "malaysian": "Bahasa Malaysia", "bahasa melayu": "Bahasa Malaysia",
+                    "jawa": "Javanese", "bahasa jawa": "Javanese", "sunda": "Sundanese",
+                    "bahasa sunda": "Sundanese"}
+
+
+def normalize_language(raw: str) -> str:
+    key = " ".join(raw.strip().lower().split())
+    for name in LANGUAGES:
+        if key == name.lower():
+            return name
+    if key in LANGUAGE_ALIASES:
+        return LANGUAGE_ALIASES[key]
+    raise ServiceError(f"Unknown language {raw!r}. Use one of: {', '.join(LANGUAGES)}.")
+
+
 def _farmer_fields(row: dict) -> tuple[str, dict]:
     """Validate one farmer row. Returns (phone digits, the fields to store)."""
     row = {k.strip().lower(): str(v if v is not None else "").strip() for k, v in row.items() if k}
@@ -398,13 +418,14 @@ def _farmer_fields(row: dict) -> tuple[str, dict]:
     crop = normalize_crop(row["crop"])
     if crop not in CROP_LABELS:
         raise ServiceError(f"Unknown crop {row['crop']!r}. Use one of: {', '.join(CROP_LABELS)}.")
+    language = normalize_language(row["language"])
     try:
         usual = max(0, int(float(row.get("usual_kg_week") or 0)))
     except ValueError:
         raise ServiceError("usual_kg_week must be a number.") from None
     return digits, {
         "name": row["name"], "phone": row["phone"], "crop": crop,
-        "language": row["language"], "village": row.get("village", ""), "usual_kg_week": usual,
+        "language": language, "village": row.get("village", ""), "usual_kg_week": usual,
         "can_pull_forward": row.get("can_pull_forward", "").lower() in ("1", "yes", "true"),
     }
 
