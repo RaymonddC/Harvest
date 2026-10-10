@@ -110,6 +110,41 @@ def test_add_farmer_validates_and_does_not_duplicate(client, store):
     assert client.post("/api/farmers", json={"name": "X"}).status_code == 400
 
 
+def test_edit_farmer_keeps_id_and_call_flags(client, store):
+    fid = client.post("/api/farmers", json={"name": "Pak Lama", "phone": "+62 812 0000 4321", "crop": "palm",
+                                            "language": "Bahasa Indonesia"}).json()["id"]
+    store.set("farmers", fid, {"do_not_call": True}, merge=True)
+    r = client.put(f"/api/farmers/{fid}", json={"name": "Pak Baru", "phone": "+62 812 0000 4321",
+                                                "crop": "karet", "language": "Bahasa Indonesia", "usual_kg_week": 50})
+    assert r.status_code == 200
+    saved = store.get("farmers", fid)
+    assert saved["name"] == "Pak Baru" and saved["crop"] == "rubber" and saved["usual_kg_week"] == 50
+    assert saved["do_not_call"] is True and saved["to_call"] is True
+    assert client.put(f"/api/farmers/{fid}", json={"name": "X"}).status_code == 400
+    assert client.put("/api/farmers/nope", json={"name": "A", "phone": "+62 812 0000 4321", "crop": "palm",
+                                                 "language": "Bahasa Indonesia"}).status_code == 400
+
+
+def test_delete_farmer_withdraws_waiting_calls_but_keeps_history(client, store):
+    fid = client.post("/api/farmers", json={"name": "Pak Hapus", "phone": "+62 812 0000 9876", "crop": "palm",
+                                            "language": "Bahasa Indonesia"}).json()["id"]
+    waiting = client.post(f"/api/farmers/{fid}/call", json={}).json()["call_id"]
+    store.set("calls", "done-1", {"id": "done-1", "farmer_id": fid, "status": "done", "kind": "collect"})
+    r = client.delete(f"/api/farmers/{fid}").json()
+    assert r["calls_withdrawn"] == 1
+    assert store.get("farmers", fid) is None and store.get("calls", waiting) is None
+    assert store.get("calls", "done-1") is not None
+    assert client.delete(f"/api/farmers/{fid}").status_code == 400
+
+
+def test_cannot_delete_a_farmer_who_is_on_a_call(client, store):
+    fid = client.post("/api/farmers", json={"name": "Pak Sibuk", "phone": "+62 812 0000 5555", "crop": "palm",
+                                            "language": "Bahasa Indonesia"}).json()["id"]
+    store.set("calls", "live-1", {"id": "live-1", "farmer_id": fid, "status": "on_call", "kind": "collect"})
+    assert client.delete(f"/api/farmers/{fid}").status_code == 400
+    assert store.get("farmers", fid) is not None
+
+
 def test_csv_download(client):
     r = client.get("/api/forecast.csv")
     assert r.status_code == 200 and r.text.startswith("week,")

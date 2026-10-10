@@ -386,9 +386,8 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
                        channel=call.get("channel", "browser"))
 
 
-def add_farmer(store: Store, row: dict) -> str:
-    """Validate one farmer row and save it. The id comes from the phone number, so the same
-    phone again updates that farmer instead of adding a duplicate."""
+def _farmer_fields(row: dict) -> tuple[str, dict]:
+    """Validate one farmer row. Returns (phone digits, the fields to store)."""
     row = {k.strip().lower(): str(v if v is not None else "").strip() for k, v in row.items() if k}
     missing = [c for c in ("name", "phone", "crop", "language") if not row.get(c)]
     if missing:
@@ -403,15 +402,48 @@ def add_farmer(store: Store, row: dict) -> str:
         usual = max(0, int(float(row.get("usual_kg_week") or 0)))
     except ValueError:
         raise ServiceError("usual_kg_week must be a number.") from None
-    fid = row.get("id") or "u" + hashlib.sha1(digits.encode()).hexdigest()[:8]
-    store.set("farmers", fid, {
+    return digits, {
         "name": row["name"], "phone": row["phone"], "crop": crop,
-        "language": row["language"], "village": row.get("village", ""),
-        "type": row.get("type", "farmer") or "farmer", "usual_kg_week": usual,
+        "language": row["language"], "village": row.get("village", ""), "usual_kg_week": usual,
         "can_pull_forward": row.get("can_pull_forward", "").lower() in ("1", "yes", "true"),
-        "to_call": True,
-    })
+    }
+
+
+def add_farmer(store: Store, row: dict) -> str:
+    """Save one farmer. The id comes from the phone number, so the same phone again updates that
+    farmer instead of adding a duplicate."""
+    digits, fields = _farmer_fields(row)
+    fid = str(row.get("id") or "").strip() or "u" + hashlib.sha1(digits.encode()).hexdigest()[:8]
+    clean = {k.strip().lower(): v for k, v in row.items() if k}
+    store.set("farmers", fid, {**fields, "type": str(clean.get("type") or "farmer").strip() or "farmer",
+                               "to_call": True})
     return fid
+
+
+def update_farmer(store: Store, farmer_id: str, row: dict) -> dict:
+    """Edit a farmer's details. Keeps the id and the call flags (to_call, do_not_call)."""
+    if not store.get("farmers", farmer_id):
+        raise ServiceError("Farmer not found.")
+    _, fields = _farmer_fields(row)
+    store.set("farmers", farmer_id, fields, merge=True)
+    return store.get("farmers", farmer_id)
+
+
+def delete_farmer(store: Store, farmer_id: str) -> dict:
+    """Remove a farmer and withdraw their waiting calls. Past calls, offers and harvests stay,
+    so the forecast and the audit trail do not change."""
+    if not store.get("farmers", farmer_id):
+        raise ServiceError("Farmer not found.")
+    for c in store.list("calls"):
+        if c["farmer_id"] == farmer_id and c["status"] == "on_call":
+            raise ServiceError("This farmer is on a call right now. Try again when it ends.")
+    withdrawn = 0
+    for c in store.list("calls"):
+        if c["farmer_id"] == farmer_id and c["status"] == "queued":
+            store.delete("calls", c["id"])
+            withdrawn += 1
+    store.delete("farmers", farmer_id)
+    return {"deleted": farmer_id, "calls_withdrawn": withdrawn}
 
 
 def upload_farmers(store: Store, settings: Settings, csv_text: str) -> dict:

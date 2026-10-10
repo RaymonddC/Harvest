@@ -186,6 +186,16 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
         return {"id": services.add_farmer(store, row)}
 
+    @app.put("/api/farmers/{farmer_id}", dependencies=[Depends(planner)])
+    def edit_farmer(farmer_id: str, body: FarmerIn):
+        row = body.model_dump()
+        row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
+        return services.update_farmer(store, farmer_id, row)
+
+    @app.delete("/api/farmers/{farmer_id}", dependencies=[Depends(planner)])
+    def remove_farmer(farmer_id: str):
+        return services.delete_farmer(store, farmer_id)
+
     @app.post("/api/farmers/upload", dependencies=[Depends(planner)])
     def upload(body: CsvIn):
         return services.upload_farmers(store, settings, body.csv)

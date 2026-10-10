@@ -2,13 +2,13 @@ import { act, api, avatar, cfg, cropLabel, el, fmtKg, icon, maskPhone, mountShel
 
 const $ = (id) => document.getElementById(id);
 const shell = mountShell("setup");
-const PAGE = 8;
+const PAGE = 10;
 let state = null;
-let shown = PAGE;
+let page = 1;
+let editingId = null;
 let limitsDirty = false;
 
-$("search").oninput = () => { shown = PAGE; renderFarmers(); };
-$("more").onclick = () => { shown += 40; renderFarmers(); };
+$("search").oninput = () => { page = 1; renderFarmers(); };
 $("upload-open").onclick = () => $("upload-dialog").showModal();
 $("upload-file").onchange = async (e) => { const f = e.target.files[0]; if (f) $("upload-text").value = await f.text(); };
 $("upload-send").onclick = () => act(async () => {
@@ -19,13 +19,32 @@ $("upload-send").onclick = () => act(async () => {
   if (r.skipped?.length) alert(`${r.added} added. ${r.skipped.length} lines skipped:\n\n${r.skipped.slice(0, 8).join("\n")}`);
   return `${r.added} farmers added.`;
 });
-$("add-open").onclick = () => $("add-dialog").showModal();
+function openFarmerForm(farmer) {
+  editingId = farmer ? farmer.id : null;
+  const f = $("add-form");
+  f.reset();
+  if (farmer) {
+    f.elements.name.value = farmer.name || "";
+    f.elements.phone.value = farmer.phone || "";
+    f.elements.crop.value = farmer.crop || "palm";
+    f.elements.language.value = farmer.language || "";
+    f.elements.village.value = farmer.village || "";
+    f.elements.usual_kg_week.value = farmer.usual_kg_week || "";
+    f.elements.can_pull_forward.checked = !!farmer.can_pull_forward;
+  }
+  $("add-title").textContent = farmer ? `Edit ${farmer.name}` : "Add a farmer";
+  $("add-send").textContent = farmer ? "Save changes" : "Add farmer";
+  $("add-dialog").showModal();
+}
+$("add-open").onclick = () => openFarmerForm(null);
 $("add-cancel").onclick = () => $("add-dialog").close();
 $("add-form").onsubmit = (e) => {
   e.preventDefault();
   const d = Object.fromEntries(new FormData($("add-form")));
   const body = { ...d, can_pull_forward: d.can_pull_forward === "on", usual_kg_week: d.usual_kg_week ? Number(d.usual_kg_week) : null };
-  act(() => api("/api/farmers", { body }), () => { $("add-dialog").close(); $("add-form").reset(); return "Farmer added."; });
+  const edit = editingId;
+  act(() => (edit ? api(`/api/farmers/${edit}`, { method: "PUT", body }) : api("/api/farmers", { body })),
+    () => { $("add-dialog").close(); $("add-form").reset(); return edit ? "Farmer saved." : "Farmer added."; });
 };
 $("reset").onclick = () => act(() => api("/api/demo/reset"), "Demo data reset.");
 
@@ -86,19 +105,42 @@ function renderFarmers() {
   const tones = ["", "grey", "ink"];
   $("avatars").replaceChildren(...farmers.slice(0, 3).map((f, i) => avatar(f.name, tones[i])),
     ...(farmers.length > 3 ? [el("span", { class: "avatar ink" }, `+${farmers.length - 3}`)] : []));
-  $("farmer-rows").replaceChildren(...rows.slice(0, shown).map((f) => el("tr", {},
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  page = Math.min(page, pages);
+  const first = (page - 1) * PAGE;
+  $("farmer-rows").replaceChildren(...rows.slice(first, first + PAGE).map((f) => el("tr", {},
     el("td", { style: "padding-left:22px" }, el("div", { class: "who-cell" }, avatar(f.name, "sm"),
       el("div", {}, el("b", {}, f.name), el("span", {}, f.village || "")))),
     el("td", { class: "num" }, maskPhone(f.phone)),
     el("td", {}, f.language),
     el("td", {}, cropLabel(f.crop)),
     el("td", { class: "r num" }, f.usual_kg_week ? fmtKg(f.usual_kg_week) : "–"),
-    el("td", { class: "r", style: "padding-right:22px" }, el("button", { class: "btn sm",
-      onclick: () => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`) }, "Call now")))));
+    el("td", { class: "r", style: "padding-right:22px;white-space:nowrap" },
+      el("button", { class: "btn sm", onclick: () => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`) }, "Call now"), " ",
+      el("button", { class: "btn sm", type: "button", onclick: () => openFarmerForm(f) }, "Edit"), " ",
+      el("button", { class: "btn sm", type: "button", onclick: () => {
+        if (confirm(`Delete ${f.name}? Their waiting calls are withdrawn. Past calls and offers stay.`)) act(() => api(`/api/farmers/${f.id}`, { method: "DELETE" }), `${f.name} deleted.`);
+      } }, "Delete")))));
   $("showing").textContent = rows.length
-    ? `Showing ${Math.min(shown, rows.length)} of ${rows.length}. Phone numbers are masked on screen.`
+    ? `Showing ${first + 1} to ${Math.min(first + PAGE, rows.length)} of ${rows.length}. Phone numbers are masked on screen.`
     : "No farmer matches that search.";
-  $("more").hidden = shown >= rows.length;
+  renderPager(pages);
+}
+
+function renderPager(pages) {
+  const go = (n) => { page = n; renderFarmers(); document.getElementById("farmer-list").scrollIntoView({ block: "start" }); };
+  const btn = (label, n, { current = false, disabled = false } = {}) => el("button", {
+    class: `btn sm${current ? " solid" : ""}`, type: "button", disabled, "aria-label": typeof label === "string" && /^\d+$/.test(label) ? `Page ${label}` : label,
+    ...(current ? { "aria-current": "page" } : {}), onclick: () => go(n) }, label);
+  if (pages <= 1) { $("pager").replaceChildren(); return; }
+  const nums = [...new Set([1, page - 1, page, page + 1, pages])].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+  const items = [btn("Previous", page - 1, { disabled: page === 1 })];
+  nums.forEach((n, i) => {
+    if (i && n - nums[i - 1] > 1) items.push(el("span", { class: "sub" }, "…"));
+    items.push(btn(String(n), n, { current: n === page }));
+  });
+  items.push(btn("Next", page + 1, { disabled: page === pages }));
+  $("pager").replaceChildren(...items);
 }
 
 function renderLimits() {
