@@ -49,6 +49,9 @@ async function answer(call) {
     return;
   }
   const ctx = new AudioContext();
+  // Some browsers create the audio engine paused (autoplay rules); a paused engine hears and plays nothing.
+  if (ctx.state !== "running") await ctx.resume().catch(() => {});
+  const micName = stream.getAudioTracks()[0]?.label || "your default microphone";
   await ctx.audioWorklet.addModule("js/audio-worklets.js");
   const source = ctx.createMediaStreamSource(stream);
   const capture = new AudioWorkletNode(ctx, "pcm-capture", { processorOptions: { targetRate: 16000 } });
@@ -61,7 +64,7 @@ async function answer(call) {
   const ws = new WebSocket(wsUrl(`/ws/call/${call.id}`));
   ws.binaryType = "arraybuffer";
   const f = farmerOf(call);
-  active = { call, ws, ctx, stream, player, startedAt: Date.now(), playEnd: 0, ended: false, muted: false,
+  active = { call, ws, ctx, stream, player, micName, startedAt: Date.now(), playEnd: 0, ended: false, muted: false,
     stage: 0, lines: {}, village: f.village, language: f.language, gapWeek: call.gap_week };
 
   $("call-farmer").textContent = call.farmer_name;
@@ -127,11 +130,15 @@ function showVoices() {
 function micCheck() {
   if (!active) return;
   const note = $("mic-note");
-  if (active.muted) {
+  if (active.ctx.state !== "running") {
+    note.textContent = "Your browser has paused the call's audio. Tap anywhere on this page to start it.";
+    note.hidden = false;
+    active.ctx.resume().catch(() => {});
+  } else if (active.muted) {
     note.textContent = "Muted: the agent cannot hear you.";
     note.hidden = false;
   } else if (!active.heardAt && Date.now() - active.startedAt > 6000) {
-    note.textContent = "No sound from your microphone yet. Check that it is not muted in your system and that the right one is allowed in the browser's site settings.";
+    note.textContent = `No sound from "${active.micName}" yet. Check that it is not muted in your system, and that the right microphone is chosen in the browser's site settings.`;
     note.hidden = false;
   } else {
     note.hidden = true;
@@ -346,6 +353,9 @@ function renderEnded(a, msg) {
   }
   $("ended-body").replaceChildren(...body);
 }
+
+// A tap or click is a user gesture, which lets a paused audio engine start.
+document.addEventListener("pointerdown", () => { if (active && active.ctx.state !== "running") active.ctx.resume().catch(() => {}); });
 
 $("hangup").onclick = () => {
   if (!active) return;
