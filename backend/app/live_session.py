@@ -15,6 +15,7 @@ import contextlib
 import json
 import array
 import logging
+import time
 from typing import Any, Awaitable, Callable, Protocol
 
 from fastapi import WebSocket
@@ -152,9 +153,12 @@ def default_connect(model: str, config: types.LiveConnectConfig):
 
 def make_translator(settings: Settings) -> Translate:
     client = None
+    paused_until = 0.0  # after a quota error, stop asking for a while instead of failing every line
 
     async def translate(text: str, target: str) -> str | None:
-        nonlocal client
+        nonlocal client, paused_until
+        if time.monotonic() < paused_until:
+            return None
         try:
             if client is None:
                 from google import genai
@@ -163,8 +167,14 @@ def make_translator(settings: Settings) -> Translate:
                 model=settings.text_model,
                 contents=f"Translate this phone-call line into {target}. Reply with the translation only.\n\n{text}")
             return (resp.text or "").strip() or None
-        except Exception:  # noqa: BLE001 - captions without translation are still useful
-            log.warning("caption translation failed", exc_info=True)
+        except Exception as e:  # noqa: BLE001 - captions without translation are still useful
+            if getattr(e, "code", None) == 429:
+                paused_until = time.monotonic() + 600
+                log.warning("caption translation paused for 10 minutes: Gemini quota exhausted for %s "
+                            "(free tier allows 20 requests a day; enable billing on the key's project)",
+                            settings.text_model)
+            else:
+                log.warning("caption translation failed", exc_info=True)
             return None
 
     return translate
