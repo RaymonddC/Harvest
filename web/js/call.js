@@ -72,9 +72,12 @@ async function answer(call) {
   setStage(0);
   meta("Connecting…");
   show("call");
-  active.timer = setInterval(() => meta(), 500);
+  $("mic-fill").style.width = "0";
+  $("mic-note").hidden = true;
+  active.timer = setInterval(() => { meta(); micCheck(); }, 500);
 
   capture.port.onmessage = (e) => {
+    if (e.data.level !== undefined) return micLevel(e.data.level);
     if (e.data.pcm && ws.readyState === WebSocket.OPEN && !active?.muted) ws.send(e.data.pcm);
   };
 
@@ -90,6 +93,28 @@ async function answer(call) {
     else if (msg.type === "ended") finish(msg);
   };
   ws.onclose = () => { if (active && !active.ended) finish({ status: "dropped", kind: call.kind }); };
+}
+
+// The level bar shows what the browser hears, so "it does not answer me" can be told apart from
+// "it cannot hear me". Speech is roughly 0.02 to 0.2 RMS.
+function micLevel(rms) {
+  if (!active) return;
+  $("mic-fill").style.width = `${Math.min(100, Math.round(rms * 600))}%`;
+  if (rms > 0.008) active.heardAt = Date.now();
+}
+
+function micCheck() {
+  if (!active) return;
+  const note = $("mic-note");
+  if (active.muted) {
+    note.textContent = "Muted: the agent cannot hear you.";
+    note.hidden = false;
+  } else if (!active.heardAt && Date.now() - active.startedAt > 6000) {
+    note.textContent = "No sound from your microphone yet. Check that it is not muted in your system and that the right one is allowed in the browser's site settings.";
+    note.hidden = false;
+  } else {
+    note.hidden = true;
+  }
 }
 
 function clock() {
