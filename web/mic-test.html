@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Microphone test · Harvest-Call</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #14231C; color: #FBF9F3; font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 24px 16px; }
+    main { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+    h1 { margin: 0; font-size: 26px; }
+    p { margin: 0; color: #B8C7BF; font-size: 14px; }
+    label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 700; }
+    select, button { font: inherit; min-height: 44px; border-radius: 10px; border: 1px solid #CFE6DA; background: #22352C; color: #FBF9F3; padding: 0 12px; }
+    button { cursor: pointer; font-weight: 700; }
+    button.primary { background: #CFE6DA; color: #14231C; }
+    button[disabled] { opacity: 0.45; cursor: not-allowed; }
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1 1 0; }
+    .meter { height: 14px; border-radius: 7px; background: #3B4D44; overflow: hidden; }
+    .meter i { display: block; height: 100%; width: 0; background: #CFE6DA; transition: width 0.08s linear; }
+    pre { margin: 0; background: #22352C; border-radius: 10px; padding: 12px; font: 13px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+    .verdict { font-weight: 700; }
+    .good { color: #CFE6DA; } .bad { color: #E3A72F; }
+    audio { width: 100%; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Microphone test</h1>
+  <p>Checks what this browser hears, without making a call. Press Start, then say a few words out loud.</p>
+
+  <label>Audio processing
+    <select id="mode">
+      <option value="all">Default: echo cancellation, noise suppression, auto gain (what calls use)</option>
+      <option value="none">All off (the raw microphone)</option>
+      <option value="echo">Echo cancellation only</option>
+    </select>
+  </label>
+  <label>Microphone
+    <select id="device"><option value="">Default microphone</option></select>
+  </label>
+  <div class="row">
+    <button class="primary" id="start">Start</button>
+    <button id="rec" disabled>Record 3 s and play back</button>
+  </div>
+
+  <div class="meter" role="img" aria-label="Microphone level"><i id="fill"></i></div>
+  <p class="verdict" id="verdict" role="status"></p>
+  <audio id="playback" controls hidden></audio>
+  <pre id="info">Not started.</pre>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const MODES = {
+  all: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  none: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+  echo: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+};
+let stream, ctx, analyser, timer, startedAt, rmsMax = 0, peakMax = 0, rms = 0, peak = 0;
+
+function stop() {
+  clearInterval(timer);
+  stream?.getTracks().forEach((t) => t.stop());
+  ctx?.close().catch(() => {});
+  stream = ctx = analyser = null;
+}
+
+async function start() {
+  stop();
+  rmsMax = peakMax = 0;
+  $("verdict").textContent = "";
+  const audio = { channelCount: 1, ...MODES[$("mode").value] };
+  if ($("device").value) audio.deviceId = { exact: $("device").value };
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio });
+  } catch (e) {
+    $("info").textContent = `The browser would not open the microphone.\n${e.name}: ${e.message}\n\nAllow the microphone for this site in the browser's site settings, then press Start again.`;
+    return;
+  }
+  // Device names are only available once permission is granted.
+  const chosen = $("device").value;
+  const inputs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput");
+  $("device").replaceChildren(new Option("Default microphone", ""),
+    ...inputs.map((d, i) => new Option(d.label || `Microphone ${i + 1}`, d.deviceId)));
+  $("device").value = inputs.some((d) => d.deviceId === chosen) ? chosen : "";
+
+  ctx = new AudioContext();
+  if (ctx.state !== "running") await ctx.resume().catch(() => {});
+  analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  ctx.createMediaStreamSource(stream).connect(analyser);
+  startedAt = Date.now();
+  $("rec").disabled = false;
+  const buf = new Float32Array(analyser.fftSize);
+  timer = setInterval(() => {
+    analyser.getFloatTimeDomainData(buf);
+    let sum = 0; peak = 0;
+    for (const v of buf) { sum += v * v; peak = Math.max(peak, Math.abs(v)); }
+    rms = Math.sqrt(sum / buf.length);
+    rmsMax = Math.max(rmsMax, rms); peakMax = Math.max(peakMax, peak);
+    $("fill").style.width = `${Math.min(100, Math.round(rms * 600))}%`;
+    report();
+  }, 100);
+}
+
+function report() {
+  const track = stream.getAudioTracks()[0];
+  const s = track.getSettings ? track.getSettings() : {};
+  $("info").textContent = [
+    `Microphone:      ${track.label || "(no name given)"}`,
+    `Track state:     ${track.readyState === "live" && !track.muted ? "live" : `${track.readyState}${track.muted ? ", MUTED by the system or browser" : ""}`}`,
+    `Audio engine:    ${ctx.state}, ${ctx.sampleRate} Hz`,
+    `Settings used:   echo cancel ${s.echoCancellation}, noise suppress ${s.noiseSuppression}, auto gain ${s.autoGainControl}, ${s.channelCount ?? "?"} channel(s)`,
+    `Level now:       ${rms.toFixed(4)}  (peak ${peak.toFixed(3)})`,
+    `Highest so far:  ${rmsMax.toFixed(4)}  (peak ${peakMax.toFixed(3)})`,
+    `Speech is about: 0.02 to 0.2`,
+  ].join("\n");
+  const secs = (Date.now() - startedAt) / 1000;
+  const v = $("verdict");
+  if (rmsMax > 0.02) { v.textContent = "Heard sound. This microphone works with these settings."; v.className = "verdict good"; }
+  else if (secs > 5) {
+    v.textContent = "Hardly any sound. Say something loudly, close to the microphone. If this stays low, try the other audio processing choices and microphones above.";
+    v.className = "verdict bad";
+  }
+}
+
+let recording = false;
+$("rec").onclick = () => {
+  if (!stream || recording || typeof MediaRecorder === "undefined") return;
+  recording = true;
+  $("rec").textContent = "Recording… say something";
+  const chunks = [];
+  const rec = new MediaRecorder(stream);
+  rec.ondataavailable = (e) => chunks.push(e.data);
+  rec.onstop = () => {
+    recording = false;
+    $("rec").textContent = "Record 3 s and play back";
+    const a = $("playback");
+    a.src = URL.createObjectURL(new Blob(chunks, { type: rec.mimeType }));
+    a.hidden = false;
+    a.play().catch(() => {});
+  };
+  rec.start();
+  setTimeout(() => rec.stop(), 3000);
+};
+
+$("start").onclick = start;
+$("mode").onchange = () => { if (stream) start(); };
+$("device").onchange = () => { if (stream) start(); };
+window.addEventListener("pagehide", stop);
+</script>
+</body>
+</html>
