@@ -23,9 +23,8 @@ def test_health_state_and_config(client):
     assert client.get("/healthz").json()["ok"]
     state = client.get("/api/state").json()
     assert {"farmers", "forecast", "offers", "limits", "calls", "settings"} <= state.keys()
-    assert state["settings"]["planner_name"] == "Dewi"
     cfg = client.get("/config.js").text
-    assert "Koperasi Sawit Maju" in cfg and '"plannerName": "Dewi"' in cfg
+    assert "Koperasi Sawit Maju" in cfg and "plannerName" not in cfg
 
 
 def test_summary_includes_gap_note(client):

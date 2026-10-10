@@ -11,7 +11,7 @@ Production has three places. Change a setting in the right one, never directly o
 | What | Where you change it | Takes effect |
 |---|---|---|
 | **Secrets** (the Gemini API key, the Twilio token) | **Google Cloud Secret Manager**: https://console.cloud.google.com/security/secret-manager?project=harvest-511117. Open the secret and add a new version. | After a redeploy. A running instance keeps the version it started with. |
-| **Settings the pipeline passes** (`LIVE_MODEL`, `GEMINI_BACKEND`, `GOOGLE_CLOUD_LOCATION`, `MILL_NAME`, `PLANNER_NAME`, `DEMO_LANGUAGE`, `FIREBASE_WEB_CONFIG`, `GCP_PROJECT`, `GCP_REGION`) | **GitHub** repository variables: https://github.com/RaymonddC/Harvest/settings/variables/actions. `JWT_SECRET`, `WIF_PROVIDER` and `WIF_SERVICE_ACCOUNT` are GitHub *secrets* instead: https://github.com/RaymonddC/Harvest/settings/secrets/actions | On the next deploy: push to `main`, or run *Deploy* in the Actions tab. |
+| **Settings the pipeline passes** (`LIVE_MODEL`, `GEMINI_BACKEND`, `GOOGLE_CLOUD_LOCATION`, `MILL_NAME`, `DEMO_LANGUAGE`, `FIREBASE_WEB_CONFIG`, `GCP_PROJECT`, `GCP_REGION`) | **GitHub** repository variables: https://github.com/RaymonddC/Harvest/settings/variables/actions. `JWT_SECRET`, `WIF_PROVIDER` and `WIF_SERVICE_ACCOUNT` are GitHub *secrets* instead: https://github.com/RaymonddC/Harvest/settings/secrets/actions | On the next deploy: push to `main`, or run *Deploy* in the Actions tab. |
 | **Everything else** (`TEXT_MODEL`, `VOICE_NAME`, `MAX_CALL_SECONDS`, the forecast numbers and so on) | The default in `backend/app/config.py`. There is no GitHub variable for these yet. To make one, follow "Adding a new setting" below. | After a merge to `main` redeploys it. |
 
 The deploy copies the GitHub values into the Cloud Run service's environment variables. So **the
@@ -64,7 +64,6 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | `GOOGLE_CLOUD_PROJECT` | none | No | Project id, needed when `STORE_BACKEND=firestore`. | Set by `deploy.sh` from GitHub variable `GCP_PROJECT` |
 | `SEED_ON_START` | true for `memory`, false for `firestore` | No | Reload the demo data on every start. | Set by `deploy.sh` (`false`); not changeable from GitHub |
 | `MILL_NAME` | `Koperasi Sawit Maju` | No | The buying mill, spoken by the agent and shown in the header. | GitHub variable `MILL_NAME`, then redeploy |
-| `PLANNER_NAME` | `Dewi` | No | The planner's name, shown in the header and on the Planner role. | GitHub variable `PLANNER_NAME`, then redeploy |
 | `DEMO_LANGUAGE` | `Bahasa Indonesia` | No | Language the agent speaks. | GitHub variable `DEMO_LANGUAGE`, then redeploy |
 | `DEMO_CROP` | `palm` | No | Default crop. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `CAPTION_TRANSLATE_TO` | `English` | No | Second caption line on the call screen. Empty turns it off. | Not settable from GitHub yet: the code default runs. See the rule above |
@@ -103,7 +102,7 @@ In the cloud the service signs in with its own account, which needs `roles/aipla
 | `GOOGLE_CLOUD_LOCATION` | `us-central1` | Vertex region for the Live API (with `vertex`). |
 | `LIVE_MODEL` | `gemini-live-2.5-flash-native-audio` with `vertex`, unset with `api_key` | The Live model's name. It differs between Vertex and the Gemini API. |
 | `SERVICE` / `JOB` | `harvest-gateway` / `harvest-forecast` | Cloud Run service and job names. |
-| `MILL_NAME`, `PLANNER_NAME`, `DEMO_LANGUAGE` | as above | Passed to the service. |
+| `MILL_NAME`, `DEMO_LANGUAGE` | as above | Passed to the service. |
 | `FIREBASE_WEB_CONFIG` | none | Passed to the service and written into `web/config.js`. |
 | `JWT_SECRET` | a new random value each deploy | Passed to the service. Fix it to keep people signed in across deploys. |
 | `SEED_DEMO_DATA` | `true` | Replace everything in Firestore with the demo data after deploying. Use `true` on the first deploy only. |
@@ -120,7 +119,7 @@ In the cloud the service signs in with its own account, which needs `roles/aipla
 | Secret | `JWT_SECRET` | Optional; keeps people signed in across deploys. |
 | Variable | `GCP_PROJECT` | Project id (required). |
 | Variable | `GCP_REGION` | Region, defaults to `asia-southeast1`. |
-| Variable | `MILL_NAME`, `PLANNER_NAME`, `DEMO_LANGUAGE`, `FIREBASE_WEB_CONFIG` | Optional. |
+| Variable | `MILL_NAME`, `DEMO_LANGUAGE`, `FIREBASE_WEB_CONFIG` | Optional. |
 | Variable | `GEMINI_BACKEND`, `GOOGLE_CLOUD_LOCATION`, `LIVE_MODEL` | Optional; see the deploy settings above. |
 
 How to create the first three is in section 7 of `DEPLOY.md`.

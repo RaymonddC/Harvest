@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Users · Harvest-Call</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <main class="page">
+    <div class="page-head">
+      <div>
+        <h1>Users and roles</h1>
+        <p>Who can sign in, and what each role may do. A role is a bundle of rights; every approval is recorded under the user who made it.</p>
+      </div>
+      <button class="btn solid" id="add-open" type="button">Add user</button>
+    </div>
+
+    <section class="card" style="padding:0;gap:0" aria-labelledby="users-title">
+      <div class="card-head" style="padding:18px 22px;border-bottom:1px solid var(--line-2)">
+        <div><h2 id="users-title">People</h2><div class="sub" id="users-count"></div></div>
+      </div>
+      <div class="table-wrap">
+        <table style="min-width:640px">
+          <thead><tr><th style="padding-left:22px">Name</th><th>Role</th><th>Status</th><th style="padding-right:22px"><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody id="user-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="roles-title">
+      <div class="card-head"><h2 id="roles-title">What each role may do</h2></div>
+      <div class="table-wrap">
+        <table style="min-width:640px">
+          <thead id="role-head"></thead>
+          <tbody id="role-rows"></tbody>
+        </table>
+      </div>
+      <p class="small muted">The rights are fixed in the code, because each one is checked by the server. Changing a user's role changes what they can do straight away.</p>
+    </section>
+  </main>
+
+  <dialog id="user-dialog" aria-labelledby="user-title">
+    <form id="user-form" method="dialog">
+      <h2 id="user-title">Add a user</h2>
+      <div style="display:grid;gap:10px;margin:12px 0">
+        <label class="field">Name <input type="text" name="name" required maxlength="60" autocomplete="off"></label>
+        <label class="field">Role <select name="role" required></select></label>
+        <p class="sub" id="role-help" style="margin:0"></p>
+        <label class="field" id="active-row" style="flex-direction:row;gap:8px;align-items:center;font-weight:400"><input name="active" type="checkbox" checked> Can sign in</label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn solid" id="user-send" type="submit">Add user</button>
+        <button class="btn" type="button" id="user-cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/users.js"></script>
+</body>
+</html>

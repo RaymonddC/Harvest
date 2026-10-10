@@ -33,7 +33,6 @@ REGION="${REGION:-asia-southeast1}"
 SERVICE="${SERVICE:-harvest-gateway}"
 JOB="${JOB:-harvest-forecast}"
 MILL_NAME="${MILL_NAME:-Koperasi Sawit Maju}"
-PLANNER_NAME="${PLANNER_NAME:-Dewi}"
 DEMO_LANGUAGE="${DEMO_LANGUAGE:-Bahasa Indonesia}"
 # How the service reaches Gemini. "vertex" (default): the service's own Google account calls
 # Vertex AI, so no key is stored anywhere. "api_key": a Gemini API key from the gemini-api-key secret.
@@ -65,7 +64,7 @@ fi
 
 # "^@^" switches gcloud's list delimiter to @, because the Firebase config JSON contains commas.
 ENV_VARS="^@^STORE_BACKEND=firestore@GOOGLE_CLOUD_PROJECT=$PROJECT@SEED_ON_START=false"
-ENV_VARS="$ENV_VARS@MILL_NAME=$MILL_NAME@PLANNER_NAME=$PLANNER_NAME@DEMO_LANGUAGE=$DEMO_LANGUAGE"
+ENV_VARS="$ENV_VARS@MILL_NAME=$MILL_NAME@DEMO_LANGUAGE=$DEMO_LANGUAGE"
 ENV_VARS="$ENV_VARS@JWT_SECRET=$JWT_SECRET"
 if [[ -n "${FIREBASE_WEB_CONFIG:-}" ]]; then ENV_VARS="$ENV_VARS@FIREBASE_WEB_CONFIG=$FIREBASE_WEB_CONFIG"; fi
 
@@ -107,7 +106,6 @@ cat > "$ROOT/web/config.js" <<JS
 window.HARVEST_CONFIG = {
   apiBase: "$URL",
   millName: "$MILL_NAME",
-  plannerName: "$PLANNER_NAME",
   firebase: $FB,
 };
 JS

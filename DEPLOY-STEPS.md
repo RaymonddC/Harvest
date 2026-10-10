@@ -106,9 +106,10 @@ Part B is done. You never repeat it for this project.
 
 ## Part C. Deploy (in Cloud Shell, 5 to 10 minutes)
 
-**C1. Nothing to choose.** There is no password. The site opens on a page where you pick a role:
-Planner (can change things), Viewer (read only) or Farmer (the call page). The script creates the
-signing key for you.
+**C1. Nothing to choose.** There is no password. The site opens on a page where you pick a person:
+Dewi the planner (can change everything), Budi the coordinator (runs campaigns, cannot approve),
+a guest viewer (read only) or a farmer (the call page). The people and their roles are saved in
+Firestore the first time the service starts. The script creates the signing key for you.
 
 **C2. Run the deploy script.**
 ```bash
@@ -137,8 +138,9 @@ You should see `{"ok":true,"store":"firestore", ...}`.
 
 **D3. Try the demo.** Any page sends you to the sign-in page first. Pick **Planner**, open the setup
 page and click *Start campaign*. Then follow the demo walk-through in the README. To watch without
-being able to change anything pick **Viewer**; to answer calls pick **Farmer**. *Switch role* in the
-header gets you back to the sign-in page.
+being able to change anything pick **Guest viewer**; to answer calls pick **Farmer**. As the planner,
+open **Users** to add people or change their role. *Switch user* in the header gets you back to the
+sign-in page.
 
 ---
 

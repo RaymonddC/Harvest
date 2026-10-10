@@ -7,9 +7,9 @@
 | Language | Bahasa Indonesia (`DEMO_LANGUAGE`), with English caption lines (`CAPTION_TRANSLATE_TO`) | Confirm with the C-02 speech test |
 | Prices | Floor Rp 2,900, reference 3,100, ceiling 3,350 per kg; first offer +4% (Rp 3,220), then steps of 2%. A counter inside the limits is accepted; above the ceiling goes to the planner | Illustrative; replace the reference with a published provincial FFB price |
 | Target | 100 t per week; a week is a gap below 80 t (`GAP_TOLERANCE=0.2`) | Matches the wireframe |
-| Buyer | "Koperasi Sawit Maju" (fictional), planner "Dewi" | `MILL_NAME`, `PLANNER_NAME` |
+| Buyer | "Koperasi Sawit Maju" (fictional), default planner user "Dewi" (a record on the Users page, not a setting) | `MILL_NAME` |
 | Live model | `gemini-2.5-flash-native-audio-preview-12-2025` | Check it is still current before recording; set `LIVE_MODEL` |
-| Dashboard auth | Demo sign-in: `login.html` hands out a signed role token (planner, viewer or farmer), no password. Only planner actions are checked on the server (`app/auth.py`); reads, Firestore reads and the call client stay open because the data is synthetic | Decided 10 Oct: keep the role picker for the hackathon. The plan's Firebase Authentication with an email allow list (task B-09) is deferred to Phase 2, because judges need a way in without an account. Anyone can pick Planner, so replace `/api/auth/login` with a real sign-in before any real data |
+| Dashboard auth | Demo sign-in: `login.html` lists the users and hands out a signed token for the one you pick, no password. Roles are bundles of capabilities (`app/access.py`, closed set in code, roles and users stored in Firestore, edited on the Users page); every changing endpoint checks a capability (`app/auth.py`); reads, Firestore reads and the call client stay open because the data is synthetic | Decided 10 Oct: keep the demo sign-in for the hackathon, now with users and roles (modelled on the Honeypot project's capability-based RBAC, without its agencies and audit trail). The plan's Firebase Authentication with an email allow list (task B-09) is deferred to Phase 2, because judges need a way in without an account. Anyone can pick Planner, so replace `/api/auth/login` with a real sign-in before any real data |
 
 ## Data model additions
 

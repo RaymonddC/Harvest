@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import auth, seed_data, services
+from . import access, auth, seed_data, services
 from .config import Settings, get_settings
 from .live_session import BrowserChannel, run_call
 from .store import COLLECTIONS, Store, make_store
@@ -50,7 +50,14 @@ class CampaignIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    role: str
+    user_id: str | None = None
+    role: str | None = None  # picks the first active user with this role
+
+
+class UserIn(BaseModel):
+    name: str = ""
+    role: str = ""
+    active: bool = True
 
 
 class CallNowIn(BaseModel):
@@ -67,6 +74,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        access.ensure_defaults(store)
         if settings.seed_on_start:
             seed_data.load_seed(store, settings)
             log.info("Seeded demo data; plan starts %s", settings.plan_start)
@@ -78,10 +86,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"],
                        allow_headers=["*"])
 
-    planner = auth.planner_dependency(settings)
+    def need(capability: str):
+        return auth.require(settings, store, capability)
+
+    users_admin = Depends(need("users.admin"))
 
     @app.exception_handler(services.ServiceError)
     async def service_error(_: Request, exc: services.ServiceError):
+        return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    @app.exception_handler(access.AccessError)
+    async def access_error(_: Request, exc: access.AccessError):
         return JSONResponse({"detail": str(exc)}, status_code=400)
 
     # ----- health and config -----
@@ -92,29 +107,82 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.get("/config.js", include_in_schema=False)
     def config_js():
-        cfg = {"apiBase": "", "millName": settings.mill_name, "plannerName": settings.planner_name,
+        cfg = {"apiBase": "", "millName": settings.mill_name,
                "firebase": json.loads(settings.firebase_web_config) if settings.firebase_web_config else None}
         return Response(f"window.HARVEST_CONFIG = {json.dumps(cfg)};", media_type="application/javascript")
 
     # ----- demo sign-in: pick a role, no password -----
 
+    def session_for(user: dict) -> dict:
+        token, exp = auth.mint_token(settings, user)
+        return {"token": token, "exp": exp, "user_id": user["id"], "role": user["role"], "name": user["name"],
+                "role_label": (access.get_role(store, user["role"]) or {}).get("label", user["role"]),
+                "capabilities": sorted(access.capabilities_of(store, user["role"]))}
+
+    @app.get("/api/auth/people")
+    def people():
+        """The people on the demo sign-in page. Replace with a real identity check before real data."""
+        access.ensure_defaults(store)
+        order = list(access.DEFAULT_ROLES)
+        users = sorted((u for u in store.list("users") if u.get("active", True)),
+                       key=lambda u: (order.index(u["role"]) if u["role"] in order else len(order), u["name"].lower()))
+        return {"people": [{**access.public_user(store, u),
+                            "description": (access.get_role(store, u["role"]) or {}).get("description", "")}
+                           for u in users]}
+
     @app.post("/api/auth/login")
     def login(body: LoginIn):
-        if body.role not in auth.ROLES:
-            raise HTTPException(400, f"Role must be one of: {', '.join(auth.ROLES)}.")
-        token, exp = auth.mint_token(settings, body.role)
-        return {"token": token, "role": body.role, "name": auth.display_name(settings, body.role), "exp": exp}
+        access.ensure_defaults(store)
+        active = sorted((u for u in store.list("users") if u.get("active", True)), key=lambda u: u["id"])
+        if body.user_id:
+            user = next((u for u in active if u["id"] == body.user_id), None)
+            if not user:
+                raise HTTPException(400, "Unknown or turned-off user.")
+        elif body.role:
+            user = next((u for u in active if u["role"] == body.role), None)
+            if not user:
+                raise HTTPException(400, f"No active user has the role {body.role!r}.")
+        else:
+            raise HTTPException(400, "Say which user to sign in as.")
+        return session_for(user)
 
     @app.get("/api/auth/me")
     def me(authorization: str | None = Header(default=None)):
+        actor = auth.current_actor(settings, store, authorization)
         claims = auth.read_token(settings, authorization)
-        return {"role": claims["role"], "name": claims.get("name"), "exp": claims["exp"]}
+        return {"user_id": actor.id, "name": actor.name, "role": actor.role,
+                "capabilities": sorted(actor.capabilities), "exp": claims["exp"]}
+
+    # ----- users (the Users page) -----
+
+    @app.get("/api/users")
+    def list_users(_: auth.Actor = users_admin):
+        access.ensure_defaults(store)
+        users = sorted(store.list("users"), key=lambda u: (u["role"] != "planner", u["name"].lower()))
+        return {"users": [access.public_user(store, u) for u in users],
+                "roles": [{"id": r["id"], "label": r.get("label", r["id"]),
+                           "description": r.get("description", ""), "capabilities": r.get("capabilities", [])}
+                          for r in sorted(store.list("roles"), key=lambda r: r["id"])],
+                "capabilities": access.CAPABILITIES}
+
+    @app.post("/api/users")
+    def create_user(body: UserIn, _: auth.Actor = users_admin):
+        return access.public_user(store, access.add_user(store, body.name, body.role))
+
+    @app.put("/api/users/{user_id}")
+    def edit_user(user_id: str, body: UserIn, _: auth.Actor = users_admin):
+        return access.public_user(store, access.update_user(store, user_id, body.name, body.role, body.active))
+
+    @app.delete("/api/users/{user_id}")
+    def remove_user(user_id: str, actor: auth.Actor = users_admin):
+        access.delete_user(store, user_id, actor.id)
+        return {"deleted": user_id}
 
     # ----- read model -----
 
     def snapshot() -> dict:
         data = {c: store.list(c) for c in COLLECTIONS}
-        data["settings"] = {"mill_name": settings.mill_name, "planner_name": settings.planner_name,
+        data["settings"] = {"mill_name": settings.mill_name,
                             "language": settings.demo_language, "max_call_seconds": settings.max_call_seconds,
                             "max_call_attempts": settings.max_call_attempts,
                             "plan_start": settings.plan_start.isoformat(),
@@ -173,71 +241,71 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     # ----- planner actions (client writes to Firestore are blocked; everything goes through here) -----
 
-    @app.put("/api/limits/{crop}", dependencies=[Depends(planner)])
+    @app.put("/api/limits/{crop}", dependencies=[Depends(need("limits.edit"))])
     def put_limits(crop: str, body: LimitsIn):
         doc = services.set_limits(store, crop, body.floor_price, body.ceiling_price, body.reference_price,
                                   body.first_premium_pct, body.step_pct)
         services.recompute_forecast(store, settings)
         return doc
 
-    @app.post("/api/farmers", dependencies=[Depends(planner)])
+    @app.post("/api/farmers", dependencies=[Depends(need("farmers.manage"))])
     def add_farmer(body: FarmerIn):
         row = body.model_dump()
         row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
         return {"id": services.add_farmer(store, row)}
 
-    @app.put("/api/farmers/{farmer_id}", dependencies=[Depends(planner)])
+    @app.put("/api/farmers/{farmer_id}", dependencies=[Depends(need("farmers.manage"))])
     def edit_farmer(farmer_id: str, body: FarmerIn):
         row = body.model_dump()
         row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
         return services.update_farmer(store, farmer_id, row)
 
-    @app.delete("/api/farmers/{farmer_id}", dependencies=[Depends(planner)])
+    @app.delete("/api/farmers/{farmer_id}", dependencies=[Depends(need("farmers.manage"))])
     def remove_farmer(farmer_id: str):
         return services.delete_farmer(store, farmer_id)
 
-    @app.post("/api/farmers/upload", dependencies=[Depends(planner)])
+    @app.post("/api/farmers/upload", dependencies=[Depends(need("farmers.manage"))])
     def upload(body: CsvIn):
         return services.upload_farmers(store, settings, body.csv)
 
-    @app.post("/api/campaign/start", dependencies=[Depends(planner)])
+    @app.post("/api/campaign/start", dependencies=[Depends(need("campaign.run"))])
     def campaign_start(body: CampaignIn):
         return services.start_campaign(store, settings, body.kind)
 
-    @app.post("/api/campaign/stop", dependencies=[Depends(planner)])
+    @app.post("/api/campaign/stop", dependencies=[Depends(need("campaign.run"))])
     def campaign_stop():
         return services.stop_campaign(store)
 
-    @app.post("/api/farmers/{farmer_id}/call", dependencies=[Depends(planner)])
+    @app.post("/api/farmers/{farmer_id}/call", dependencies=[Depends(need("campaign.run"))])
     def farmer_call(farmer_id: str, body: CallNowIn | None = None):
         return {"call_id": services.call_now(store, farmer_id, body.kind if body else None)}
 
-    @app.post("/api/farmers/{farmer_id}/dial", dependencies=[Depends(planner)])
+    @app.post("/api/farmers/{farmer_id}/dial", dependencies=[Depends(need("campaign.run"))])
     def farmer_dial(farmer_id: str, body: DialIn | None = None):
         """VA-8: place a real outbound call over Twilio instead of waiting for a browser answer."""
         return {"call_id": services.dial_now(store, settings, farmer_id, body.kind if body else None)}
 
-    @app.post("/api/offers/{offer_id}/approve", dependencies=[Depends(planner)])
-    def approve(offer_id: str):
-        return services.decide_offer(store, settings, offer_id, approve=True)
+    @app.post("/api/offers/{offer_id}/approve")
+    def approve(offer_id: str, actor: auth.Actor = Depends(need("offers.decide"))):
+        return services.decide_offer(store, settings, offer_id, approve=True, actor=actor)
 
-    @app.post("/api/offers/{offer_id}/reject", dependencies=[Depends(planner)])
-    def reject(offer_id: str):
-        return services.decide_offer(store, settings, offer_id, approve=False)
+    @app.post("/api/offers/{offer_id}/reject")
+    def reject(offer_id: str, actor: auth.Actor = Depends(need("offers.decide"))):
+        return services.decide_offer(store, settings, offer_id, approve=False, actor=actor)
 
-    @app.post("/api/offers/{offer_id}/undo", dependencies=[Depends(planner)])
+    @app.post("/api/offers/{offer_id}/undo", dependencies=[Depends(need("offers.decide"))])
     def undo(offer_id: str):
         return services.undo_offer(store, settings, offer_id)
 
-    @app.post("/api/rival-quotes/{quote_id}/offer", dependencies=[Depends(planner)])
+    @app.post("/api/rival-quotes/{quote_id}/offer", dependencies=[Depends(need("offers.decide"))])
     def rival_offer(quote_id: str):
         return services.offer_from_rival_quote(store, settings, quote_id)
 
-    @app.post("/api/forecast/recompute", dependencies=[Depends(planner)])
+    @app.post("/api/forecast/recompute", dependencies=[Depends(need("campaign.run"))])
     def recompute():
         return services.recompute_forecast(store, settings)
 
-    @app.post("/api/demo/reset", dependencies=[Depends(planner)])
+    @app.post("/api/demo/reset", dependencies=[Depends(need("demo.reset"))])
     def reset():
         seed_data.load_seed(store, settings)
         return {"ok": True}

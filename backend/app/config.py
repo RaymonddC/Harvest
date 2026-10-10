@@ -38,7 +38,6 @@ class Settings:
     voice_name: str
     vad_silence_ms: int  # silence that ends the farmer's turn; shorter means the agent answers sooner
     mill_name: str
-    planner_name: str
     demo_language: str
     demo_crop: str
     plan_start: dt.date
@@ -111,7 +110,6 @@ def get_settings() -> Settings:
         voice_name=os.environ.get("VOICE_NAME", "Kore"),
         vad_silence_ms=int(os.environ.get("VAD_SILENCE_MS", "400")),
         mill_name=os.environ.get("MILL_NAME", "Koperasi Sawit Maju"),
-        planner_name=os.environ.get("PLANNER_NAME", "Dewi"),
         demo_language=os.environ.get("DEMO_LANGUAGE", "Bahasa Indonesia"),
         demo_crop=os.environ.get("DEMO_CROP", "palm"),
         plan_start=plan_start,

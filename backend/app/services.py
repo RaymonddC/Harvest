@@ -181,7 +181,7 @@ def create_offer(store: Store, settings: Settings, *, farmer: dict, crop: str, k
     return {**doc, "id": offer_id}
 
 
-def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool) -> dict:
+def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool, actor=None) -> dict:
     offer = store.get("offers", offer_id)
     if not offer:
         raise ServiceError("Offer not found.")
@@ -201,7 +201,8 @@ def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool)
             changes = {"price_per_kg": price, "quoted_price": offer["price_per_kg"]}
     status = "approved" if approve else "rejected"
     store.set("offers", offer_id, {**changes, "status": status, "decided_at": now_iso(),
-                                   "decided_by": settings.planner_name}, merge=True)
+                                   "decided_by": actor.name if actor else "Planner",
+                                   "decided_by_id": actor.id if actor else None}, merge=True)
     recompute_forecast(store, settings)
     if approve:
         farmer = store.get("farmers", offer["farmer_id"])
@@ -226,7 +227,7 @@ def undo_offer(store: Store, settings: Settings, offer_id: str) -> dict:
         if c["status"] == "queued":
             store.delete("calls", c["id"])
     back = "escalated" if (offer.get("negotiation") or {}).get("escalated") else "pending"
-    changes = {"status": back, "decided_at": None, "decided_by": None}
+    changes = {"status": back, "decided_at": None, "decided_by": None, "decided_by_id": None}
     if back == "escalated" and offer.get("quoted_price") is not None:
         changes.update(price_per_kg=offer["quoted_price"], quoted_price=None)
     store.set("offers", offer_id, changes, merge=True)

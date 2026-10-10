@@ -141,7 +141,7 @@ bash deploy/deploy.sh
 ```
 
 `FIREBASE_WEB_CONFIG` is optional. There is no password: the site opens on a page where you pick
-a role (Planner, Viewer or Farmer). `JWT_SECRET` is optional too; the script makes one if you
+a person (Dewi the planner, Budi the coordinator, a guest viewer or a farmer), and what they may do depends on their role; the planner manages people on the Users page. `JWT_SECRET` is optional too; the script makes one if you
 don't pass it.
 
 The script, in order: enables the APIs, deploys the gateway, deploys the forecast job,
@@ -243,7 +243,7 @@ In the repository: *Settings, Secrets and variables, Actions*.
 | Variable | `GCP_PROJECT` | your project id |
 | Variable | `GCP_REGION` | e.g. `asia-southeast1` (defaults to that if empty) |
 | Variable | `FIREBASE_WEB_CONFIG` | the JSON from section 4 step 7, or leave unset |
-| Variable | `MILL_NAME`, `PLANNER_NAME`, `DEMO_LANGUAGE` | optional; defaults are in `deploy.sh` |
+| Variable | `MILL_NAME`, `DEMO_LANGUAGE` | optional; defaults are in `deploy.sh` |
 
 The first deploy (section 5) must be done by hand first. It seeds the data, and the workflow
 deliberately never seeds.
@@ -292,7 +292,7 @@ workflow's `env:` block, as `deploy.sh` already reads them.
 | `firebase deploy` says the project is not a Firebase project, or hosting is not set up | Section 4 step 3 was skipped. |
 | `firebase deploy` fails with 403 in CI | The deployer lacks `roles/firebasehosting.admin` or `roles/firebaserules.admin`. |
 | Actions fail with 401, or the login page keeps reappearing | The session expired or `JWT_SECRET` changed or differs between instances. Pick the role again; set one `JWT_SECRET` for the service. |
-| Buttons say "You are signed in as a viewer" | Use *Switch role* in the header and pick Planner. |
+| Buttons say "You are signed in as ..." or the server says your role is not allowed | Use *Switch user* in the header and pick someone whose role has that right (the planner has all of them). |
 | Dashboard shows old pages or no role picker after a redeploy | Browsers cache. Pages, scripts and styles are served with `no-cache` (see `firebase.json`), but a copy fetched before that setting existed can stay for up to an hour: hard refresh (Ctrl+Shift+R) once. |
 | The gateway has the wrong settings after a redeploy | The run used different env values than the last one. Re-run with the full set. |
 

@@ -3,7 +3,7 @@
 // events from the backend. Writes always go through the backend API (Firestore rules
 // block client writes).
 
-export const cfg = Object.assign({ apiBase: "", firebase: null, millName: "the cooperative", plannerName: "Planner" },
+export const cfg = Object.assign({ apiBase: "", firebase: null, millName: "the cooperative" },
   window.HARVEST_CONFIG || {});
 
 const COLLECTIONS = ["farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns"];
@@ -20,20 +20,21 @@ export function wsUrl(path) {
 // ---------- demo sign-in: the browser keeps the role token the backend handed out ----------
 
 const SESSION_KEY = "harvestSession";
-export const ROLE_LABEL = { planner: "Planner", viewer: "Viewer", farmer: "Farmer" };
+export const roleLabel = (s) => (s && (s.role_label || s.role)) || "";
+export const can = (capability) => !!getSession()?.capabilities?.includes(capability);
 
 export function getSession() {
   try {
     const s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
-    if (s && s.token && s.exp * 1000 > Date.now()) return s;
+    if (s && s.token && s.user_id && Array.isArray(s.capabilities) && s.exp * 1000 > Date.now()) return s;  // older sessions lack user_id: sign in again
   } catch { /* storage blocked or corrupt: treated as signed out */ }
   return null;
 }
 export function clearSession() {
   try { localStorage.removeItem(SESSION_KEY); } catch { /* storage blocked */ }
 }
-export async function signIn(role) {
-  const session = await api("/api/auth/login", { body: { role }, auth: false });
+export async function signIn(userId) {
+  const session = await api("/api/auth/login", { body: { user_id: userId }, auth: false });
   try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch { /* checked below */ }
   if (!getSession()) throw new Error("This browser blocks storage, so the sign-in cannot be kept. Allow site data and try again.");
   return session;
@@ -181,8 +182,8 @@ export function toast(message, isError = false) {
 // Run a planner action. Viewers are told why nothing happens; an expired session goes back to sign-in.
 export async function act(fn, okMessage) {
   const session = getSession();
-  if (session && session.role !== "planner") {
-    toast("You are signed in as a viewer. Switch to the Planner role to change anything.", true);
+  if (session && !session.capabilities?.length) {
+    toast(`You are signed in as ${session.name} (${roleLabel(session)}), who can only watch. Switch user to change anything.`, true);
     return undefined;
   }
   try {
@@ -213,6 +214,7 @@ export const ICON_PATHS = {
   spark: '<path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
 };
 export function icon(name, size = 18) {
@@ -226,7 +228,8 @@ export function icon(name, size = 18) {
 export function mountShell(active) {
   const session = getSession();
   if (!session) toLogin(false);
-  const pages = [["setup", "setup.html", "Setup"], ["forecast", "index.html", "Live forecast"], ["approvals", "approvals.html", "Approvals"]];
+  const pages = [["setup", "setup.html", "Setup"], ["forecast", "index.html", "Live forecast"], ["approvals", "approvals.html", "Approvals"],
+    ...(can("users.admin") ? [["users", "users.html", "Users"]] : [])];
   const links = {};
   const count = el("span", { class: "count", hidden: true });
   const nav = el("nav", { "aria-label": "Planner pages" }, pages.map(([key, href, label]) => {
@@ -241,7 +244,7 @@ export function mountShell(active) {
     el("div", { class: "spacer" }),
     el("div", { class: "planner" }, avatar(session ? session.name : "?", "ink"),
       el("div", {}, el("b", {}, session ? session.name : "Signed out"),
-        el("span", {}, session ? `${ROLE_LABEL[session.role]} · ` : ""), el("a", { href: "login.html" }, "Switch role"))));
+        el("span", {}, session ? `${roleLabel(session)} · ` : ""), el("a", { href: "login.html" }, "Switch user"))));
 
   const main = document.querySelector("main");
   const head = main?.querySelector(".page-head");
@@ -253,9 +256,9 @@ export function mountShell(active) {
 
   const banner = el("div", { class: "banner", hidden: true, role: "status" });
   main?.prepend(banner);
-  if (session && session.role !== "planner") {
+  if (session && !session.capabilities?.length) {
     main?.prepend(el("div", { class: "banner", role: "note" },
-      "View only. You can watch the forecast, offers and calls, but anything that changes data is blocked. Use Switch role to sign in as the Planner."));
+      "View only. You can watch the forecast, offers and calls, but anything that changes data is blocked. Use Switch user to sign in as someone who can."));
   }
   return {
     update(state) {

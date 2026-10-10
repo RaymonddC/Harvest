@@ -42,7 +42,10 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
    allow list, and the Firestore read rule requires a signed-in user. Do it before any real data
    or real phone calls, and after the submission. Replace `/api/auth/login` in
    `backend/app/main.py` and `backend/app/auth.py`; the frontend gate is in `web/js/data.js`.
-   Also record who approved an offer (today it stores only the `PLANNER_NAME` setting).
+   Offers now record the approving user (`decided_by`, `decided_by_id`); link users to real accounts by
+   email. RBAC without real sign-in is only labels, so this is what makes the roles protection.
+   Also add an audit log of who did what and of refused attempts (Honeypot has one in `core/audit.py`),
+   and a screen to edit roles if a mill needs custom ones.
 
 8. **After judging, shut the public demo down.** Anyone with the URL can pick Planner, start
    campaigns, reset the demo data and use the Gemini quota. Scale the gateway to zero
