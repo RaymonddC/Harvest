@@ -112,3 +112,54 @@
 .week-card .wc-dot.on { background: var(--leaf); }
 .week-card .wc-dot.amber { background: var(--amber); }
 @media (max-width: 860px) { .week-card { display: none; } }
+
+/* ---------- a server action in progress ---------- */
+.spinner { width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent;
+  opacity: .8; animation: hc-spin .7s linear infinite; }
+@keyframes hc-spin { to { transform: rotate(360deg); } }
+.btn[aria-busy="true"] { opacity: .75; cursor: progress; }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; border-right-color: currentColor; opacity: .5; } }
+
+/* ---------- forecast hero: the page's one message ---------- */
+.hero { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 24px 28px; border-radius: 16px; border: 1px solid; }
+.hero.gap { background: var(--amber-soft); border-color: var(--amber-line); }
+.hero.ok { background: var(--leaf-soft); border-color: var(--leaf-soft); }
+.hero-text { flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.hero-eyebrow { font-size: 13px; font-weight: 800; color: var(--amber-text); }
+.hero.ok .hero-eyebrow { color: var(--leaf-deep); }
+.hero h2 { font-size: clamp(30px, 4vw, 44px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+.hero.gap h2 .num { color: #6B4206; }
+.hero p { font-size: 15.5px; line-height: 1.5; color: #3A4540; max-width: 62ch; }
+.hero-acts { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.hero-mark { width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; background: var(--leaf); color: var(--on-ink); display: grid; place-items: center; }
+@media (max-width: 640px) { .hero { padding: 18px; } .hero-acts, .hero-acts .btn { width: 100%; } }
+
+/* ---------- readable small text (projector and video) ---------- */
+.chart .axis .tick span, .xlabels small { font-size: 12px; }
+.chart .val small { font-size: 12px; }
+.small { font-size: 13px; }
+.chart-tip { font-size: 12.5px; }
+.offers-foot { font-size: 13px; }
+
+/* ---------- Setup: the price step gets the room; the farmer step is compact ---------- */
+.steps.linked .drop { padding: 14px; gap: 6px; }
+.steps.linked .drop .big { font-size: 18px; }
+@media (min-width: 1240px) { .steps.linked { grid-template-columns: 1fr 1.35fr 1fr; } }
+
+/* ---------- farmer table: row hover, sortable headers, row menu ---------- */
+table.farmers tbody tr:hover td { background: var(--fill); }
+th .sort { all: unset; cursor: pointer; font: inherit; color: inherit; border-radius: 4px; }
+th .sort:hover, th .sort.on { color: var(--ink); }
+th .sort:focus-visible { box-shadow: 0 0 0 3px var(--leaf-soft); }
+.btn.more { min-width: 36px; padding: 0 8px; font-size: 18px; line-height: 1; }
+.hc-menu { z-index: 50; min-width: 150px; padding: 6px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(16, 24, 20, .16); animation: hc-fade .12s ease-out; }
+.hc-menu-item { display: flex; align-items: center; min-height: 38px; padding: 0 12px; border-radius: 8px; font-size: 14px; font-weight: 600;
+  color: var(--ink); cursor: pointer; outline: none; }
+.hc-menu-item[data-highlighted] { background: var(--fill); }
+.hc-menu-item.danger { color: var(--danger); }
+
+/* Phone tab bar: as many equal columns as there are pages (Users makes four for an admin). */
+@media (max-width: 640px) {
+  .side nav { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+}

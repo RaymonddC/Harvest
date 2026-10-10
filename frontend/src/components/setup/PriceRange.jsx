@@ -2,6 +2,7 @@ import * as Slider from "@radix-ui/react-slider";
 import { useEffect, useState } from "react";
 import { api, cropLabel, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
+import { SubmitButton } from "../../ui.jsx";
 import StepTop from "./StepTop.jsx";
 
 const FIELDS = ["floor_price", "reference_price", "ceiling_price", "first_premium_pct", "step_pct"];
@@ -60,10 +61,13 @@ export default function PriceRange({ l }) {
 
   const edit = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); setDirty(true); };
   const slide = (values) => { setForm({ ...form, ...values }); setDirty(true); };
-  const save = (e) => {
+  const [saving, setSaving] = useState(false);
+  const save = async (e) => {
     e.preventDefault();
     const body = Object.fromEntries(FIELDS.map((k) => [k, Number(form[k])]));
-    act(() => api(`/api/limits/${l.id}`, { method: "PUT", body }), () => { setDirty(false); return "Price range saved. The agent uses it from the next offer."; });
+    setSaving(true);
+    await act(() => api(`/api/limits/${l.id}`, { method: "PUT", body }), () => { setDirty(false); return "Price range saved. The agent uses it from the next offer."; });
+    setSaving(false);
   };
   const rungs = form && l ? ladder(form, l) : null;
   const priced = !!l && !dirty;
@@ -92,7 +96,7 @@ export default function PriceRange({ l }) {
         </div>
       </details>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: "auto" }}>
-        <button className="btn solid" type="submit" disabled={!l}>Save price range</button>
+        <SubmitButton busy={saving || !l} busyText={l ? "Saving…" : "Save price range"}>Save price range</SubmitButton>
         <span className="small muted">Illustrative prices for the demo.</span>
       </div>
     </form>

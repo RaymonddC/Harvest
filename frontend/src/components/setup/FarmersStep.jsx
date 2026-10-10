@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
-import { Avatar, Dialog, DialogClose } from "../../ui.jsx";
+import { ActButton, Avatar, Dialog, DialogClose } from "../../ui.jsx";
 import StepTop from "./StepTop.jsx";
 
 const SAMPLE_CSV = "name,phone,crop,language,village,usual_kg_week,can_pull_forward\nPak Contoh,+62 812 0000 5001,palm,Bahasa Indonesia,Sungai Lala,1500,yes";
@@ -51,7 +51,7 @@ export default function FarmersStep({ farmers, toCall, onAdd }) {
           onChange={async (e) => { const f = e.target.files[0]; if (f) setCsv(await f.text()); }} />
         <textarea aria-label="CSV text" value={csv} onChange={(e) => setCsv(e.target.value)} />
         <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-          <button className="btn solid" onClick={upload}>Upload</button>
+          <ActButton className="btn solid" busy="Uploading…" run={upload}>Upload</ActButton>
           <DialogClose>Cancel</DialogClose>
         </div>
       </Dialog>

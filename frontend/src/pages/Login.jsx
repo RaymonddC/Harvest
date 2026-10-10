@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, getSession, OLD_URLS, roleLabel, signIn } from "../lib.js";
-import { Icon } from "../ui.jsx";
+import { Icon, Spinner } from "../ui.jsx";
 
 const ROLE_ICON = { planner: "forecast", coordinator: "setup", viewer: "eye", farmer: "phone" };
 
@@ -17,7 +17,7 @@ export default function Login() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [people, setPeople] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(null); // the person being signed in
   const [notice, setNotice] = useState(params.get("expired") ? "Your session ended. Pick a person to continue." : "");
   const current = getSession();
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function Login() {
   }, []);
 
   const pick = async (person) => {
-    setBusy(true);
+    setBusy(person.id);
     setNotice("");
     try {
       await signIn(person.id);
@@ -38,7 +38,7 @@ export default function Login() {
       else navigate(returnTo(params.get("next") || "/"), { replace: true });
     } catch (err) {
       setNotice(err.status ? err.message : `${err.message || "Cannot reach the server."} Check the backend URL in config.js.`);
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -52,11 +52,11 @@ export default function Login() {
       {notice && <p className="banner error" role="alert">{notice}</p>}
       <div className="roles" role="group" aria-label="People">
         {(people || []).map((p, i) => (
-          <button key={p.id} className={`role-tile ${i === 0 ? "main" : ""}`} disabled={busy} onClick={() => pick(p)}>
+          <button key={p.id} className={`role-tile ${i === 0 ? "main" : ""}`} disabled={!!busy} aria-busy={busy === p.id || undefined} onClick={() => pick(p)}>
             <span className="role-icon"><Icon name={ROLE_ICON[p.role] || "users"} size={20} /></span>
             <span className="role-name">{p.name}</span>
             <span className="role-desc">{`${p.role_label}. ${p.description || ""}`.trim()}</span>
-            <span className="role-go">{p.role === "farmer" ? "Open the call client" : "Open the live forecast"}</span>
+            <span className="role-go">{busy === p.id ? <><Spinner />Signing in…</> : p.role === "farmer" ? "Open the call client" : "Open the live forecast"}</span>
           </button>
         ))}
       </div>

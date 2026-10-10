@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, can, getSession } from "../lib.js";
 import Shell from "../Shell.jsx";
 import { useAct } from "../toast.jsx";
-import { Avatar, Dialog, DialogClose, Pill } from "../ui.jsx";
+import { ActButton, Avatar, Dialog, DialogClose, Pill, SubmitButton } from "../ui.jsx";
 
 // Add a user (user = {}) or edit one (user = the record); null keeps it closed.
 function UserForm({ user, roles, onClose, onSaved }) {
@@ -13,11 +13,15 @@ function UserForm({ user, roles, onClose, onSaved }) {
     if (user) setF(editing ? { name: user.name, role: user.role, active: user.active } : { name: "", role: "viewer", active: true });
   }, [user, editing]);
   const help = roles.find((r) => r.id === f.role)?.description || "";
-  const save = (e) => {
+  const [saving, setSaving] = useState(false);
+  const save = async (e) => {
     e.preventDefault();
     const body = { name: f.name, role: f.role, active: editing ? f.active : true };
-    act(() => (editing ? api(`/api/users/${user.id}`, { method: "PUT", body }) : api("/api/users", { body })),
-      () => { onClose(); return editing ? "User saved." : "User added."; }).then(onSaved);
+    setSaving(true);
+    await act(() => (editing ? api(`/api/users/${user.id}`, { method: "PUT", body }) : api("/api/users", { body })),
+      () => { onClose(); return editing ? "User saved." : "User added."; });
+    setSaving(false);
+    onSaved();
   };
   return (
     <Dialog open={!!user} onClose={onClose} title={editing ? `Edit ${user.name}` : "Add a user"}>
@@ -37,7 +41,7 @@ function UserForm({ user, roles, onClose, onSaved }) {
           )}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="btn solid" type="submit">{editing ? "Save changes" : "Add user"}</button>
+          <SubmitButton busy={saving} busyText={editing ? "Saving…" : "Adding…"}>{editing ? "Save changes" : "Add user"}</SubmitButton>
           <DialogClose>Cancel</DialogClose>
         </div>
       </form>
@@ -65,9 +69,10 @@ export default function Users() {
   useEffect(() => { if (allowed) load(); }, [allowed, load]);
 
   const roleName = (id) => data.roles.find((r) => r.id === id)?.label || id;
-  const remove = (u) => {
+  const remove = async (u) => {
     if (confirm(`Delete ${u.name}? They can no longer sign in. Offers they approved keep their name.`)) {
-      act(() => api(`/api/users/${u.id}`, { method: "DELETE" }), `${u.name} deleted.`).then(load);
+      await act(() => api(`/api/users/${u.id}`, { method: "DELETE" }), `${u.name} deleted.`);
+      await load();
     }
   };
   const head = (
@@ -105,7 +110,7 @@ export default function Users() {
                   <td>{u.active ? <Pill cls="mint">Can sign in</Pill> : <Pill>Turned off</Pill>}</td>
                   <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
                     <button className="btn sm" type="button" onClick={() => setForm(u)}>Edit</button>{" "}
-                    <button className="btn sm" type="button" disabled={u.id === me.user_id} onClick={() => remove(u)}>Delete</button>
+                    <ActButton className="btn sm" busy="Deleting…" disabled={u.id === me.user_id} run={() => remove(u)}>Delete</ActButton>
                   </td>
                 </tr>
               ))}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
-import { Dialog, DialogClose } from "../../ui.jsx";
+import { Dialog, DialogClose, SubmitButton } from "../../ui.jsx";
 
 const LANGUAGES = ["Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese"];
 const EMPTY = { name: "", phone: "", crop: "palm", language: "Bahasa Indonesia", village: "", usual_kg_week: "", can_pull_forward: false };
@@ -23,11 +23,14 @@ export default function FarmerForm({ farmer, onClose }) {
   // An older record may hold a language that is not in the list any more: keep it visible.
   const languages = LANGUAGES.includes(f.language) || !f.language ? LANGUAGES : [...LANGUAGES, f.language];
 
-  const save = (e) => {
+  const [saving, setSaving] = useState(false);
+  const save = async (e) => {
     e.preventDefault();
     const body = { ...f, usual_kg_week: f.usual_kg_week ? Number(f.usual_kg_week) : null };
-    act(() => (editing ? api(`/api/farmers/${farmer.id}`, { method: "PUT", body }) : api("/api/farmers", { body })),
+    setSaving(true);
+    await act(() => (editing ? api(`/api/farmers/${farmer.id}`, { method: "PUT", body }) : api("/api/farmers", { body })),
       () => { onClose(); return editing ? "Farmer saved." : "Farmer added."; });
+    setSaving(false);
   };
 
   return (
@@ -50,7 +53,7 @@ export default function FarmerForm({ farmer, onClose }) {
           <p className="sub" style={{ margin: "-4px 0 0" }}>When a week is short of supply, the agent may ask this farmer to harvest a week or two earlier to fill it. Leave it off if their crop cannot be picked early.</p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="btn solid" type="submit">{editing ? "Save changes" : "Add farmer"}</button>
+          <SubmitButton busy={saving} busyText={editing ? "Saving…" : "Adding…"}>{editing ? "Save changes" : "Add farmer"}</SubmitButton>
           <DialogClose>Cancel</DialogClose>
         </div>
       </form>
