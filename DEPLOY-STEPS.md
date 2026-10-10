@@ -10,9 +10,10 @@ About 30 minutes the first time.
 
 ## Part A. In the browser (5 minutes)
 
-**A1. Get a Gemini API key.**
-Open https://aistudio.google.com/apikey, click *Create API key* and copy it. Keep it somewhere
-safe; you paste it in step B6.
+**A1. Nothing to get for Gemini.** By default the service calls Gemini through Vertex AI with its own
+Google account, so there is no API key to create or store. (Google's newer "AQ." AI Studio keys are
+reported to fail with the Gemini API, which is why Vertex is the default. To use an API key anyway,
+see the API-key option in [DEPLOY.md](DEPLOY.md).)
 
 **A2. Create a Google Cloud project.**
 1. Open https://console.cloud.google.com and sign in.
@@ -53,7 +54,7 @@ gcloud config set project $PROJECT
 ```bash
 gcloud services enable run.googleapis.com firestore.googleapis.com secretmanager.googleapis.com \
   cloudbuild.googleapis.com artifactregistry.googleapis.com logging.googleapis.com \
-  firebase.googleapis.com cloudresourcemanager.googleapis.com
+  firebase.googleapis.com cloudresourcemanager.googleapis.com aiplatform.googleapis.com
 gcloud firestore databases create --location=$REGION --type=firestore-native
 ```
 If it says the database already exists, that is fine.
@@ -73,22 +74,17 @@ firebase projects:addfirebase $PROJECT
 If it says the project already has Firebase, that is fine. If it fails with `403 ... Firebase Management
 API has not been used`, the API from B3 is not active yet: wait a minute and run it again.
 
-**B6. Save the Gemini key in Secret Manager.**
-```bash
-read -rs GEMINI_KEY        # paste the key from A1, press Enter (nothing is shown as you type)
-printf '%s' "$GEMINI_KEY" | gcloud secrets create gemini-api-key --data-file=-
-unset GEMINI_KEY
-```
+**B6. Nothing to save.** Vertex AI needs no key: the permission in B7 is all the service needs.
 
-**B7. Let Cloud Run and Cloud Build use what they need.** The build runs as the same account, which
-is why it also needs the build roles.
+**B7. Let Cloud Run and Cloud Build use what they need.** The service calls Vertex AI as this account,
+and the build runs as it too, which is why it needs the AI and build roles.
 ```bash
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT --format='value(projectNumber)')
 RUNTIME_SA=$PROJECT_NUMBER-compute@developer.gserviceaccount.com
 gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$RUNTIME_SA \
   --role=roles/datastore.user --condition=None
-gcloud secrets add-iam-policy-binding gemini-api-key --member=serviceAccount:$RUNTIME_SA \
-  --role=roles/secretmanager.secretAccessor
+gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$RUNTIME_SA \
+  --role=roles/aiplatform.user --condition=None
 for role in roles/cloudbuild.builds.builder roles/storage.objectViewer \
             roles/artifactregistry.writer roles/logging.logWriter; do
   gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$RUNTIME_SA \
@@ -183,5 +179,5 @@ To remove everything, delete the project in the console (*IAM and admin, Setting
 | Firebase says the project is not a Firebase project | Run B5 again. |
 | Health check returns an error, or the logs mention Firestore permissions | Run B7 again. |
 | `compute@developer.gserviceaccount.com does not have storage.objects.get access` during the deploy | The build roles from B7 are missing. Run B7 again, wait a minute, re-run the deploy. |
-| Voice call fails straight away | The secret is missing or the key is wrong (B6). Check `gcloud run services logs read harvest-gateway --region $REGION --limit 50`. |
+| Voice call fails straight away | Read the log: `gcloud run services logs read harvest-gateway --region $REGION --limit 100`. `PERMISSION_DENIED` or `aiplatform` means B7 did not apply: run it again and wait a minute. `not found` about a model means the `LIVE_MODEL` or `GOOGLE_CLOUD_LOCATION` setting is wrong (see ENV.md). `401` or `invalid authentication credentials` means the service is using a Gemini API key instead of Vertex. |
 | Organization policy blocks `--allow-unauthenticated` | Your Google account belongs to a company or school that forbids public Cloud Run services. Use a personal Google account and project. |

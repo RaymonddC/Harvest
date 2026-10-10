@@ -18,7 +18,7 @@ Google Cloud by hand, and deploying it automatically on every push to `main`.
 | Forecast job (`python -m app.forecast_job`) | Cloud Run job `harvest-forecast` | `gcloud run jobs deploy` |
 | Dashboard and call client (`web/`) | Firebase Hosting, at `https://PROJECT.web.app` | `firebase deploy --only hosting` |
 | Data | Firestore (Native mode) | created once; rules deployed with Hosting |
-| Gemini API key | Secret Manager secret `gemini-api-key` | created once |
+| Gemini access | Vertex AI, called with the service's own Google account (`roles/aiplatform.user`). No key is stored. With `GEMINI_BACKEND=api_key` instead: Secret Manager secret `gemini-api-key`. | permission granted once |
 
 The browser opens its WebSocket straight to the Cloud Run URL, because Firebase Hosting
 rewrites do not carry WebSockets.
@@ -91,21 +91,24 @@ gcloud config set project $PROJECT
    minute, then `npx firebase-tools projects:addfirebase $PROJECT`. Hosting needs this. Without the
    API enabled the command fails with `403 Firebase Management API has not been used`.
 
-4. **Store the Gemini API key:**
-   ```bash
-   gcloud services enable secretmanager.googleapis.com
-   printf '%s' "$GOOGLE_API_KEY" | gcloud secrets create gemini-api-key --data-file=-
-   ```
+4. **Gemini access.** The default is Vertex AI: nothing to store, you only grant a permission in
+   step 5. Enable its API with `gcloud services enable aiplatform.googleapis.com`.
 
-5. **Let the Cloud Run runtime read Firestore and the secret.** By default Cloud Run runs as
+   *Option: use a Gemini API key instead.* Google's newer "AQ." AI Studio keys are reported to fail
+   with the Gemini API, so use this only with a key you have tested. Run
+   `gcloud services enable secretmanager.googleapis.com`, then
+   `printf '%s' "$GOOGLE_API_KEY" | gcloud secrets create gemini-api-key --data-file=-`, give the runtime
+   account `roles/secretmanager.secretAccessor` on the secret, and deploy with `GEMINI_BACKEND=api_key`.
+
+5. **Let the Cloud Run runtime use Firestore and Vertex AI.** By default Cloud Run runs as
    the Compute Engine default service account:
    ```bash
    PROJECT_NUMBER=$(gcloud projects describe $PROJECT --format='value(projectNumber)')
    RUNTIME_SA=$PROJECT_NUMBER-compute@developer.gserviceaccount.com
    gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$RUNTIME_SA \
      --role=roles/datastore.user --condition=None
-   gcloud secrets add-iam-policy-binding gemini-api-key --member=serviceAccount:$RUNTIME_SA \
-     --role=roles/secretmanager.secretAccessor
+   gcloud projects add-iam-policy-binding $PROJECT --member=serviceAccount:$RUNTIME_SA \
+     --role=roles/aiplatform.user --condition=None
    # the source build also runs as this account
    for role in roles/cloudbuild.builds.builder roles/storage.objectViewer \
                roles/artifactregistry.writer roles/logging.logWriter; do
@@ -265,7 +268,7 @@ workflow's `env:` block, as `deploy.sh` already reads them.
 - **Reset the demo data:** sign in as Planner and press *Reset demo data* on the Setup page, or
   `TOKEN=$(curl -s -X POST $URL/api/auth/login -H 'Content-Type: application/json' -d '{"role":"planner"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')`
   then `curl -X POST $URL/api/demo/reset -H "Authorization: Bearer $TOKEN"`. It wipes Firestore, then reloads the seed.
-- **Rotate the Gemini key:**
+- **Rotate the Gemini key (only with `GEMINI_BACKEND=api_key`):**
   `printf '%s' "$NEW_KEY" | gcloud secrets versions add gemini-api-key --data-file=-`, then
   redeploy so the service picks up `latest`.
 - **Roll back the gateway:** Cloud Console, Cloud Run, `harvest-gateway`, *Revisions*, send
