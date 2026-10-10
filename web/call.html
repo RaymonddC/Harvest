@@ -6,7 +6,8 @@
   <title>Call client · Harvest-Call</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Domine:wght@500;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/call.css">
   <script src="config.js"></script>
@@ -38,13 +39,11 @@
       <div id="rail" class="panel" hidden></div>
       <div id="offer-saved" hidden></div>
       <p class="consent" id="consent"></p>
-      <div class="mic" id="mic">
-        <div class="mic-row">
-          <span>Microphone</span>
-          <div class="mic-bar" role="img" aria-label="Microphone level"><i id="mic-fill"></i></div>
-        </div>
-        <p class="mic-note" id="mic-note" role="status" hidden></p>
+      <div class="voices" aria-hidden="true">
+        <div class="voice" id="voice-agent"><span class="eq"><i></i><i></i><i></i><i></i><i></i></span>Agent</div>
+        <div class="voice" id="voice-you"><span class="eq"><i></i><i></i><i></i><i></i><i></i></span>You</div>
       </div>
+      <p class="mic-note" id="mic-note" role="status" hidden></p>
       <div class="controls">
         <button class="btn outline-mint" id="mute" aria-pressed="false">Mute</button>
         <button class="btn end" id="hangup">End call</button>

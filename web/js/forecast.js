@@ -1,10 +1,13 @@
-import { act, api, apiUrl, callChip, cfg, cropLabel, el, fmtPrice, fmtT, KIND_WORD, mountShell, pill, subscribe } from "./data.js";
+import { act, api, apiUrl, avatar, callChip, cfg, cropLabel, el, fmtPrice, fmtT, icon, KIND_WORD, mountShell, pill, subscribe } from "./data.js";
 
 const $ = (id) => document.getElementById(id);
 const shell = mountShell("forecast");
 let state = null;
 let noteKey = "";
 let polishedNote = null;
+let chartEls = null; // the drawn chart, kept so updates move bars instead of redrawing them
+let gapWasOpen = false;
+const okDefault = [...$("ok-card").childNodes];
 
 $("csv").href = apiUrl("/api/forecast.csv");
 $("call-log-open").onclick = () => { renderLog(); $("log-dialog").showModal(); };
@@ -58,6 +61,7 @@ function renderKpis(rows) {
 function renderChart(rows) {
   const area = $("chart-area");
   if (!rows.length) {
+    chartEls = null;
     area.replaceChildren(el("div", { class: "empty" }, el("p", {}, "No forecast yet. Start a call campaign to collect harvest answers."),
       el("a", { class: "btn", href: "setup.html" }, "Go to setup")));
     return;
@@ -66,30 +70,58 @@ function renderChart(rows) {
   $("legend-target").textContent = `Target ${fmtT(target)} t`;
   const max = Math.max(target * 1.15, ...rows.map((r) => r.expected_kg + r.pending_kg));
   const pct = (kg) => `${(kg / max) * 100}%`;
-  const line = el("div", { class: "target" });
+  // Built once per set of weeks: the bars grow up from the axis on first draw, and later
+  // updates only slide each bar to its new height.
+  const key = rows.map((r) => r.week).join(",");
+  if (!chartEls || chartEls.key !== key || !area.contains(chartEls.chart)) {
+    const cols = {};
+    const line = el("div", { class: "target" });
+    const bars = el("div", { class: "bars" }, rows.map((r) => {
+      const c = { value: el("span", {}), small: el("small", {}, el("span", {})), bar: el("div", { class: "bar" }),
+        pend: el("div", { class: "pend" }), tip: el("div", { class: "tip", role: "tooltip", id: `tip-${r.week}` }) };
+      // Hover, keyboard focus or a tap opens the week's breakdown.
+      c.col = el("div", { class: "col", tabindex: "0", "aria-describedby": `tip-${r.week}` },
+        el("div", { class: "val num" }, c.value, c.small), c.pend, c.bar, c.tip);
+      cols[r.week] = c;
+      return c.col;
+    }));
+    const labels = el("div", { class: "xlabels", "aria-hidden": "true" }, rows.map((r) => {
+      const d = new Date(r.week_start + "T00:00:00");
+      return cols[r.week].label = el("span", {}, r.label,
+        el("small", {}, d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })));
+    }));
+    chartEls = { key, cols, line, chart: el("div", { class: "chart enter", role: "img" }, line, bars) };
+    area.replaceChildren(chartEls.chart, labels);
+    void area.offsetHeight; // start every bar at zero so the first heights grow from the axis
+    setTimeout(() => chartEls && chartEls.chart.classList.remove("enter"), 1200);
+  }
+  const { cols, line, chart } = chartEls;
+  line.dataset.label = `Target ${fmtT(target)} t`;
   line.style.bottom = pct(target);
-  const bars = el("div", { class: "bars" }, rows.map((r) => {
-    const col = el("div", { class: "col" });
-    col.append(el("div", { class: "val num" }, el("span", {}, r.is_gap ? `${fmtT(r.expected_kg)} · gap` : fmtT(r.expected_kg)),
-      r.pending_kg ? el("small", {}, el("span", {}, `+${fmtT(r.pending_kg)} pending`)) : null));
-    if (r.pending_kg) {
-      const p = el("div", { class: "pend", title: `${fmtT(r.pending_kg)} t waiting for approval` });
-      p.style.height = pct(r.pending_kg);
-      col.append(p);
-    }
-    const bar = el("div", { class: `bar ${r.is_gap ? "gap" : ""}` });
-    bar.style.height = pct(r.expected_kg);
-    col.append(bar);
-    return col;
-  }));
-  const chart = el("div", { class: "chart", role: "img",
-    "aria-label": rows.map((r) => `${r.label} ${fmtT(r.expected_kg)} tonnes${r.is_gap ? ", gap" : ""}`).join("; ") }, line, bars);
-  const labels = el("div", { class: "xlabels", "aria-hidden": "true" }, rows.map((r) => {
-    const d = new Date(r.week_start + "T00:00:00");
-    return el("span", { class: r.is_gap ? "gap" : "" }, r.label,
-      el("small", {}, d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })));
-  }));
-  area.replaceChildren(chart, labels);
+  chart.setAttribute("aria-label", rows.map((r) => `${r.label} ${fmtT(r.expected_kg)} tonnes${r.is_gap ? ", gap" : ""}`).join("; "));
+  for (const r of rows) {
+    const c = cols[r.week];
+    c.col.classList.toggle("is-gap", r.is_gap);
+    c.label.className = r.is_gap ? "gap" : "";
+    c.bar.classList.toggle("gap", r.is_gap);
+    c.bar.style.height = pct(r.expected_kg);
+    c.pend.hidden = !r.pending_kg;
+    c.pend.style.height = pct(r.pending_kg);
+    c.pend.title = `${fmtT(r.pending_kg)} t waiting for approval`;
+    c.small.hidden = !r.pending_kg;
+    c.small.firstChild.textContent = `+${fmtT(r.pending_kg)} pending`;
+    const line = (label, kg, extra = "") => el("div", {}, el("span", {}, label), el("b", { class: "num" }, `${fmtT(kg)} t${extra}`));
+    c.tip.replaceChildren(...[
+      el("strong", {}, `${r.label} · ${new Date(r.week_start + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`),
+      line("Firm answers", r.firm_kg),
+      r.unsure_weighted_kg ? line(r.unsure_count ? `${r.unsure_count} unsure, counted half` : "Unsure, counted half", r.unsure_weighted_kg) : null,
+      r.approved_in_kg ? line("Approved deals", r.approved_in_kg) : null,
+      r.pending_kg ? line("Waiting for approval", r.pending_kg) : null,
+      el("div", { class: "sum" }, el("span", {}, "Expected"), el("b", { class: "num" }, `${fmtT(r.expected_kg)} of ${fmtT(target)} t`)),
+      el("p", { class: r.is_gap ? "short" : "fine" }, r.is_gap ? `${fmtT(r.gap_kg)} t short of the target` : r.gap_kg ? `${fmtT(r.gap_kg)} t under target, within the gap threshold` : "At or above the target")].filter(Boolean));
+    // On a phone the shortfall moves out of the pill (the KPI card above still shows it).
+    c.value.replaceChildren(fmtT(r.expected_kg), r.is_gap ? el("span", { class: "short" }, ` · ${fmtT(r.gap_kg)} t short`) : "");
+  }
 }
 
 function renderNote(rows) {
@@ -107,13 +139,31 @@ function renderNote(rows) {
   }
   const text = polishedNote ? polishedNote.gap_note : gap.note;
   const by = polishedNote && polishedNote.gap_note_by === "gemini" ? "Note drafted by Gemini." : "Note built from today's call answers.";
-  box.replaceChildren(el("strong", {}, `Why week ${gap.week} is short: `), text, " ", el("span", { class: "muted" }, by));
+  box.replaceChildren(el("span", { class: "spark" }, icon("spark", 15)),
+    el("div", {}, el("strong", { style: "display:block" }, `Why week ${gap.week} is short`), text, " ", el("span", { class: "muted" }, by)));
 }
 
 function renderGap(rows) {
   const gap = rows.find((r) => r.is_gap);
+  // No gap left while approved offers exist: those offers closed it.
+  const approved = state.offers.filter((o) => o.status === "approved" && o.deliver_week);
+  const coveredWeek = !gap && approved.length ? approved[approved.length - 1].deliver_week : null;
   $("gap-card").hidden = !gap;
-  $("ok-card").hidden = !!gap || !rows.length;
+  const ok = $("ok-card");
+  ok.hidden = !!gap || !rows.length;
+  const okKey = coveredWeek === null ? "" : String(coveredWeek);
+  if (ok.dataset.covered !== okKey) {
+    ok.dataset.covered = okKey;
+    ok.classList.toggle("covered", coveredWeek !== null);
+    // Celebrate only when the gap closed while this page was open.
+    ok.classList.toggle("pop", coveredWeek !== null && gapWasOpen);
+    ok.replaceChildren(...(coveredWeek === null ? okDefault.map((n) => n.cloneNode(true)) : [
+      el("span", { class: "covered-mark" }, icon("check", 22)),
+      el("div", { class: "eyebrow" }, "Gap closed"),
+      el("h2", { style: "font-size:22px" }, `Week ${coveredWeek} is covered`),
+      el("p", {}, "Approved offers filled the gap. Every week is now within the gap threshold of the target.")]));
+  }
+  gapWasOpen = !!gap;
   if (!gap) return;
   const list = gap.shortlist || [];
   const farmersKg = list.reduce((s, p) => s + p.kg, 0);
@@ -131,23 +181,24 @@ function renderGap(rows) {
   const top = list.slice(0, 3);
   const rest = list.slice(3);
   $("gap-card").replaceChildren(
-    el("div", { class: "eyebrow" }, "Gap alert"),
-    el("h2", { class: "serif", style: "font-size:26px" }, `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short`),
+    el("span", { class: "eyebrow" }, `Gap alert · week ${gap.week}`),
+    el("h2", { style: "font-size:22px" }, `${fmtT(gap.gap_kg)} t to fill`),
     el("p", {}, text),
     list.length || quotes.length ? el("div", { class: "list-card" },
-      top.map((p) => el("div", { class: "li" }, el("span", {}, `${p.name}${p.village ? ` · ${p.village}` : ""}`), el("strong", {}, `${fmtT(p.kg)} t`))),
-      rest.length ? el("div", { class: "li muted" }, el("span", {}, `${rest.length} more farmer${rest.length > 1 ? "s" : ""}`),
-        el("strong", { style: "color:var(--ink)" }, `${fmtT(rest.reduce((s, p) => s + p.kg, 0))} t`)) : null,
-      quotes.map((q) => el("div", { class: "li sep" },
-        el("span", {}, `${q.supplier_name}, logged quote ${fmtPrice(q.price_per_kg, q.currency || "IDR")}`),
+      top.map((p) => el("div", { class: "li" }, avatar(p.name, "sm"), el("span", {}, `${p.name}${p.village ? ` · ${p.village}` : ""}`), el("strong", {}, `${fmtT(p.kg)} t`))),
+      rest.length ? el("div", { class: "li" }, el("span", { class: "avatar sm grey", "aria-hidden": "true" }, `+${rest.length}`),
+        el("span", { class: "muted" }, `${rest.length} more farmer${rest.length > 1 ? "s" : ""}`),
+        el("strong", {}, `${fmtT(rest.reduce((s, p) => s + p.kg, 0))} t`)) : null,
+      quotes.map((q) => el("div", { class: "li sep" }, avatar(q.supplier_name, "sm ink"),
+        el("span", {}, `${q.supplier_name}, quote ${fmtPrice(q.price_per_kg, q.currency || "IDR")}`),
         el("span", { style: "display:flex;gap:8px;align-items:center" },
           used(q) ? pill("Offer added", "mint")
-            : el("button", { class: "btn", style: "min-height:36px;padding:0 10px;font-size:13px",
+            : el("button", { class: "btn sm",
               onclick: () => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added to approvals.") }, "Add as offer"),
           el("strong", {}, `${fmtT(q.kg)} t`))))) : null,
-    el("button", { class: "btn solid big block", disabled: !list.length && !state.farmers.some((f) => f.type === "supplier"),
+    el("button", { class: "btn leaf big block", disabled: !list.length && !state.farmers.some((f) => f.type === "supplier"),
       onclick: () => act(() => api("/api/campaign/start", { body: { kind: "gap_fill" } }),
-        (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`) }, "Start gap-fill calls"),
+        (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`) }, icon("phone", 16), "Start gap-fill calls"),
   );
 }
 
@@ -159,12 +210,13 @@ function renderCalls() {
   const row = (c) => {
     const chip = callChip(c);
     const label = c.kind === "collect" ? c.farmer_name : `${c.farmer_name} · ${KIND_WORD[c.kind].replace(" call", "")}`;
+    const av = avatar(c.farmer_name, `sm ${c.status === "on_call" ? "" : "grey"}`);
     return c.status === "on_call"
-      ? el("div", { class: "row" }, el("span", { class: "name" }, label), pill(chip.text, chip.cls))
-      : el("button", { class: "row", onclick: () => showCall(c) }, el("span", { class: "name" }, label), pill(chip.text, chip.cls));
+      ? el("div", { class: "row" }, av, el("span", { class: "name" }, label), pill(chip.text, chip.cls))
+      : el("button", { class: "row", onclick: () => showCall(c) }, av, el("span", { class: "name" }, label), pill(chip.text, chip.cls));
   };
   const items = [...onCall.map(row), ...finished.map(row)];
-  if (queued.length) items.push(el("div", { class: "row" }, el("span", { class: "name" },
+  if (queued.length) items.push(el("div", { class: "row" }, el("span", { class: "avatar sm grey", "aria-hidden": "true" }, String(queued.length)), el("span", { class: "name" },
     queued.length === 1 ? queued[0].farmer_name : `${queued.length} farmers`), pill("Queued")));
   $("calls").replaceChildren(...(items.length ? items
     : [el("p", { class: "muted" }, "No calls yet. Start the campaign on the Setup page.")]));

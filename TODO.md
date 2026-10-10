@@ -2,7 +2,9 @@
 
 Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim.
 
-1. **Escalated offers can be approved at the ceiling.**
+1. ~~**Escalated offers can be approved at the ceiling.**~~ Fixed 2026-10-10: approving an
+   escalated offer now checks `requested_price` against the limits and approves at that price
+   (undo restores the quoted ceiling). Test: `test_escalated_offer_needs_limits_that_cover_the_request`.
    `tools.py` `_tool_save_offer` (escalate branch) stores `max(quoted)`, which is the ceiling,
    as `price_per_kg`. `services.decide_offer` and the Approve button in `web/js/approvals.js`
    only check `price_per_kg` against the limits, so an escalated offer always passes.

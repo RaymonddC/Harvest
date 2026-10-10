@@ -8,6 +8,7 @@ $("ai-badge-text").textContent = `AI agent calling for ${cfg.millName}`;
 
 let state = { calls: [], farmers: [] };
 let active = null; // the call in progress
+const calm = matchMedia("(prefers-reduced-motion: reduce)");
 
 function show(view) {
   for (const v of ["waiting", "call", "ended"]) $(`view-${v}`).hidden = v !== view;
@@ -72,14 +73,14 @@ async function answer(call) {
   setStage(0);
   meta("Connecting…");
   show("call");
-  $("mic-fill").style.width = "0";
   $("mic-note").hidden = true;
   active.timer = setInterval(() => { meta(); micCheck(); }, 500);
 
   capture.port.onmessage = (e) => {
-    if (e.data.level !== undefined) return micLevel(e.data.level);
+    if (e.data.level !== undefined) return hearYou(e.data.level);
     if (e.data.pcm && ws.readyState === WebSocket.OPEN && !active?.muted) ws.send(e.data.pcm);
   };
+  active.voiceTimer = setInterval(showVoices, 80);
 
   ws.onmessage = (e) => {
     if (e.data instanceof ArrayBuffer) return play(e.data);
@@ -95,12 +96,32 @@ async function answer(call) {
   ws.onclose = () => { if (active && !active.ended) finish({ status: "dropped", kind: call.kind }); };
 }
 
-// The level bar shows what the browser hears, so "it does not answer me" can be told apart from
+// ---------- who is speaking: mic level for the farmer, playback for the agent ----------
+// The "You" bars show what the browser hears, so "it does not answer me" can be told apart from
 // "it cannot hear me". Speech is roughly 0.02 to 0.2 RMS.
-function micLevel(rms) {
+
+function hearYou(rms) {
   if (!active) return;
-  $("mic-fill").style.width = `${Math.min(100, Math.round(rms * 600))}%`;
+  // Map the RMS to 0..1 on a log-ish scale for the bars.
+  active.micLevel = active.muted ? 0 : Math.min(1, Math.max(0, (Math.log10(rms + 1e-4) + 3) / 2.2));
   if (rms > 0.008) active.heardAt = Date.now();
+}
+
+function showVoices() {
+  if (!active) return;
+  const talking = active.playEnd > active.ctx.currentTime + 0.05;
+  const you = active.micLevel || 0;
+  const t = performance.now() / 1000;
+  const set = (id, on, level) => {
+    const box = $(id);
+    box.classList.toggle("on", on);
+    box.querySelectorAll("i").forEach((bar, k) => {
+      const wave = calm.matches ? [0.6, 0.9, 1, 0.8, 0.55][k] : 0.55 + 0.45 * Math.sin(t * 9 + k * 1.3);
+      bar.style.transform = `scaleY(${on ? Math.max(0.18, level * wave) : 0.18})`;
+    });
+  };
+  set("voice-agent", talking, 0.85);
+  set("voice-you", you > 0.35, you);
 }
 
 function micCheck() {
@@ -163,8 +184,15 @@ function flush() {
   active.playEnd = active.ctx.currentTime;
 }
 
+// Keep the newest line in view, unless the reader scrolled up to reread something.
+function nearBottom(box) { return box.scrollHeight - box.scrollTop - box.clientHeight < 60; }
+function follow(box, stick) {
+  if (stick) box.scrollTop = box.scrollHeight; // instant, so the next line still finds us at the bottom
+}
+
 function caption({ who, text, index }) {
   const box = $("captions");
+  const stick = nearBottom(box);
   box.querySelector(".hint")?.remove();
   let line = active.lines[index];
   if (!line) {
@@ -176,16 +204,21 @@ function caption({ who, text, index }) {
     if (who === "farmer") setStage(active.call.kind === "confirm" ? 5 : 1);
   }
   line.txt.textContent += text;
-  box.scrollTop = box.scrollHeight;
+  follow(box, stick);
 }
 
 function translation({ index, text }) {
   const line = active?.lines[index];
-  if (line) line.tr.textContent = text;
+  if (!line) return;
+  const box = $("captions");
+  const stick = nearBottom(box);
+  line.tr.textContent = text;
+  follow(box, stick);
 }
 
 function toolEvent({ name, args, result, ui }) {
-  if (ui?.captured) renderCaptured(ui.captured);
+  if (ui?.captured) { active.captured = ui.captured; renderCaptured(ui.captured); }
+  if (ui?.offer_saved) active.saved = ui.offer_saved;
   if (ui?.rail) renderRail(ui.rail);
   if (ui?.offer_saved) renderSaved(ui.offer_saved);
   if (ui && "consent" in ui) {
@@ -258,6 +291,7 @@ function finish(msg) {
   meta("Ending…");
   setTimeout(() => {
     clearInterval(a.timer);
+    clearInterval(a.voiceTimer);
     a.stream.getTracks().forEach((t) => t.stop());
     a.ctx.close();
     if (a.ws.readyState <= WebSocket.OPEN) a.ws.close();
@@ -270,23 +304,43 @@ function finish(msg) {
 function renderEnded(a, msg) {
   $("ended-farmer").textContent = a.call.farmer_name;
   const words = { done: "Call finished", declined: "Farmer declined or asked to stop", dropped: "Call dropped" };
-  $("ended-meta").textContent = `${KIND_WORD[a.call.kind]} · ${words[msg.status] || msg.status || "ended"}`;
-  const body = [];
-  if (msg.deal && msg.status === "done") {
+  const secs = Math.round((Date.now() - a.startedAt) / 1000);
+  $("ended-meta").textContent = `${KIND_WORD[a.call.kind]} · ${words[msg.status] || msg.status || "ended"} · ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+  const cur = (d) => (d.currency === "IDR" || !d.currency ? "Rp " : "");
+
+  // The outcome card says in one line what changed for the mill, then the facts.
+  let tone = "ok", glyph = "check", title = "Call finished", facts = [];
+  const c = a.captured, saved = a.saved;
+  if (msg.status === "dropped") {
+    tone = "warn"; glyph = "alert"; title = "Call dropped";
+  } else if (msg.status === "declined") {
+    tone = "muted"; glyph = "x"; title = "Farmer declined";
+  } else if (msg.deal) {
     const d = msg.deal;
     const start = d.deliver_start ? new Date(d.deliver_start + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) : "";
-    body.push(el("div", { class: "panel deal" },
-      el("div", { class: "head" }, el("span", { class: "serif" }, "Deal confirmed"), d.decided_by ? pill(`Approved by ${d.decided_by}`, "leaf") : null),
-      kv([["Volume", `${fmtKg(d.kg)} kg ${cropLabel(d.crop)}`], ["Price", `${d.currency === "IDR" ? "Rp " : ""}${plainPrice(d.price_per_kg, d.currency)} / kg`],
-        ["Delivery", `Week ${d.deliver_week}${start ? `, from ${start}` : ""}`],
-        ["Forecast", d.from_week ? `Moved from week ${d.from_week} to week ${d.deliver_week}` : `Added to week ${d.deliver_week}`]])));
+    title = "Deal confirmed";
+    facts = [["Volume", `${fmtKg(d.kg)} kg ${cropLabel(d.crop)}`], ["Price", `${cur(d)}${plainPrice(d.price_per_kg, d.currency)} / kg`],
+      ["Delivery", `Week ${d.deliver_week}${start ? `, from ${start}` : ""}`],
+      ["Forecast", d.from_week ? `Moved from week ${d.from_week} to week ${d.deliver_week}` : `Added to week ${d.deliver_week}`]];
+    if (d.decided_by) facts.push(["Approved by", d.decided_by]);
+  } else if (saved) {
+    tone = saved.status === "pending" ? "ok" : "warn";
+    title = saved.status === "pending" ? "Offer sent for approval" : "Sent to the planner: price above the ceiling";
+    facts = [["Volume", `${fmtKg(saved.kg)} kg`]];
+    if (saved.price) facts.push(["Price", `Rp ${plainPrice(saved.price, "IDR")} / kg`]);
+    facts.push(["Next", "The planner approves or rejects it on the Approvals page"]);
+  } else if (c && c.status === "saved") {
+    title = "Harvest recorded";
+    facts = [["Volume", `${fmtKg(c.kg)} kg ${c.crop}`], ["Ready", c.ready], ["Answer", c.confidence === "Unsure" ? "Unsure, counted half" : "Firm"]];
   }
-  if (msg.status === "dropped") {
-    body.push(el("div", { class: "summary-box" }, msg.retry_queued
-      ? "The call dropped. Answers saved during the call are kept, and the call is queued again once."
-      : "The call dropped. Answers saved during the call are kept."));
-  }
-  if (msg.summary) body.push(el("div", { class: "summary-box" }, el("strong", {}, "Summary for the planner: "), msg.summary));
+  const body = [el("div", { class: `outcome ${tone}` },
+    el("div", { class: "head" }, el("span", { class: "glyph", "aria-hidden": "true" }, glyph === "check" ? "✓" : glyph === "x" ? "✕" : "!"),
+      el("h2", {}, title)),
+    facts.length ? kv(facts) : null,
+    msg.status === "dropped" ? el("p", {}, msg.retry_queued
+      ? "Answers saved during the call are kept, and the call is queued again once."
+      : "Answers saved during the call are kept.") : null,
+    msg.summary ? el("div", { class: "summary" }, el("span", {}, "Summary for the planner"), el("p", {}, msg.summary)) : null)];
   if (msg.consent !== undefined && msg.status !== "dropped") {
     body.push(el("p", { class: "consent" }, msg.consent ? `Consent given. Transcript is saved for ${cfg.millName}.` : "No consent. The transcript is not kept."));
   }
