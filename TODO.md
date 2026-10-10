@@ -51,5 +51,25 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
      "nothing new after 15 October" rule no longer apply. Instead, after the last rehearsal tag what you
      submit (`git tag submission-v1`) and re-check the live site after any later deploy.
 
+## Open: the microphone is silent on real devices (10 Oct, not solved)
+
+10. **The call connects and the agent speaks, but the browser's microphone stays silent.** The "You"
+    meter does not move, the page warns `No sound from "Default" yet`, the agent never gets an answer
+    and there is no farmer transcript. Seen on the live site and locally, on Windows (Brave) and on
+    Android (Brave and Chrome).
+    - **Ruled out:** the Gemini key (the agent speaks, so it works), the Live model, a Brave-only
+      problem (Chrome behaves the same), a paused audio engine (`resume()` added), and the capture
+      code itself (in headless Chromium with a fake microphone a tone fills the meter and silence
+      leaves it empty).
+    - **Not yet tried or not reported back:** the text in the `/mic-test.html` info box and whether
+      its 3-second playback is clear; a plain voice-recorder app on the same phone; the Android
+      permission (Settings, Apps, browser, Permissions, Microphone) and the microphone privacy switch;
+      a wired headset; the Windows Sound input meter; another computer or phone; Firefox.
+    - **Next ideas:** add a "plain `{audio: true}`" option to `/mic-test.html` to rule out our
+      constraints (`channelCount`, echo cancellation, noise suppression, auto gain); log how many audio
+      chunks reach the server per call (the gateway already receives them in `live_session.upstream`).
+    - **Tools that exist:** `/mic-test.html`, the Microphone name in the call page's warning, the
+      Agent / You meters, and the Volume slider.
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.
