@@ -114,7 +114,8 @@ WebSockets to the Cloud Run URL directly, because Hosting rewrites do not carry 
 
 ## Configuration
 
-See `.env.example`. The main settings are `GOOGLE_API_KEY` (or Vertex AI variables),
+Copy `.env.example` to `.env` and the backend reads it at start; every setting, and where it lives
+(local, cloud, GitHub), is in [ENV.md](ENV.md). The main settings are `GOOGLE_API_KEY` (or Vertex AI variables),
 `STORE_BACKEND`, `LIVE_MODEL`, `DEMO_LANGUAGE`, `MILL_NAME`, `PLAN_START`,
 `TARGET_KG_PER_WEEK`, `GAP_TOLERANCE`, `AUTH_REQUIRED` and `JWT_SECRET`.
 

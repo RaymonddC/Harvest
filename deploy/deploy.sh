@@ -14,7 +14,21 @@
 # set too - that gate is deliberate, see DECISIONS.md.
 set -euo pipefail
 
-: "${PROJECT:?Set PROJECT to your GCP project id}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Settings file (see deploy/deploy.env.example). A variable already exported in the shell wins.
+ENV_FILE="$ROOT/deploy/deploy.env"
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^[A-Z_][A-Z0-9_]*= ]] || continue
+    key="${line%%=*}"
+    [[ -z "${!key:-}" ]] && eval "$line"
+  done < "$ENV_FILE"
+  set +a
+fi
+
+: "${PROJECT:?Set PROJECT to your GCP project id (in deploy/deploy.env or the shell)}"
 REGION="${REGION:-asia-southeast1}"
 SERVICE="${SERVICE:-harvest-gateway}"
 JOB="${JOB:-harvest-forecast}"
@@ -36,7 +50,6 @@ REAL_CALL_ALLOWLIST="${REAL_CALL_ALLOWLIST:-}"
 SEED_DEMO_DATA="${SEED_DEMO_DATA:-true}"
 # One-time API enablement needs more permission than a deploy; CI sets SKIP_API_ENABLE=true.
 SKIP_API_ENABLE="${SKIP_API_ENABLE:-false}"
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 gcloud config set project "$PROJECT" >/dev/null
 if [[ "$SKIP_API_ENABLE" != "true" ]]; then
