@@ -35,7 +35,7 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 |---|---|---|---|
 | `GOOGLE_API_KEY` | none | Yes | Gemini API key, read by the Google SDK. Only used with `GEMINI_BACKEND=api_key`; then it comes from the `gemini-api-key` secret. Leave it unset when using Vertex AI, or it overrides the Vertex sign-in. Not needed for anything but the voice call. |
 | `LIVE_MODEL` | `gemini-2.5-flash-native-audio-preview-09-2025` | No | Gemini Live model for calls. Change it if Google retires the default. |
-| `TEXT_MODEL` | `gemini-2.5-flash` | No | Gemini model for caption translation and the plain-language forecast note. |
+| `TEXT_MODEL` | `gemini-3.8-flash` | No | Gemini model for caption translation and the plain-language forecast note. Google retired `gemini-2.5-flash` for new users (it answers 404), so if this one is retired too, set the name the error message suggests. Both features fall back quietly when it fails. |
 | `VOICE_NAME` | `Kore` | No | The agent's voice. |
 | `STORE_BACKEND` | `memory` | No | `memory` (local, in-process) or `firestore`. |
 | `GOOGLE_CLOUD_PROJECT` | none | No | Project id, needed when `STORE_BACKEND=firestore`. |
