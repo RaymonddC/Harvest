@@ -73,14 +73,13 @@ async function answer(call) {
   setStage(0);
   meta("Connecting…");
   show("call");
-  active.timer = setInterval(() => meta(), 500);
+  $("mic-note").hidden = true;
+  active.timer = setInterval(() => { meta(); micCheck(); }, 500);
 
   capture.port.onmessage = (e) => {
+    if (e.data.level !== undefined) return hearYou(e.data.level);
     if (e.data.pcm && ws.readyState === WebSocket.OPEN && !active?.muted) ws.send(e.data.pcm);
-    if (e.data.level !== undefined) hearYou(e.data.level);
   };
-  $("mic-hint").hidden = true;
-  active.heardAt = 0;
   active.voiceTimer = setInterval(showVoices, 80);
 
   ws.onmessage = (e) => {
@@ -98,12 +97,14 @@ async function answer(call) {
 }
 
 // ---------- who is speaking: mic level for the farmer, playback for the agent ----------
+// The "You" bars show what the browser hears, so "it does not answer me" can be told apart from
+// "it cannot hear me". Speech is roughly 0.02 to 0.2 RMS.
 
 function hearYou(rms) {
   if (!active) return;
-  // Speech RMS sits around 0.02-0.2; map it to 0..1 on a log-ish scale.
+  // Map the RMS to 0..1 on a log-ish scale for the bars.
   active.micLevel = active.muted ? 0 : Math.min(1, Math.max(0, (Math.log10(rms + 1e-4) + 3) / 2.2));
-  if (active.micLevel > 0.35) active.heardAt = Date.now();
+  if (rms > 0.008) active.heardAt = Date.now();
 }
 
 function showVoices() {
@@ -121,9 +122,20 @@ function showVoices() {
   };
   set("voice-agent", talking, 0.85);
   set("voice-you", you > 0.35, you);
-  // After the agent's greeting, a mic that never picks anything up is the usual reason a call goes nowhere.
-  const quietFor = Date.now() - (active.heardAt || active.startedAt);
-  $("mic-hint").hidden = !active.connected || active.muted || quietFor < 12000;
+}
+
+function micCheck() {
+  if (!active) return;
+  const note = $("mic-note");
+  if (active.muted) {
+    note.textContent = "Muted: the agent cannot hear you.";
+    note.hidden = false;
+  } else if (!active.heardAt && Date.now() - active.startedAt > 6000) {
+    note.textContent = "No sound from your microphone yet. Check that it is not muted in your system and that the right one is allowed in the browser's site settings.";
+    note.hidden = false;
+  } else {
+    note.hidden = true;
+  }
 }
 
 function clock() {

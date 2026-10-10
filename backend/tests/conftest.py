@@ -1,11 +1,14 @@
 import dataclasses
 import datetime as dt
+import os
 
 import pytest
 
 from app import seed_data
 from app.config import get_settings
 from app.store import MemoryStore
+
+os.environ.setdefault("HARVEST_NO_DOTENV", "1")  # a developer's own .env must not change test results
 
 PLAN_START = dt.date(2026, 10, 12)
 

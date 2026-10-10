@@ -3,7 +3,8 @@
     "public": "web",
     "ignore": ["**/.*"],
     "headers": [
-      { "source": "config.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+      { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+      { "source": "**/*.@(html|js|css)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
     ]
   },
   "firestore": {

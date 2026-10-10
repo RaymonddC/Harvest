@@ -96,8 +96,8 @@
 .voice .eq i { display: block; width: 4px; height: 22px; border-radius: 2px; background: currentColor; transform: scaleY(.18); transition: transform .08s linear; }
 #voice-agent.on { background: rgba(22, 119, 78, .35); color: #7FE0B4; }
 #voice-you.on { background: rgba(245, 199, 102, .16); color: #F5C766; }
-.mic-hint { font-size: 13px; color: #F5C766; background: rgba(245, 199, 102, .1); border-radius: 10px; padding: 10px 12px; margin: 0; }
-.mic-hint[hidden] { display: none; }
+.mic-note { font-size: 13px; color: #F5C766; background: rgba(245, 199, 102, .1); border-radius: 10px; padding: 10px 12px; margin: 0; }
+.mic-note[hidden] { display: none; }
 
 /* ---------- captions: roomier lines for reading on screen ---------- */
 .captions { gap: 12px; max-height: 42vh; padding: 4px 2px 8px; scroll-padding-bottom: 8px;
