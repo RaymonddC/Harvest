@@ -35,6 +35,11 @@ JOB="${JOB:-harvest-forecast}"
 MILL_NAME="${MILL_NAME:-Koperasi Sawit Maju}"
 PLANNER_NAME="${PLANNER_NAME:-Dewi}"
 DEMO_LANGUAGE="${DEMO_LANGUAGE:-Bahasa Indonesia}"
+# How the service reaches Gemini. "vertex" (default): the service's own Google account calls
+# Vertex AI, so no key is stored anywhere. "api_key": a Gemini API key from the gemini-api-key secret.
+GEMINI_BACKEND="${GEMINI_BACKEND:-vertex}"
+# Vertex region for the Live API (separate from the Cloud Run region above).
+GOOGLE_CLOUD_LOCATION="${GOOGLE_CLOUD_LOCATION:-us-central1}"
 # Signs the sign-in tokens. Set it to keep people signed in across deploys; when empty a fresh
 # random one is made, so a redeploy only asks everyone to pick their role again.
 JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}"
@@ -54,7 +59,8 @@ SKIP_API_ENABLE="${SKIP_API_ENABLE:-false}"
 gcloud config set project "$PROJECT" >/dev/null
 if [[ "$SKIP_API_ENABLE" != "true" ]]; then
   gcloud services enable run.googleapis.com firestore.googleapis.com secretmanager.googleapis.com \
-    cloudbuild.googleapis.com artifactregistry.googleapis.com logging.googleapis.com
+    cloudbuild.googleapis.com artifactregistry.googleapis.com logging.googleapis.com \
+    aiplatform.googleapis.com
 fi
 
 # "^@^" switches gcloud's list delimiter to @, because the Firebase config JSON contains commas.
@@ -63,10 +69,22 @@ ENV_VARS="$ENV_VARS@MILL_NAME=$MILL_NAME@PLANNER_NAME=$PLANNER_NAME@DEMO_LANGUAG
 ENV_VARS="$ENV_VARS@JWT_SECRET=$JWT_SECRET"
 if [[ -n "${FIREBASE_WEB_CONFIG:-}" ]]; then ENV_VARS="$ENV_VARS@FIREBASE_WEB_CONFIG=$FIREBASE_WEB_CONFIG"; fi
 
+case "$GEMINI_BACKEND" in
+  vertex)
+    # The Vertex name of the Live model differs from the Gemini API one.
+    LIVE_MODEL="${LIVE_MODEL:-gemini-live-2.5-flash-native-audio}"
+    ENV_VARS="$ENV_VARS@GOOGLE_GENAI_USE_VERTEXAI=true@GOOGLE_CLOUD_LOCATION=$GOOGLE_CLOUD_LOCATION@LIVE_MODEL=$LIVE_MODEL"
+    GEMINI_SECRET_FLAGS=(--clear-secrets) ;;  # no key: a leftover GOOGLE_API_KEY would override Vertex sign-in
+  api_key)
+    if [[ -n "${LIVE_MODEL:-}" ]]; then ENV_VARS="$ENV_VARS@LIVE_MODEL=$LIVE_MODEL"; fi
+    GEMINI_SECRET_FLAGS=(--set-secrets GOOGLE_API_KEY=gemini-api-key:latest) ;;
+  *) echo "GEMINI_BACKEND must be vertex or api_key (got: $GEMINI_BACKEND)" >&2; exit 1 ;;
+esac
+
 # WebSocket calls: long timeout, session affinity, one warm instance for the demo.
 gcloud run deploy "$SERVICE" --source "$ROOT/backend" --region "$REGION" \
   --allow-unauthenticated --timeout 3600 --session-affinity --min-instances 1 \
-  --set-env-vars "$ENV_VARS" --set-secrets GOOGLE_API_KEY=gemini-api-key:latest
+  --set-env-vars "$ENV_VARS" "${GEMINI_SECRET_FLAGS[@]}"
 
 gcloud run jobs deploy "$JOB" --source "$ROOT/backend" --region "$REGION" \
   --command python --args=-m,app.forecast_job \
@@ -79,7 +97,7 @@ if [[ -n "$TWILIO_ACCOUNT_SID" && -n "$TWILIO_AUTH_TOKEN" && -n "$TWILIO_FROM_NU
   echo "Wiring up the Twilio channel (PUBLIC_BASE_URL=$URL, REAL_CALLS_ENABLED=$REAL_CALLS_ENABLED)..."
   gcloud run services update "$SERVICE" --region "$REGION" --update-env-vars \
     "^@^PUBLIC_BASE_URL=$URL@TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID@TWILIO_FROM_NUMBER=$TWILIO_FROM_NUMBER@REAL_CALLS_ENABLED=$REAL_CALLS_ENABLED@REAL_CALL_ALLOWLIST=$REAL_CALL_ALLOWLIST" \
-    --set-secrets TWILIO_AUTH_TOKEN=twilio-auth-token:latest
+    --update-secrets TWILIO_AUTH_TOKEN=twilio-auth-token:latest
 fi
 
 # Point the dashboard at the gateway. WebSockets do not pass through Hosting rewrites,

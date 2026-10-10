@@ -33,7 +33,7 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 
 | Variable | Default | Secret? | What it does |
 |---|---|---|---|
-| `GOOGLE_API_KEY` | none | Yes | Gemini API key, read by the Google SDK. In the cloud it comes from the `gemini-api-key` secret. Not needed for anything but the voice call. |
+| `GOOGLE_API_KEY` | none | Yes | Gemini API key, read by the Google SDK. Only used with `GEMINI_BACKEND=api_key`; then it comes from the `gemini-api-key` secret. Leave it unset when using Vertex AI, or it overrides the Vertex sign-in. Not needed for anything but the voice call. |
 | `LIVE_MODEL` | `gemini-2.5-flash-native-audio-preview-09-2025` | No | Gemini Live model for calls. Change it if Google retires the default. |
 | `TEXT_MODEL` | `gemini-2.5-flash` | No | Gemini model for caption translation and the plain-language forecast note. |
 | `VOICE_NAME` | `Kore` | No | The agent's voice. |
@@ -65,8 +65,10 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | `REAL_CALLS_ENABLED` | `false` | No | Safety gate: real calls need this on **and** the number on the allow list. |
 | `REAL_CALL_ALLOWLIST` | empty | No | Numbers a real call may dial. `*` allows any number. |
 
-Using Vertex AI instead of an API key: set `GOOGLE_GENAI_USE_VERTEXAI=true`,
-`GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION`. The Google SDK reads these itself.
+Using Vertex AI instead of an API key (the cloud default): set `GOOGLE_GENAI_USE_VERTEXAI=true`,
+`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` and a Vertex `LIVE_MODEL`, and leave `GOOGLE_API_KEY`
+unset. The Google SDK reads these itself. Locally, sign in once with `gcloud auth application-default login`.
+In the cloud the service signs in with its own account, which needs `roles/aiplatform.user`.
 
 ## Deploy settings (`deploy/deploy.env` or the shell)
 
@@ -74,6 +76,9 @@ Using Vertex AI instead of an API key: set `GOOGLE_GENAI_USE_VERTEXAI=true`,
 |---|---|---|
 | `PROJECT` | none, required | Google Cloud project id. |
 | `REGION` | `asia-southeast1` | Region for Cloud Run. |
+| `GEMINI_BACKEND` | `vertex` | `vertex`: the service calls Vertex AI with its own Google account and stores no key. `api_key`: it uses the `gemini-api-key` secret. |
+| `GOOGLE_CLOUD_LOCATION` | `us-central1` | Vertex region for the Live API (with `vertex`). |
+| `LIVE_MODEL` | `gemini-live-2.5-flash-native-audio` with `vertex`, unset with `api_key` | The Live model's name. It differs between Vertex and the Gemini API. |
 | `SERVICE` / `JOB` | `harvest-gateway` / `harvest-forecast` | Cloud Run service and job names. |
 | `MILL_NAME`, `PLANNER_NAME`, `DEMO_LANGUAGE` | as above | Passed to the service. |
 | `FIREBASE_WEB_CONFIG` | none | Passed to the service and written into `web/config.js`. |
@@ -93,5 +98,6 @@ Using Vertex AI instead of an API key: set `GOOGLE_GENAI_USE_VERTEXAI=true`,
 | Variable | `GCP_PROJECT` | Project id (required). |
 | Variable | `GCP_REGION` | Region, defaults to `asia-southeast1`. |
 | Variable | `MILL_NAME`, `PLANNER_NAME`, `DEMO_LANGUAGE`, `FIREBASE_WEB_CONFIG` | Optional. |
+| Variable | `GEMINI_BACKEND`, `GOOGLE_CLOUD_LOCATION`, `LIVE_MODEL` | Optional; see the deploy settings above. |
 
 How to create the first three is in section 7 of `DEPLOY.md`.
