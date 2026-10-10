@@ -82,5 +82,15 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     - **Tools that exist:** `/mic-test.html`, the Microphone name in the call page's warning, the
       Agent / You meters, and the Volume slider.
 
+11. **Voice follow-ups (parked 10 Oct).** The microphone now works (item 10). Still to check on a real call:
+    - Reply speed after the new Live model (`-12-2025`) and `VAD_SILENCE_MS=400`. If the agent cuts the
+      farmer off, raise `VAD_SILENCE_MS` in `config.py` to 700 to 1000. If the call fails to connect,
+      revert the `realtime_input_config` block in `live_session.build_live_config`.
+    - The Gemini key is on the free tier (20 text requests a day per model), so caption translation and the
+      forecast note stop after a few calls. Fix: enable billing on the AI Studio project that owns the key
+      (https://aistudio.google.com/apikey), or switch to `GEMINI_BACKEND=vertex`.
+    - The agent's opening is partly English, partly the farmer's language (`backend/app/prompt.py`).
+    - Farmer list: Delete is permanent (a confirm popup, no undo; accepted).
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.
