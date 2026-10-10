@@ -37,7 +37,7 @@ export default function Forecast() {
 
   return (
     <Shell title="Live forecast" head={head}>
-      <Kpis rows={rows} calls={campaignCalls} />
+      <Kpis rows={rows} calls={campaignCalls} toCall={state ? state.farmers.filter((f) => f.to_call).length : 0} />
       <div className="cols">
         <div className="col-main">
           <section className="card" aria-labelledby="chart-title">

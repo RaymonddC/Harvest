@@ -23,7 +23,7 @@ export default function FarmersStep({ farmers, toCall, onAdd }) {
   });
 
   return (
-    <section className="card" aria-labelledby="farmers-title">
+    <section className={`card ${farmers.length ? "done" : ""}`} aria-labelledby="farmers-title">
       <StepTop n={1} done={farmers.length > 0} word={farmers.length ? "Done" : "To do"} />
       <div className="step-head"><h2 id="farmers-title">Farmers</h2><span className="sub">Who the agent will call.</span></div>
       <div className="drop">

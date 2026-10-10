@@ -1,9 +1,27 @@
 import { motion } from "motion/react";
 import { useEffect } from "react";
 import { Link, Navigate, NavLink, useLocation } from "react-router-dom";
-import { can, cfg, getSession, PAGES, roleLabel } from "./lib.js";
+import { can, cfg, fmtT, getSession, PAGES, roleLabel } from "./lib.js";
 import { useLive } from "./live.jsx";
 import { Avatar, Icon } from "./ui.jsx";
+
+// This week at a glance, under the page links: is calling on, is a week short, does anything
+// wait for a decision. Hidden on narrow screens, where the sidebar is a single row.
+function WeekCard({ state }) {
+  if (!state) return null;
+  const campaign = state.campaigns.find((x) => x.id === "current") || {};
+  const running = campaign.status === "running";
+  const gap = [...state.forecast].sort((a, b) => a.week - b.week).find((r) => r.is_gap);
+  const waiting = state.offers.filter((o) => ["pending", "escalated"].includes(o.status)).length;
+  return (
+    <div className="week-card" aria-label="This week">
+      <span className="wc-title">This week</span>
+      <div className="wc-row"><i className={`wc-dot ${running ? "on" : ""}`} />{running ? (campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Calling farmers") : "No calls running"}</div>
+      <div className="wc-row"><i className={`wc-dot ${gap ? "amber" : "on"}`} />{gap ? `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short` : "Every week on track"}</div>
+      {waiting > 0 && <Link className="wc-row wc-link" to="/approvals"><i className="wc-dot amber" />{waiting} waiting for a decision</Link>}
+    </div>
+  );
+}
 
 // Sidebar (phone: top row plus a bottom tab bar, from app.css), a top bar holding the page
 // heading, and the banners for live-data trouble and view-only sessions.
@@ -32,6 +50,7 @@ export default function Shell({ title, head, children }) {
             </NavLink>
           ))}
         </nav>
+        <WeekCard state={state} />
         <div className="spacer" />
         <div className="planner">
           <Avatar name={session.name} cls="ink" />
