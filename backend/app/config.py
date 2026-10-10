@@ -72,8 +72,22 @@ class Settings:
     real_call_allowlist: tuple[str, ...]
 
 
+def _load_dotenv(folders: tuple[Path, ...] | None = None) -> None:
+    """Read a local `.env` into the environment. Real environment variables always win, and blank
+    values are skipped so a copied `.env.example` does not set anything to the empty string."""
+    from dotenv import dotenv_values
+
+    here = Path(__file__).resolve()
+    for folder in folders or (here.parents[2], here.parents[1]):  # repo root, then backend/
+        for key, value in dotenv_values(folder / ".env").items():
+            if value and key not in os.environ:
+                os.environ[key] = value
+
+
 @lru_cache
 def get_settings() -> Settings:
+    if os.environ.get("HARVEST_NO_DOTENV") != "1":  # the tests set this
+        _load_dotenv()
     plan_start_raw = os.environ.get("PLAN_START")
     plan_start = dt.date.fromisoformat(plan_start_raw) if plan_start_raw else next_monday()
 

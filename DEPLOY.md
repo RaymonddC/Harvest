@@ -52,8 +52,10 @@ Things to know:
 
 - **Python version:** use 3.12, which is what the Dockerfile and CI use. On 3.13 one test
   (`test_decode_matches_stdlib_audioop_exactly`) fails because `audioop` was removed.
-- **`.env` is not read automatically.** Nothing in the backend loads it. Either `export` each
-  variable, or run `set -a; source .env; set +a` before starting the server.
+- **Settings can live in a `.env` file.** Run `cp .env.example .env` and put your key in it; the
+  backend reads it at start (from the repo root or `backend/`), so you can skip the `export`. A
+  variable already set in your shell wins. `.env` is git-ignored. Every setting is listed in
+  [ENV.md](ENV.md).
 - **Each person uses their own API key.** Do not share yours; a shared key shares its quota.
 - **After the first clone, the daily routine is just:** activate the venv, export the key,
   start uvicorn. Run `git pull` and `pip install -r requirements-dev.txt` when dependencies change.
