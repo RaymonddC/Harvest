@@ -31,10 +31,9 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
    `confirmed_by_farmer=true` without the unconfirmed call first. Fix: track the read-back in
    `CallSession` and refuse otherwise.
 
-5. **Counters inside the limits are accepted immediately** (no ladder, even at the ceiling).
-   Confirm that is intended and say so in the README.
+5. ~~**Counters inside the limits are accepted immediately**~~ Decided 2026-10-10: intended; stated in the README.
 
-6. **Docs:** AI disclosure and "read the reference price first" are prompt-only.
+6. ~~**Docs:** AI disclosure and "read the reference price first" are prompt-only.~~ Fixed 2026-10-10: the README now says so.
 
 ## Login (decided 10 Oct: keep the demo role picker for the hackathon)
 

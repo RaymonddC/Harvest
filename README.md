@@ -100,13 +100,14 @@ WebSockets to the Cloud Run URL directly, because Hosting rewrites do not carry 
 
 | Guardrail | Enforcement |
 |---|---|
-| AI disclosure in the first sentence (VA-2) | Exact opening line in `prompt.py`; badge always on the call screen |
+| AI disclosure in the first sentence (VA-2) | Prompt rule only: exact opening line in `prompt.py`, not checked in code; badge always on the call screen |
 | Prices only from `check_offer` (VA-5) | `save_offer` rejects any price `check_offer` did not return on this call (`tools.py`) |
 | Read-back before saving (VA-3) | `record_harvest` runs twice: unconfirmed (returns the read-back sentence), then confirmed |
 | Floor and ceiling (G3) | `rules_engine.check_offer`; re-checked in `create_offer` and again on approval |
 | Out-of-limit requests go to the planner | `escalate` decision → offer saved as `escalated`; Approve stays disabled until the limits allow it |
+| Counters inside the limits | Accepted at once, with no ladder, even at the ceiling (by design: the limits are already the planner's approved range, and the planner still approves every deal) |
 | Agent is not given the floor and ceiling | The prompt and `get_reference_price` carry only the reference price. `check_offer` returns just the next price the agent may say; that is the ceiling only when the farmer asks for more (the top of the ladder), and the floor only when the farmer counters below it. The agent never gets the range itself |
-| Reference price read aloud first | Prompt stage 4; `get_reference_price` returns the sentence to say |
+| Reference price read aloud first | Prompt rule only (stage 4); `get_reference_price` returns the sentence to say, but nothing forces the agent to call it |
 | Consent before a transcript is saved | `end_call(transcript_consent)`; the transcript is dropped when false |
 | Human approval on every deal | Offers start `pending`; only approved offers count in the forecast |
 | One farmer per call | Tool handlers are bound to the call's farmer and cannot read others |
