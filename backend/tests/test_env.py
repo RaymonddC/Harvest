@@ -1,4 +1,5 @@
 import re
+import sys
 from pathlib import Path
 
 from app import config
@@ -63,3 +64,12 @@ def test_every_github_secret_and_variable_is_in_env_md():
     reference = (ROOT / "ENV.md").read_text()
     for name in sorted(names):
         assert f"`{name}`" in reference, f"{name} is missing from ENV.md"
+
+
+def test_a_missing_python_dotenv_does_not_stop_the_app(monkeypatch, tmp_path):
+    monkeypatch.setitem(sys.modules, "dotenv", None)  # makes `import dotenv` fail
+    (tmp_path / ".env").write_text("HARVEST_T_NEVER=1\n")
+    config._load_dotenv((tmp_path,))
+    import os
+
+    assert "HARVEST_T_NEVER" not in os.environ

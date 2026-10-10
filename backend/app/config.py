@@ -75,7 +75,10 @@ class Settings:
 def _load_dotenv(folders: tuple[Path, ...] | None = None) -> None:
     """Read a local `.env` into the environment. Real environment variables always win, and blank
     values are skipped so a copied `.env.example` does not set anything to the empty string."""
-    from dotenv import dotenv_values
+    try:
+        from dotenv import dotenv_values
+    except ImportError:  # not installed yet: skip .env; real environment variables still work
+        return
 
     here = Path(__file__).resolve()
     for folder in folders or (here.parents[2], here.parents[1]):  # repo root, then backend/
