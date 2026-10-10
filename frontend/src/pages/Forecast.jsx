@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { CallDialog, CallLog, Calls } from "../components/forecast/Calls.jsx";
 import Chart from "../components/forecast/Chart.jsx";
-import { GapCard, OkCard } from "../components/forecast/GapCard.jsx";
+import { FillList, Hero } from "../components/forecast/GapCard.jsx";
 import GapNote from "../components/forecast/GapNote.jsx";
 import Kpis from "../components/forecast/Kpis.jsx";
 import { apiUrl, cropLabel, fmtT } from "../lib.js";
@@ -37,6 +37,16 @@ export default function Forecast() {
 
   return (
     <Shell title="Live forecast" head={head}>
+      {/* The page's one message first: the gap and how to fill it, or that every week is fine.
+          initial={false}: no fade when the page opens, only when the gap opens or closes. */}
+      <AnimatePresence mode="wait" initial={false}>
+        {state && rows.length > 0 && (
+          <motion.div key={gap ? "gap" : "ok"} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}>
+            <Hero gap={gap} rows={rows} state={state} />
+          </motion.div>
+        )}
+      </AnimatePresence>
       <Kpis rows={rows} calls={campaignCalls} toCall={state ? state.farmers.filter((f) => f.to_call).length : 0} />
       <div className="cols">
         <div className="col-main">
@@ -59,15 +69,7 @@ export default function Forecast() {
           </section>
         </div>
         <div className="col-side">
-          {/* initial={false}: no fade when the page opens, only when the gap opens or closes. */}
-          <AnimatePresence mode="wait" initial={false}>
-            {state && rows.length > 0 && (
-              <motion.div key={gap ? "gap" : "ok"} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}>
-                {gap ? <GapCard gap={gap} state={state} /> : <OkCard state={state} />}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {state && gap && <FillList gap={gap} state={state} />}
           <section className="card" aria-labelledby="calls-title">
             <div className="card-head">
               <h2 id="calls-title">Live calls</h2>

@@ -8,6 +8,7 @@ import { api } from "../lib.js";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 import { useAct } from "../toast.jsx";
+import { ActButton } from "../ui.jsx";
 
 export default function Setup() {
   const { state } = useLive();
@@ -37,7 +38,7 @@ export default function Setup() {
       </div>
       {state && <FarmerList farmers={farmers} onEdit={setFarmerForm} />}
       <FarmerForm farmer={farmerForm} onClose={() => setFarmerForm(null)} />
-      <p className="small muted">All data is synthetic. <button className="btn sm" type="button" style={{ marginLeft: 8 }} onClick={() => act(() => api("/api/demo/reset"), "Demo data reset.")}>Reset demo data</button></p>
+      <p className="small muted">All data is synthetic. <ActButton className="btn sm" busy="Resetting…" style={{ marginLeft: 8 }} run={() => act(() => api("/api/demo/reset"), "Demo data reset.")}>Reset demo data</ActButton></p>
     </Shell>
   );
 }

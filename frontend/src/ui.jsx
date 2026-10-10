@@ -1,4 +1,5 @@
 import * as RDialog from "@radix-ui/react-dialog";
+import { useEffect, useRef, useState } from "react";
 import { ICON_PATHS, initials } from "./lib.js";
 
 export function Icon({ name, size = 18 }) {
@@ -32,4 +33,28 @@ export function Dialog({ open, onClose, title, children, wide }) {
 
 export const DialogClose = ({ children = "Close" }) => (
   <RDialog.Close asChild><button className="btn" type="button">{children}</button></RDialog.Close>
+);
+
+// A button for a server action. run() returns a promise; while it runs the button is disabled,
+// shows a small spinner and says what is happening ("Approving…"), so nobody clicks twice.
+export function ActButton({ run, busy: busyText, children, className = "btn", disabled, ...rest }) {
+  const [busy, setBusy] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+  const click = async (e) => {
+    setBusy(true);
+    try { await run(e); } finally { if (alive.current) setBusy(false); }
+  };
+  return (
+    <button type="button" className={className} disabled={disabled || busy} aria-busy={busy || undefined} onClick={click} {...rest}>
+      {busy ? <><Spinner />{busyText}</> : children}
+    </button>
+  );
+}
+
+export const Spinner = () => <span className="spinner" aria-hidden="true" />;
+
+// The submit button of a form whose save is running.
+export const SubmitButton = ({ busy, busyText, children, className = "btn solid" }) => (
+  <button type="submit" className={className} disabled={busy} aria-busy={busy || undefined}>{busy ? <><Spinner />{busyText}</> : children}</button>
 );

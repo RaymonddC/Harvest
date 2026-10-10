@@ -6,7 +6,7 @@ import { api, plainPrice } from "../lib.js";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 import { useAct } from "../toast.jsx";
-import { Avatar } from "../ui.jsx";
+import { ActButton, Avatar } from "../ui.jsx";
 
 const ORDER = { pending: 0, escalated: 1, approved: 2, rejected: 3 };
 
@@ -56,7 +56,7 @@ export default function Approvals() {
               <div className="who"><Avatar name={q.supplier_name} cls="ink" /><div><b>{q.supplier_name}</b><span>Logged quote for week {q.deliver_week}, not used yet</span></div></div>
               <div className="fig"><span>Volume</span><b className="num">{(q.kg / 1000).toFixed(1)} t</b></div>
               <div className="fig"><span>Price, {q.currency || "IDR"}/kg</span><b className="num">{plainPrice(q.price_per_kg, q.currency || "IDR")}</b></div>
-              <div className="acts"><button className="btn" onClick={() => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added as a pending offer.")}>Add as offer</button></div>
+              <div className="acts"><ActButton busy="Adding…" run={() => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added as a pending offer.")}>Add as offer</ActButton></div>
             </motion.div>
           ))}
           </AnimatePresence>
@@ -68,7 +68,7 @@ export default function Approvals() {
           )}
         </div>
         <div className="offers-foot">
-          {l && `${anyOut ? "Offers marked Needs planner asked for more than the ceiling. All others are" : "All offers are"} inside the floor (${plainPrice(l.floor_price, l.currency)}) and ceiling (${plainPrice(l.ceiling_price, l.currency)}). The small bar under each price runs from the floor to the ceiling (black mark); red past it is above the ceiling. Synthetic data.`}
+          {l && `Price range: floor ${plainPrice(l.floor_price, l.currency)}, ceiling ${plainPrice(l.ceiling_price, l.currency)}. The bar under each price shows where it sits; red is above the ceiling${anyOut ? " (marked Needs planner)" : ""}. Synthetic data.`}
         </div>
       </section>
       </div>

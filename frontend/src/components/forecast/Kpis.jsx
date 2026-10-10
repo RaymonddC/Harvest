@@ -1,5 +1,4 @@
 import { fmtT } from "../../lib.js";
-import { shortDate } from "./Chart.jsx";
 
 // A figure, a line of context under it, and (optionally) a bar showing how far it has got.
 const Kpi = ({ label, cls = "", value, note, share }) => (
@@ -11,6 +10,7 @@ const Kpi = ({ label, cls = "", value, note, share }) => (
   </div>
 );
 
+// The gap itself is the banner above; these are the supporting figures.
 export default function Kpis({ rows, calls, toCall }) {
   if (!rows.length) return <div className="kpis" id="kpis" />;
   const target = rows[0].target_kg;
@@ -23,9 +23,6 @@ export default function Kpis({ rows, calls, toCall }) {
       <Kpi label="Weekly target" value={`${fmtT(target)} t`} note={`${onTrack} of ${rows.length} weeks on track`} share={onTrack / rows.length} />
       <Kpi label={`Week ${focus.week} expected`} value={`${fmtT(focus.expected_kg)} t`}
         note={`${Math.round((focus.expected_kg / target) * 100)}% of the target`} share={focus.expected_kg / target} />
-      {gap
-        ? <Kpi label={`Week ${gap.week} gap`} cls="amber" value={`${fmtT(gap.gap_kg)} t short`} note={`Week of ${shortDate(gap.week_start)}`} />
-        : <Kpi label="Gap" cls="mint" value="None" note="Every week is within the threshold" />}
       {calls.length
         ? <Kpi label="Calls" value={<span>{done} <small>of {calls.length} done</small></span>} share={done / calls.length}
           note={calls.length - done ? `${calls.length - done} still to go` : "Every farmer answered"} />

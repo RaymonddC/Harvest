@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { api, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
-import { Avatar, Pill } from "../../ui.jsx";
+import { ActButton, Avatar, Pill } from "../../ui.jsx";
 import PriceSpot from "./PriceSpot.jsx";
 
 function detail(o) {
@@ -37,14 +37,14 @@ export default function Offer({ o, l }) {
         {open ? (
           <>
             {o.status === "pending" ? <Pill cls="amber">Pending</Pill> : <Pill cls="danger">Needs planner</Pill>}
-            <button className="btn" onClick={() => act(() => api(`/api/offers/${o.id}/reject`), `Rejected. ${o.farmer_name} will not be confirmed.`, { fn: () => api(`/api/offers/${o.id}/undo`), ok: "Back to pending." })}>Reject</button>
-            <button className="btn leaf" disabled={!inLimits} title={inLimits ? undefined : "Outside the current floor and ceiling"}
-              onClick={() => act(() => api(`/api/offers/${o.id}/approve`), `Approved. A confirmation call to ${o.farmer_name} is queued.`, { fn: () => api(`/api/offers/${o.id}/undo`), ok: "Back to pending." })}>Approve</button>
+            <ActButton busy="Rejecting…" run={() => act(() => api(`/api/offers/${o.id}/reject`), `Rejected. ${o.farmer_name} will not be confirmed.`, { fn: () => api(`/api/offers/${o.id}/undo`), ok: "Back to pending." })}>Reject</ActButton>
+            <ActButton className="btn leaf" busy="Approving…" disabled={!inLimits} title={inLimits ? undefined : "Outside the current floor and ceiling"}
+              run={() => act(() => api(`/api/offers/${o.id}/approve`), `Approved. A confirmation call to ${o.farmer_name} is queued.`, { fn: () => api(`/api/offers/${o.id}/undo`), ok: "Back to pending." })}>Approve</ActButton>
           </>
         ) : (
           <>
             <Pill cls={o.status === "approved" ? "mint" : ""}>{confirmed ? "Approved · confirmed by voice" : o.status === "approved" ? "Approved" : "Rejected"}</Pill>
-            {!confirmed && <button className="btn ghost" onClick={() => act(() => api(`/api/offers/${o.id}/undo`), "Back to pending.")}>Undo</button>}
+            {!confirmed && <ActButton className="btn ghost" busy="Undoing…" run={() => act(() => api(`/api/offers/${o.id}/undo`), "Back to pending.")}>Undo</ActButton>}
           </>
         )}
       </div>
