@@ -106,7 +106,7 @@ def get_settings() -> Settings:
     return Settings(
         store_backend=store_backend,
         gcp_project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
-        live_model=os.environ.get("LIVE_MODEL", "gemini-2.5-flash-native-audio-preview-09-2025"),
+        live_model=os.environ.get("LIVE_MODEL", "gemini-2.5-flash-native-audio-preview-12-2025"),
         text_model=os.environ.get("TEXT_MODEL", "gemini-3.8-flash"),
         voice_name=os.environ.get("VOICE_NAME", "Kore"),
         vad_silence_ms=int(os.environ.get("VAD_SILENCE_MS", "400")),

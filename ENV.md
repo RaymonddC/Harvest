@@ -56,7 +56,7 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | Variable | Default | Secret? | What it does | In production, change it in |
 |---|---|---|---|---|
 | `GOOGLE_API_KEY` | none | Yes | Gemini API key, read by the Google SDK. Only used with `GEMINI_BACKEND=api_key`; then it comes from the `gemini-api-key` secret. Leave it unset when using Vertex AI, or it overrides the Vertex sign-in. Not needed for anything but the voice call. | Secret Manager, secret `gemini-api-key`: add a new version, then redeploy |
-| `LIVE_MODEL` | `gemini-2.5-flash-native-audio-preview-09-2025` | No | Gemini Live model for calls. Change it if Google retires the default. | GitHub variable `LIVE_MODEL`, then redeploy |
+| `LIVE_MODEL` | `gemini-2.5-flash-native-audio-preview-12-2025` | No | Gemini Live model for calls. Change it if Google retires the default. | GitHub variable `LIVE_MODEL`, then redeploy |
 | `TEXT_MODEL` | `gemini-3.8-flash` | No | Gemini model for caption translation and the plain-language forecast note. Google retired `gemini-2.5-flash` for new users (it answers 404), so if this one is retired too, set the name the error message suggests. Both features fall back quietly when it fails. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `VOICE_NAME` | `Kore` | No | The agent's voice. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `VAD_SILENCE_MS` | `400` | No | How many milliseconds of silence end the farmer's turn, so the agent starts answering. Lower is faster but can cut off someone who pauses mid-sentence; raise it to 700 to 1000 if the agent interrupts. | Not settable from GitHub yet: the code default runs. See the rule above |
