@@ -4,11 +4,11 @@ import { useAct } from "../../toast.jsx";
 import { Avatar, Dialog, DialogClose } from "../../ui.jsx";
 import StepTop from "./StepTop.jsx";
 
-const SAMPLE_CSV = "name,phone,crop,language,village\nPak Contoh,+62 812 0000 5001,palm,Bahasa Indonesia,Sungai Lala";
+const SAMPLE_CSV = "name,phone,crop,language,village,usual_kg_week,can_pull_forward\nPak Contoh,+62 812 0000 5001,palm,Bahasa Indonesia,Sungai Lala,1500,yes";
 const TONES = ["", "grey", "ink"];
 
-// Step 1: who the agent will call, and the CSV upload.
-export default function FarmersStep({ farmers, toCall }) {
+// Step 1: who the agent will call, with adding one farmer (onAdd) and the CSV upload.
+export default function FarmersStep({ farmers, toCall, onAdd }) {
   const act = useAct();
   const [open, setOpen] = useState(false);
   const [csv, setCsv] = useState(SAMPLE_CSV);
@@ -17,7 +17,10 @@ export default function FarmersStep({ farmers, toCall }) {
     const r = await api("/api/farmers/upload", { body: { csv } });
     setOpen(false);
     return r;
-  }, (r) => `${r.added} farmers added.`);
+  }, (r) => {
+    if (r.skipped?.length) alert(`${r.added} added. ${r.skipped.length} lines skipped:\n\n${r.skipped.slice(0, 8).join("\n")}`);
+    return `${r.added} farmers added.`;
+  });
 
   return (
     <section className="card" aria-labelledby="farmers-title">
@@ -33,13 +36,17 @@ export default function FarmersStep({ farmers, toCall }) {
           ? `${toCall} to call this week · ${langs.join(", ") || "language not set"} · synthetic data`
           : "Upload a CSV with name, phone, crop and language."}</span>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+          <button className="btn" type="button" onClick={onAdd}>Add farmer</button>
           <button className="btn" type="button" onClick={() => setOpen(true)}>Upload CSV</button>
           <a className="btn ghost" href="#farmer-list">See the list</a>
         </div>
       </div>
 
       <Dialog open={open} onClose={() => setOpen(false)} title="Upload farmer list">
-        <p className="muted" style={{ margin: "8px 0" }}>CSV with columns name, phone, crop, language. Optional: village, can_pull_forward.</p>
+        <p className="muted" style={{ margin: "8px 0" }}>
+          One farmer per line. Required: name, phone, crop (palm, rubber or coffee), language (Bahasa Indonesia, Bahasa Malaysia, English, Javanese or Sundanese).
+          Optional: village, usual_kg_week, can_pull_forward (yes or no). <a href="/farmers-template.csv" download>Download the template</a>, fill it in, then choose the file here.
+        </p>
         <input type="file" accept=".csv,text/csv" aria-label="CSV file" style={{ marginBottom: 8 }}
           onChange={async (e) => { const f = e.target.files[0]; if (f) setCsv(await f.text()); }} />
         <textarea aria-label="CSV text" value={csv} onChange={(e) => setCsv(e.target.value)} />

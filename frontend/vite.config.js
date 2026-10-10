@@ -8,11 +8,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const web = resolve(here, "../web");
 const backend = process.env.HARVEST_BACKEND || "http://localhost:8000";
 
-// The call client (call.html) stays vanilla JS in web/ (B-03). It and the files it loads,
-// plus config.js (written by deploy/deploy.sh) and the favicon, are copied into the build
+// The call client (call.html) and the microphone test stay vanilla JS in web/ (B-03). They and the
+// files they load, the farmer CSV template, plus config.js (written by deploy/deploy.sh) and the favicon, are copied into the build
 // as they are, so one Hosting folder serves both.
-const VANILLA = ["call.html", "config.js", "favicon.svg", "js/call.js", "js/data.js",
-  "js/audio-worklets.js", "css/app.css", "css/call.css"];
+const VANILLA = ["call.html", "mic-test.html", "farmers-template.csv", "config.js", "favicon.svg",
+  "js/call.js", "js/data.js", "js/audio-worklets.js", "css/app.css", "css/call.css"];
 
 function copyVanilla() {
   return {
@@ -36,7 +36,7 @@ export default defineConfig({
     port: 5173,
     fs: { allow: [resolve(here, "..")] },
     // In development the backend serves the API, config.js and the vanilla call client.
-    proxy: Object.fromEntries(["/api", "/config.js", "/call.html", "/js", "/css", "/favicon.svg"]
+    proxy: Object.fromEntries(["/api", "/config.js", "/call.html", "/mic-test.html", "/farmers-template.csv", "/js", "/css", "/favicon.svg"]
       .map((p) => [p, { target: backend, changeOrigin: true }])
       .concat([["/ws", { target: backend.replace(/^http/, "ws"), ws: true }]])),
   },

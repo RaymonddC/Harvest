@@ -37,3 +37,8 @@
 .chart-tip p { margin: 0; font-weight: 700; }
 .chart-tip p.short { color: #F5C766; }
 .chart-tip p.fine { color: #7FE0B4; }
+
+/* Selects in dialog forms look like the text inputs (app.css styles them only on the vanilla form). */
+.hc-dialog select { min-height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface);
+  font: inherit; font-weight: 600; color: var(--ink); width: 100%; }
+.hc-dialog input[type="checkbox"] { width: 18px; min-height: 18px; }

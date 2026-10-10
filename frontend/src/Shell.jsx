@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { useEffect } from "react";
 import { Link, Navigate, NavLink, useLocation } from "react-router-dom";
-import { cfg, getSession, PAGES, ROLE_LABEL } from "./lib.js";
+import { can, cfg, getSession, PAGES, roleLabel } from "./lib.js";
 import { useLive } from "./live.jsx";
 import { Avatar, Icon } from "./ui.jsx";
 
@@ -25,7 +25,7 @@ export default function Shell({ title, head, children }) {
         <Link className="brand" to="/"><span className="mark"><Icon name="leaf" /></span>Harvest-Call</Link>
         <div className="workspace-card"><span>Workspace</span><b>{cfg.millName}</b></div>
         <nav aria-label="Planner pages">
-          {PAGES.map(({ key, to, label }) => (
+          {PAGES.filter((p) => !p.need || can(p.need)).map(({ key, to, label }) => (
             <NavLink key={key} to={to} end aria-label={key === "approvals" && waiting ? `Approvals, ${waiting} waiting` : undefined}>
               <Icon name={key} /><span className="label">{label}</span>
               {key === "approvals" && waiting > 0 && <span className="count">{waiting}</span>}
@@ -37,7 +37,7 @@ export default function Shell({ title, head, children }) {
           <Avatar name={session.name} cls="ink" />
           <div>
             <b>{session.name}</b>
-            <span>{ROLE_LABEL[session.role]} · </span><Link to="/login">Switch role</Link>
+            <span>{roleLabel(session)} · </span><Link to="/login">Switch user</Link>
           </div>
         </div>
       </aside>
@@ -45,8 +45,8 @@ export default function Shell({ title, head, children }) {
         <div className="topbar">{head}</div>
         {/* A short fade as each page opens. */}
         <motion.main className="page" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }}>
-          {session.role !== "planner" && (
-            <div className="banner" role="note">View only. You can watch the forecast, offers and calls, but anything that changes data is blocked. Use Switch role to sign in as the Planner.</div>
+          {!session.capabilities?.length && (
+            <div className="banner" role="note">View only. You can watch the forecast, offers and calls, but anything that changes data is blocked. Use Switch user to sign in as someone who can.</div>
           )}
           {status !== "live" && status !== "connecting" && (
             <div className={`banner ${status === "error" ? "error" : ""}`} role="status">
