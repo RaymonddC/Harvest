@@ -10,3 +10,5 @@ deploy/deploy.env
 .firebase/
 firebase-debug.log
 *.log
+node_modules/
+frontend/dist/

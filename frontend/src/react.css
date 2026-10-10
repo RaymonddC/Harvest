@@ -1,0 +1,39 @@
+/* The shared stylesheet lays out body's children (sidebar, workspace); React renders them into
+   #root, so #root steps out of the layout. */
+#root { display: contents; }
+
+/* ---------- toasts (Sonner, unstyled) in the app's colours ---------- */
+.hc-toast { display: flex; align-items: center; gap: 12px; width: min(420px, calc(100vw - 32px)); padding: 12px 14px 12px 18px;
+  border-radius: 12px; background: var(--ink); color: var(--on-ink); font: 600 14px/1.4 var(--font); box-shadow: 0 10px 30px rgba(0, 0, 0, .2); }
+.hc-toast.error { background: var(--danger); }
+.hc-toast [data-content] { flex: 1 1 auto; }
+.hc-toast-action { flex-shrink: 0; min-height: 36px; padding: 0 14px; border: 0; border-radius: 9px; background: rgba(255, 255, 255, .14);
+  color: var(--on-ink); font: 700 13px var(--font); cursor: pointer; }
+.hc-toast-action:hover { background: rgba(255, 255, 255, .24); }
+/* On a phone, keep toasts above the bottom tab bar. */
+@media (max-width: 640px) {
+  [data-sonner-toaster][data-y-position="bottom"] { bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
+}
+
+/* ---------- dialogs (Radix) ---------- */
+.hc-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(16, 24, 20, .42); animation: hc-fade .15s ease-out; }
+.hc-dialog { position: fixed; z-index: 61; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px); overflow: auto; padding: 24px; border: 1px solid var(--line); border-radius: 16px;
+  background: var(--surface); color: var(--ink); box-shadow: 0 24px 80px rgba(16, 24, 20, .25); animation: hc-rise .18s ease-out; }
+.hc-dialog.wide { width: min(880px, calc(100vw - 32px)); }
+.hc-dialog-title { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 8px; }
+.hc-dialog:focus { outline: none; }
+@keyframes hc-fade { from { opacity: 0; } }
+@keyframes hc-rise { from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); } }
+
+/* ---------- chart week breakdown (Radix tooltip) ---------- */
+.chart-tip { z-index: 50; width: 220px; padding: 12px 14px; border-radius: 12px; background: var(--ink); color: var(--on-ink);
+  font-size: 12px; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 10px 30px rgba(16, 24, 20, .25);
+  animation: hc-fade .12s ease-out; }
+.chart-tip strong { font-size: 13px; margin-bottom: 2px; }
+.chart-tip > div { display: flex; justify-content: space-between; gap: 10px; }
+.chart-tip span { color: #B9C2BD; }
+.chart-tip .sum { border-top: 1px solid rgba(255, 255, 255, .15); padding-top: 6px; margin-top: 2px; }
+.chart-tip p { margin: 0; font-weight: 700; }
+.chart-tip p.short { color: #F5C766; }
+.chart-tip p.fine { color: #7FE0B4; }
