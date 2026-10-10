@@ -28,5 +28,22 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
 
 6. **Docs:** AI disclosure and "read the reference price first" are prompt-only.
 
+## Login (decided 10 Oct: keep the demo role picker for the hackathon)
+
+7. **Replace the demo role picker with Firebase Authentication** (plan task B-09, Phase 2).
+   Google sign-in on the pages, the server verifies each request's ID token and checks an email
+   allow list, and the Firestore read rule requires a signed-in user. Do it before any real data
+   or real phone calls, and not before the 15 Oct feature freeze. Replace `/api/auth/login` in
+   `backend/app/main.py` and `backend/app/auth.py`; the frontend gate is in `web/js/data.js`.
+   Also record who approved an offer (today it stores only the `PLANNER_NAME` setting).
+
+8. **After judging, shut the public demo down.** Anyone with the URL can pick Planner, start
+   campaigns, reset the demo data and use the Gemini quota. Scale the gateway to zero
+   (`gcloud run services update harvest-gateway --region $REGION --min-instances 0`) or delete it,
+   and switch the *Deploy* workflow off.
+
+9. **Keep the plan doc and board in step.** The Technical spec and issue #16 still say Firebase
+   login; update them to say "demo role picker" so the team and judges read the same thing.
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.
