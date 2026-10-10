@@ -83,7 +83,11 @@ async function answer(call) {
 
   capture.port.onmessage = (e) => {
     if (e.data.level !== undefined) return hearYou(e.data.level);
-    if (e.data.pcm && ws.readyState === WebSocket.OPEN && !active?.muted) ws.send(e.data.pcm);
+    if (active) active.made = (active.made || 0) + 1;  // chunks the microphone worklet produced
+    if (e.data.pcm && ws.readyState === WebSocket.OPEN && !active?.muted) {
+      ws.send(e.data.pcm);
+      active.sent = (active.sent || 0) + 1;  // chunks actually sent to the server
+    }
   };
   active.voiceTimer = setInterval(showVoices, 80);
 
@@ -140,7 +144,7 @@ function micCheck() {
     note.textContent = "Muted: the agent cannot hear you.";
     note.hidden = false;
   } else if (!active.heardAt && Date.now() - active.startedAt > 6000) {
-    note.textContent = `No sound from "${active.micName}" yet. Check that it is not muted in your system, and that the right microphone is chosen in the browser's site settings.`;
+    note.textContent = `No sound from "${active.micName}" yet. Check that it is not muted in your system, and that the right microphone is chosen in the browser's site settings. (Audio chunks made: ${active.made || 0}, sent: ${active.sent || 0}, audio engine: ${active.ctx.state}, connection: ${["connecting", "open", "closing", "closed"][active.ws.readyState]}.)`;
     note.hidden = false;
   } else {
     note.hidden = true;
