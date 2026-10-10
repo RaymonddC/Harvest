@@ -33,7 +33,7 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
 7. **Replace the demo role picker with Firebase Authentication** (plan task B-09, Phase 2).
    Google sign-in on the pages, the server verifies each request's ID token and checks an email
    allow list, and the Firestore read rule requires a signed-in user. Do it before any real data
-   or real phone calls, and not before the 15 Oct feature freeze. Replace `/api/auth/login` in
+   or real phone calls, and after the submission. Replace `/api/auth/login` in
    `backend/app/main.py` and `backend/app/auth.py`; the frontend gate is in `web/js/data.js`.
    Also record who approved an offer (today it stores only the `PLANNER_NAME` setting).
 
@@ -42,8 +42,12 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
    (`gcloud run services update harvest-gateway --region $REGION --min-instances 0`) or delete it,
    and switch the *Deploy* workflow off.
 
-9. **Keep the plan doc and board in step.** The Technical spec and issue #16 still say Firebase
-   login; update them to say "demo role picker" so the team and judges read the same thing.
+9. **Keep the plan doc and board in step with these decisions** (10 Oct), so the team and judges read
+   the same thing:
+   - Login: the Technical spec and issue #16 still say Firebase login; they should say "demo role picker".
+   - No build freeze: issue #18's title ("freeze the build"), the plan's feature freeze on 15 Oct and its
+     "nothing new after 15 October" rule no longer apply. Instead, after the last rehearsal tag what you
+     submit (`git tag submission-v1`) and re-check the live site after any later deploy.
 
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.
