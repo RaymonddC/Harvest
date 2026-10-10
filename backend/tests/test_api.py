@@ -418,3 +418,20 @@ def test_non_browser_channel_is_refused(store, settings):
     with TestClient(app) as c, c.websocket_connect(f"/ws/call/{call_id}") as ws:
         msg = json.loads(ws.receive()["text"])
     assert msg["type"] == "error" and "twilio" in msg["message"]
+
+
+@pytest.mark.parametrize("outcome,ended_cleanly,confirmed", [
+    ("completed", True, True),
+    ("escalated", True, False),
+    ("wrong_person", True, False),
+    ("declined", True, False),
+    (None, False, False),
+])
+def test_only_a_completed_confirmation_call_marks_the_offer_confirmed(
+        client, store, settings, outcome, ended_cleanly, confirmed):
+    offer_id = client.post("/api/rival-quotes/rq01/offer").json()["id"]
+    client.post(f"/api/offers/{offer_id}/approve")
+    call_id = next(c["id"] for c in store.list("calls") if c["kind"] == "confirm")
+    services.finish_call(store, settings, call_id, ended_cleanly=ended_cleanly, outcome=outcome,
+                         summary=None, consent=False, transcript=[])
+    assert bool(store.get("offers", offer_id).get("confirmed_by_voice")) is confirmed

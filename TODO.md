@@ -12,7 +12,9 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
    called `check_offer`. Fix: store or check `requested_price`, or block approval of escalated
    offers until the limits cover it. See `tests/test_tools.py:81-89`.
 
-2. **Confirmation call can be marked confirmed when the farmer wanted changes.**
+2. ~~**Confirmation call can be marked confirmed when the farmer wanted changes.**~~ Fixed 2026-10-10:
+   only outcome `completed` confirms; the prompt tells the agent to use `escalated` for changes.
+   Test: `test_only_a_completed_confirmation_call_marks_the_offer_confirmed`. Original problem:
    `services.finish_call` sets `confirmed_by_voice=True` for any clean ending that is not
    `declined` or `stopped` (so `escalated` and `wrong_person` count too). Fix: require an
    explicit outcome for confirm calls.

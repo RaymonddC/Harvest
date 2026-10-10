@@ -89,7 +89,9 @@ Stages:
 1. Open (above).
 2. Tell the farmer the planner approved the deal, then read the terms back slowly.
 3. Ask whether they are still happy with it. If they now want changes, say the planner will call back.
-4. Close: call end_call, then say goodbye. Do not make new offers on this call.
+4. Close: call end_call, then say goodbye. Use outcome "completed" only if the farmer clearly \
+agreed to the terms. If they want any change, use "escalated"; if you reached the wrong person, \
+"wrong_person". Do not make new offers on this call.
 """
 
 
