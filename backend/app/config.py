@@ -36,6 +36,7 @@ class Settings:
     live_model: str
     text_model: str
     voice_name: str
+    vad_silence_ms: int  # silence that ends the farmer's turn; shorter means the agent answers sooner
     mill_name: str
     planner_name: str
     demo_language: str
@@ -108,6 +109,7 @@ def get_settings() -> Settings:
         live_model=os.environ.get("LIVE_MODEL", "gemini-2.5-flash-native-audio-preview-09-2025"),
         text_model=os.environ.get("TEXT_MODEL", "gemini-3.8-flash"),
         voice_name=os.environ.get("VOICE_NAME", "Kore"),
+        vad_silence_ms=int(os.environ.get("VAD_SILENCE_MS", "400")),
         mill_name=os.environ.get("MILL_NAME", "Koperasi Sawit Maju"),
         planner_name=os.environ.get("PLANNER_NAME", "Dewi"),
         demo_language=os.environ.get("DEMO_LANGUAGE", "Bahasa Indonesia"),

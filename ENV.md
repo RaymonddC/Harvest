@@ -59,6 +59,7 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | `LIVE_MODEL` | `gemini-2.5-flash-native-audio-preview-09-2025` | No | Gemini Live model for calls. Change it if Google retires the default. | GitHub variable `LIVE_MODEL`, then redeploy |
 | `TEXT_MODEL` | `gemini-3.8-flash` | No | Gemini model for caption translation and the plain-language forecast note. Google retired `gemini-2.5-flash` for new users (it answers 404), so if this one is retired too, set the name the error message suggests. Both features fall back quietly when it fails. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `VOICE_NAME` | `Kore` | No | The agent's voice. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `VAD_SILENCE_MS` | `400` | No | How many milliseconds of silence end the farmer's turn, so the agent starts answering. Lower is faster but can cut off someone who pauses mid-sentence; raise it to 700 to 1000 if the agent interrupts. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `STORE_BACKEND` | `memory` | No | `memory` (local, in-process) or `firestore`. | Set by `deploy.sh` (`firestore`); not changeable from GitHub |
 | `GOOGLE_CLOUD_PROJECT` | none | No | Project id, needed when `STORE_BACKEND=firestore`. | Set by `deploy.sh` from GitHub variable `GCP_PROJECT` |
 | `SEED_ON_START` | true for `memory`, false for `firestore` | No | Reload the demo data on every start. | Set by `deploy.sh` (`false`); not changeable from GitHub |

@@ -131,6 +131,11 @@ def build_live_config(settings: Settings, system_instruction: str) -> types.Live
         system_instruction=system_instruction,
         tools=[types.Tool(function_declarations=TOOL_DECLARATIONS)],
         input_audio_transcription=types.AudioTranscriptionConfig(),
+        # Answer as soon as the farmer has stopped talking: a short silence ends their turn.
+        realtime_input_config=types.RealtimeInputConfig(
+            automatic_activity_detection=types.AutomaticActivityDetection(
+                end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_HIGH,
+                silence_duration_ms=settings.vad_silence_ms)),
         output_audio_transcription=types.AudioTranscriptionConfig(),
         speech_config=types.SpeechConfig(
             voice_config=types.VoiceConfig(
