@@ -16,7 +16,7 @@ Google Cloud by hand, and deploying it automatically on every push to `main`.
 |---|---|---|
 | Voice gateway and planner API (`backend/`, FastAPI) | Cloud Run service `harvest-gateway` | `gcloud run deploy --source backend` |
 | Forecast job (`python -m app.forecast_job`) | Cloud Run job `harvest-forecast` | `gcloud run jobs deploy` |
-| Dashboard and call client (`web/`) | Firebase Hosting, at `https://PROJECT.web.app` | `firebase deploy --only hosting` |
+| Dashboard (`frontend/`, React, built into `frontend/dist`) and call client (`web/`, copied into the build) | Firebase Hosting, at `https://PROJECT.web.app` | `deploy/deploy.sh` (builds, then `firebase deploy --only hosting`) |
 | Data | Firestore (Native mode) | created once; rules deployed with Hosting |
 | Gemini access | Vertex AI, called with the service's own Google account (`roles/aiplatform.user`). No key is stored. With `GEMINI_BACKEND=api_key` instead: Secret Manager secret `gemini-api-key`. | permission granted once |
 
@@ -145,7 +145,8 @@ a person (Dewi the planner, Budi the coordinator, a guest viewer or a farmer), a
 don't pass it.
 
 The script, in order: enables the APIs, deploys the gateway, deploys the forecast job,
-writes the gateway URL into `web/config.js`, deploys Hosting and Firestore rules, and seeds
+writes the gateway URL into `web/config.js`, builds the React dashboard (`frontend/`, which
+copies the call client and `config.js` into `frontend/dist`), deploys Hosting and Firestore rules, and seeds
 the demo data. It prints the dashboard and call-client URLs at the end.
 
 Check it worked:
@@ -155,7 +156,7 @@ curl "$(gcloud run services describe harvest-gateway --region $REGION --format '
 # {"ok":true,"store":"firestore","model":"..."}
 ```
 
-Then open `https://$PROJECT.web.app/setup.html`.
+Then open `https://$PROJECT.web.app/setup` (the old `setup.html` address redirects there).
 
 ## 6. Is it a one-time setup?
 

@@ -93,7 +93,8 @@ WebSockets to the Cloud Run URL directly, because Hosting rewrites do not carry 
 | `backend/app/seed_data.py` | Synthetic farmers, harvests, limits and the rival quote |
 | `backend/app/forecast_job.py` | Cloud Run job entry point |
 | `backend/app/twilio_channel.py`, `backend/app/audio_codec.py` | VA-8 stretch goal: the real phone channel and its mu-law codec (see `DECISIONS.md`) |
-| `web/setup.html`, `web/index.html`, `web/approvals.html` (+ `web/js/*.js`) | Planner pages: setup, live forecast, approvals |
+| `frontend/` (React, Vite) | Planner pages: sign-in, setup, live forecast, approvals, users. What Hosting serves (built into `frontend/dist`) |
+| `web/setup.html`, `web/index.html`, `web/approvals.html` (+ `web/js/*.js`) | The older vanilla planner pages, still served by the backend locally (`STATIC_DIR`) |
 | `web/call.html`, `web/js/call.js`, `web/js/audio-worklets.js` | Browser call client: 16 kHz mic capture, 24 kHz playback, barge-in |
 
 ## Guardrails, and where they live in code

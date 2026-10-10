@@ -67,18 +67,13 @@ npm run build
 
 The output goes to `frontend/dist/`. `npm run preview` serves it at http://localhost:4173.
 
-## Switching the deploy (B-07)
+## Deploy
 
-`web/` is still what Firebase Hosting serves. To serve the React app instead:
+Firebase Hosting serves `frontend/dist`. `deploy/deploy.sh` writes `web/config.js`, then runs
+`npm ci && npm run build` here (the build copies that `config.js` and the call client), then
+`firebase deploy`. `firebase.json` has the single-page rewrite, so `/setup` and the old `.html`
+addresses load the app, while real files such as `call.html` are served first.
 
-1. In `deploy/deploy.sh` and the Deploy workflow, run `npm ci && npm run build` in `frontend/`
-   after `web/config.js` is written, because the build copies it.
-2. In `firebase.json`, set `"public": "frontend/dist"` and add the single-page rewrite, so
-   `/setup` and the old `.html` addresses load the app (real files such as `call.html` are
-   served first):
+To go back to the vanilla pages, set `"public": "web"` in `firebase.json` and drop the rewrite.
 
-   ```json
-   "rewrites": [{ "source": "**", "destination": "/index.html" }]
-   ```
-
-The backend's own static serving (`STATIC_DIR`) has no such rewrite, so it only suits `web/`.
+The backend's own static serving (`STATIC_DIR`) has no single-page rewrite, so it only suits `web/`.
