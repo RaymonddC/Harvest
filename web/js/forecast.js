@@ -1,4 +1,4 @@
-import { act, api, apiUrl, avatar, callChip, cfg, cropLabel, el, fmtPrice, fmtT, icon, KIND_WORD, mountShell, pill, subscribe } from "./data.js";
+import { act, api, apiUrl, avatar, callChip, cfg, cropLabel, el, fmtPrice, fmtT, gate, icon, KIND_WORD, mountShell, pill, subscribe } from "./data.js";
 
 const $ = (id) => document.getElementById(id);
 const shell = mountShell("forecast");
@@ -193,12 +193,12 @@ function renderGap(rows) {
         el("span", {}, `${q.supplier_name}, quote ${fmtPrice(q.price_per_kg, q.currency || "IDR")}`),
         el("span", { style: "display:flex;gap:8px;align-items:center" },
           used(q) ? pill("Offer added", "mint")
-            : el("button", { class: "btn sm",
-              onclick: () => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added to approvals.") }, "Add as offer"),
+            : gate(el("button", { class: "btn sm",
+              onclick: () => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added to approvals.") }, "Add as offer"), "offers.decide"),
           el("strong", {}, `${fmtT(q.kg)} t`))))) : null,
-    el("button", { class: "btn leaf big block", disabled: !list.length && !state.farmers.some((f) => f.type === "supplier"),
+    gate(el("button", { class: "btn leaf big block", disabled: !list.length && !state.farmers.some((f) => f.type === "supplier"),
       onclick: () => act(() => api("/api/campaign/start", { body: { kind: "gap_fill" } }),
-        (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`) }, icon("phone", 16), "Start gap-fill calls"),
+        (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`) }, icon("phone", 16), "Start gap-fill calls"), "campaign.run"),
   );
 }
 

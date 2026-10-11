@@ -1,4 +1,4 @@
-import { act, api, avatar, cfg, cropLabel, el, fmtKg, icon, maskPhone, mountShell, plainPrice, subscribe } from "./data.js";
+import { act, api, avatar, cfg, cropLabel, el, fmtKg, gate, icon, maskPhone, mountShell, plainPrice, subscribe } from "./data.js";
 
 const $ = (id) => document.getElementById(id);
 const shell = mountShell("setup");
@@ -48,6 +48,10 @@ $("add-form").onsubmit = (e) => {
   act(() => (edit ? api(`/api/farmers/${edit}`, { method: "PUT", body }) : api("/api/farmers", { body })),
     () => { $("add-dialog").close(); $("add-form").reset(); return edit ? "Farmer saved." : "Farmer added."; });
 };
+gate($("add-open"), "farmers.manage");
+gate($("upload-open"), "farmers.manage");
+gate($("reset"), "demo.reset");
+gate(document.querySelector("#limits-form button[type=submit]"), "limits.edit");
 $("reset").onclick = () => act(() => api("/api/demo/reset"), "Demo data reset.");
 
 const form = $("limits-form");
@@ -118,11 +122,11 @@ function renderFarmers() {
     el("td", {}, cropLabel(f.crop)),
     el("td", { class: "r num" }, f.usual_kg_week ? fmtKg(f.usual_kg_week) : "–"),
     el("td", { class: "r", style: "padding-right:22px;white-space:nowrap" },
-      el("button", { class: "btn sm", onclick: () => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`) }, "Call now"), " ",
-      el("button", { class: "btn sm", type: "button", onclick: () => openFarmerForm(f) }, "Edit"), " ",
-      el("button", { class: "btn sm", type: "button", onclick: () => {
+      gate(el("button", { class: "btn sm", onclick: () => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`) }, "Call now"), "campaign.run"), " ",
+      gate(el("button", { class: "btn sm", type: "button", onclick: () => openFarmerForm(f) }, "Edit"), "farmers.manage"), " ",
+      gate(el("button", { class: "btn sm", type: "button", onclick: () => {
         if (confirm(`Delete ${f.name}? Their waiting calls are withdrawn. Past calls and offers stay.`)) act(() => api(`/api/farmers/${f.id}`, { method: "DELETE" }), `${f.name} deleted.`);
-      } }, "Delete")))));
+      } }, "Delete"), "farmers.manage")))));
   $("showing").textContent = rows.length
     ? `Showing ${first + 1} to ${Math.min(first + PAGE, rows.length)} of ${rows.length}. Phone numbers are masked on screen.`
     : "No farmer matches that search.";
@@ -193,12 +197,12 @@ function renderCampaign() {
   $("campaign-actions").replaceChildren(...(running ? [
     el("span", { class: "pill lg dot running", style: "align-self:flex-start;background:var(--ink-2);color:var(--on-ink)" }, c.kind === "gap_fill" ? "Gap-fill calls running" : "Calling farmers now"),
     el("a", { class: "btn mint big block", href: "call.html", target: "_blank", rel: "noopener" }, "Open call client"),
-    el("button", { class: "btn on-ink block", onclick: () => act(() => api("/api/campaign/stop"), "Calling stopped.") }, "Stop calling"),
+    gate(el("button", { class: "btn on-ink block", onclick: () => act(() => api("/api/campaign/stop"), "Calling stopped.") }, "Stop calling"), "campaign.run"),
   ] : [
-    el("button", { class: "btn mint big block", disabled: !toCall.length, onclick: async () => {
+    gate(el("button", { class: "btn mint big block", disabled: !toCall.length, onclick: async () => {
       const r = await act(() => api("/api/campaign/start", { body: { kind: "collect" } }));
       if (r) location.href = "index.html";
-    } }, icon("phone", 18), toCall.length ? `Start calling ${toCall.length} farmers` : "Add farmers to start"),
+    } }, icon("phone", 18), toCall.length ? `Start calling ${toCall.length} farmers` : "Add farmers to start"), "campaign.run"),
   ]));
 }
 

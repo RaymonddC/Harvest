@@ -1,4 +1,4 @@
-import { act, api, avatar, el, fmtT, mountShell, pill, plainPrice, subscribe } from "./data.js";
+import { act, api, avatar, el, fmtT, gate, mountShell, pill, plainPrice, subscribe } from "./data.js";
 
 const $ = (id) => document.getElementById(id);
 const shell = mountShell("approvals");
@@ -87,15 +87,15 @@ function render() {
     if (o.status === "pending" || o.status === "escalated") {
       acts = [
         o.status === "pending" ? pill("Pending", "amber") : pill("Needs planner", "danger"),
-        el("button", { class: "btn", onclick: () => act(() => api(`/api/offers/${o.id}/reject`), `Rejected. ${o.farmer_name} will not be confirmed.`) }, "Reject"),
-        el("button", { class: "btn leaf", disabled: !inLimits, title: inLimits ? null : "Outside the current floor and ceiling",
-          onclick: () => act(() => api(`/api/offers/${o.id}/approve`), `Approved. A confirmation call to ${o.farmer_name} is queued.`) }, "Approve"),
+        gate(el("button", { class: "btn", onclick: () => act(() => api(`/api/offers/${o.id}/reject`), `Rejected. ${o.farmer_name} will not be confirmed.`) }, "Reject"), "offers.decide"),
+        gate(el("button", { class: "btn leaf", disabled: !inLimits, title: inLimits ? null : "Outside the current floor and ceiling",
+          onclick: () => act(() => api(`/api/offers/${o.id}/approve`), `Approved. A confirmation call to ${o.farmer_name} is queued.`) }, "Approve"), "offers.decide"),
       ];
     } else {
       const confirmed = o.status === "approved" && o.confirmed_by_voice;
       acts = [
         pill(confirmed ? "Approved · confirmed by voice" : o.status === "approved" ? "Approved" : "Rejected", o.status === "approved" ? "mint" : ""),
-        confirmed ? null : el("button", { class: "btn ghost", onclick: () => act(() => api(`/api/offers/${o.id}/undo`), "Back to pending.") }, "Undo"),
+        confirmed ? null : gate(el("button", { class: "btn ghost", onclick: () => act(() => api(`/api/offers/${o.id}/undo`), "Back to pending.") }, "Undo"), "offers.decide"),
       ];
     }
     return el("div", { class: `offer is-${o.status}` },
@@ -111,7 +111,7 @@ function render() {
       el("div", { class: "who" }, avatar(q.supplier_name, "ink"), el("div", {}, el("b", {}, q.supplier_name), el("span", {}, `Logged quote for week ${q.deliver_week}, not used yet`))),
       el("div", { class: "fig" }, el("span", {}, "Volume"), el("b", { class: "num" }, `${(q.kg / 1000).toFixed(1)} t`)),
       el("div", { class: "fig" }, el("span", {}, `Price, ${q.currency || "IDR"}/kg`), el("b", { class: "num" }, plainPrice(q.price_per_kg, q.currency || "IDR"))),
-      el("div", { class: "acts" }, el("button", { class: "btn", onclick: () => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added as a pending offer.") }, "Add as offer"))));
+      el("div", { class: "acts" }, gate(el("button", { class: "btn", onclick: () => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added as a pending offer.") }, "Add as offer"), "offers.decide"))));
   }
   $("offers").replaceChildren(...(rows.length ? rows : [el("div", { class: "empty" },
     el("p", {}, "No offers yet. Offers appear here as the agent agrees them on gap-fill calls."),

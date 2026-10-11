@@ -22,6 +22,14 @@ export function wsUrl(path) {
 const SESSION_KEY = "harvestSession";
 export const roleLabel = (s) => (s && (s.role_label || s.role)) || "";
 export const can = (capability) => !!getSession()?.capabilities?.includes(capability);
+// Switch a control off, with the reason, when the signed-in role lacks the right. The server still checks.
+export function gate(node, capability) {
+  if (node && !can(capability)) {
+    node.disabled = true;
+    node.setAttribute("title", `Your role (${roleLabel(getSession())}) cannot do this.`);
+  }
+  return node;
+}
 
 export function getSession() {
   try {
