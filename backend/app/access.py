@@ -33,6 +33,11 @@ DEFAULT_ROLES: dict[str, dict] = {
                "description": "Answers the agent's phone calls in this browser, playing the farmer."},
 }
 
+# Roles that exist only so the hackathon demo can be explored: a guest who watches, and a stand-in for the
+# farmer who answers the agent's call in the browser. Real farmers never sign in; the agent phones them.
+# Kept in code (not in the stored role) so it also applies to roles already saved in Firestore.
+DEMO_ROLES = frozenset({"viewer", "farmer"})
+
 DEFAULT_USERS: list[tuple[str, str, str]] = [
     ("user-dewi", "Dewi", "planner"),
     ("user-budi", "Budi", "coordinator"),
@@ -120,4 +125,5 @@ def delete_user(store: Store, user_id: str, acting_id: str | None) -> None:
 def public_user(store: Store, user: dict) -> dict:
     role = get_role(store, user["role"]) or {}
     return {"id": user["id"], "name": user["name"], "role": user["role"],
-            "role_label": role.get("label", user["role"]), "active": bool(user.get("active", True))}
+            "role_label": role.get("label", user["role"]), "active": bool(user.get("active", True)),
+            "demo": user["role"] in DEMO_ROLES}

@@ -28,7 +28,7 @@ function tile(person, first) {
   const ic = document.createElement("span");
   ic.className = "role-icon";
   ic.append(icon(ROLE_ICON[person.role] || "users", 20));
-  b.append(ic, mk("role-name", person.name), mk("role-desc", `${person.role_label}. ${person.description || ""}`.trim()),
+  b.append(ic, mk("role-name", person.name), ...(person.demo ? [mk("pill", "Demo user")] : []), mk("role-desc", `${person.role_label}. ${person.description || ""}`.trim()),
     mk("role-go", person.role === "farmer" ? "Open the call client" : "Open the live forecast"));
   return b;
 }

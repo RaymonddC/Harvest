@@ -91,6 +91,7 @@ def test_login_by_user_and_the_people_list(client):
     people = client.get("/api/auth/people").json()["people"]
     assert {p["id"] for p in people} >= {"user-dewi", "user-budi", "user-guest", "user-farmer"}
     body = client.post("/api/auth/login", json={"user_id": "user-budi"}).json()
+    assert {p["id"] for p in people if p["demo"]} == {"user-farmer", "user-guest"}
     assert body["name"] == "Budi" and body["role"] == "coordinator"
     assert body["capabilities"] == ["campaign.run", "farmers.manage"]
     assert client.post("/api/auth/login", json={"user_id": "nobody"}).status_code == 400

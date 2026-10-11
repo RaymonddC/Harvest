@@ -33,7 +33,7 @@ function render() {
   $("user-rows").replaceChildren(...data.users.map((u) => el("tr", {},
     el("td", { style: "padding-left:22px" }, el("div", { class: "who-cell" }, avatar(u.name, "sm"),
       el("div", {}, el("b", {}, u.name), u.id === me.user_id ? el("span", {}, "You") : null))),
-    el("td", {}, roleLabel(u.role)),
+    el("td", {}, roleLabel(u.role), u.demo ? " " : null, u.demo ? pill("Demo user", "amber") : null),
     el("td", {}, u.active ? pill("Can sign in", "mint") : pill("Turned off")),
     el("td", { class: "r", style: "padding-right:22px;white-space:nowrap" },
       el("button", { class: "btn sm", type: "button", onclick: () => openForm(u) }, "Edit"), " ",
@@ -45,7 +45,7 @@ function render() {
 
   const caps = Object.entries(data.capabilities);
   $("role-head").replaceChildren(el("tr", {}, el("th", { style: "padding-left:22px" }, "Right"),
-    ...data.roles.map((r) => el("th", { class: "r", title: r.description }, r.label))));
+    ...data.roles.map((r) => el("th", { class: "r", title: r.description }, r.label, r.demo ? el("div", { class: "sub" }, "demo") : null))));
   $("role-rows").replaceChildren(...caps.map(([key, label]) => el("tr", {},
     el("td", { style: "padding-left:22px" }, label),
     ...data.roles.map((r) => el("td", { class: "r" }, r.capabilities.includes(key) ? "Yes" : "–")))));

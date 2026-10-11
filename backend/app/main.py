@@ -161,8 +161,9 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         users = sorted(store.list("users"), key=lambda u: (u["role"] != "planner", u["name"].lower()))
         return {"users": [access.public_user(store, u) for u in users],
                 "roles": [{"id": r["id"], "label": r.get("label", r["id"]),
-                           "description": r.get("description", ""), "capabilities": r.get("capabilities", [])}
-                          for r in sorted(store.list("roles"), key=lambda r: r["id"])],
+                           "description": r.get("description", ""), "capabilities": r.get("capabilities", []),
+                           "demo": r["id"] in access.DEMO_ROLES}
+                          for r in sorted(store.list("roles"), key=lambda r: (list(access.DEFAULT_ROLES).index(r["id"]) if r["id"] in access.DEFAULT_ROLES else 99, r["id"]))],
                 "capabilities": access.CAPABILITIES}
 
     @app.post("/api/users")
