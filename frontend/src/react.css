@@ -37,3 +37,129 @@
 .chart-tip p { margin: 0; font-weight: 700; }
 .chart-tip p.short { color: #F5C766; }
 .chart-tip p.fine { color: #7FE0B4; }
+
+/* Selects in dialog forms look like the text inputs (app.css styles them only on the vanilla form). */
+.hc-dialog select { min-height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface);
+  font: inherit; font-weight: 600; color: var(--ink); width: 100%; }
+.hc-dialog input[type="checkbox"] { width: 18px; min-height: 18px; }
+
+/* ---------- chart: tonne axis and the missing tonnes of a gap week ---------- */
+.chart.has-axis { margin-left: 34px; background: none; }
+.xlabels.has-axis { margin-left: 34px; }
+.chart .axis { position: absolute; inset: 0; pointer-events: none; }
+.chart .axis .tick { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--line-2); }
+.chart .axis .tick:first-child { border-top: 0; }
+.chart .axis .tick span { position: absolute; right: calc(100% + 8px); top: -8px; font-size: 11px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chart .axis .unit { position: absolute; left: -26px; top: -22px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.chart .shortfall { position: absolute; left: 0; right: 0; z-index: -1; border: 2px dashed var(--amber); border-bottom: 0;
+  border-radius: 8px 8px 0 0; background: repeating-linear-gradient(135deg, rgba(227, 167, 47, .14) 0 6px, transparent 6px 12px);
+  transition: height .7s cubic-bezier(.2, .8, .2, 1), bottom .7s cubic-bezier(.2, .8, .2, 1); }
+@media (max-width: 520px) { .chart.has-axis, .xlabels.has-axis { margin-left: 26px; } }
+
+/* ---------- price range slider (Radix) ---------- */
+.price-slider { display: flex; flex-direction: column; gap: 6px; padding: 4px 2px 0; }
+.ps-root { position: relative; display: flex; align-items: center; height: 28px; touch-action: none; user-select: none; }
+.ps-track { position: relative; flex-grow: 1; height: 6px; border-radius: 3px; background: var(--line-2); }
+.ps-range { position: absolute; height: 100%; border-radius: 3px; background: var(--leaf-mid); }
+.ps-thumb { display: block; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: 3px solid var(--leaf);
+  box-shadow: 0 1px 3px rgba(16, 24, 20, .2); cursor: grab; }
+.ps-thumb:active { cursor: grabbing; }
+.ps-thumb.ref { width: 14px; height: 26px; border-radius: 5px; background: var(--ink); border-color: var(--ink); }
+.ps-thumb:focus-visible { outline: none; box-shadow: 0 0 0 4px var(--leaf-soft); }
+.ps-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ---------- approvals: offers beside the week summary ---------- */
+.approvals-cols .col-side { position: sticky; top: 20px; }
+.week-summary { gap: 14px; }
+.week-summary h2 { font-size: 15px; color: var(--muted); font-weight: 700; }
+.ws-big { display: flex; align-items: baseline; gap: 8px; }
+.ws-big b { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.ws-big span { font-size: 15px; color: var(--muted); font-weight: 600; }
+.meter.big { height: 14px; border-radius: 7px; }
+.ws-left { margin: -4px 0 0; font-size: 14px; font-weight: 700; color: var(--amber-text); }
+.ws-left.done { color: var(--leaf-deep); }
+.ws-stats { display: grid; gap: 8px; border-top: 1px solid var(--line-2); padding-top: 14px; }
+.ws-stat { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; }
+.ws-stat span { color: var(--muted); }
+.ws-stat b { font-weight: 800; }
+.ws-stat.amber b { color: var(--amber-text); }
+/* Roomier offer rows. */
+.offers-card .offer { padding: 18px 22px; gap: 14px 20px; }
+.offers-card .offer .who b { font-size: 16px; }
+.offers-card .offer .who span:not(.avatar) { font-size: 13.5px; }
+.offers-card .offer .fig b { font-size: 17px; }
+
+/* ---------- KPI notes ---------- */
+.kpi .kpi-note { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.kpi.amber .kpi-note { color: var(--amber-text); }
+.kpi.mint .kpi-note { color: var(--leaf-deep); }
+
+/* ---------- Setup: a line joins each step to the next when the three sit in a row ---------- */
+@media (min-width: 1240px) {
+  .steps.linked > .card { position: relative; overflow: visible; }
+  .steps.linked > .card:not(:last-child)::after { content: ""; position: absolute; top: 37px; left: 100%; width: 20px; height: 3px;
+    border-radius: 2px; background: var(--line-strong); }
+  .steps.linked > .card.done:not(:last-child)::after { background: var(--leaf); }
+}
+
+/* ---------- sidebar: this week at a glance ---------- */
+.week-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--fill); }
+.week-card .wc-title { font-size: 12px; font-weight: 700; color: var(--muted); }
+.week-card .wc-row { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #3A4540; line-height: 1.35; }
+.week-card .wc-link { text-decoration: none; color: var(--amber-text); border-radius: 6px; }
+.week-card .wc-link:hover { color: var(--ink); }
+.week-card .wc-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.week-card .wc-dot.on { background: var(--leaf); }
+.week-card .wc-dot.amber { background: var(--amber); }
+@media (max-width: 860px) { .week-card { display: none; } }
+
+/* ---------- a server action in progress ---------- */
+.spinner { width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent;
+  opacity: .8; animation: hc-spin .7s linear infinite; }
+@keyframes hc-spin { to { transform: rotate(360deg); } }
+.btn[aria-busy="true"] { opacity: .75; cursor: progress; }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; border-right-color: currentColor; opacity: .5; } }
+
+/* ---------- forecast hero: the page's one message ---------- */
+.hero { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 24px 28px; border-radius: 16px; border: 1px solid; }
+.hero.gap { background: var(--amber-soft); border-color: var(--amber-line); }
+.hero.ok { background: var(--leaf-soft); border-color: var(--leaf-soft); }
+.hero-text { flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.hero-eyebrow { font-size: 13px; font-weight: 800; color: var(--amber-text); }
+.hero.ok .hero-eyebrow { color: var(--leaf-deep); }
+.hero h2 { font-size: clamp(30px, 4vw, 44px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+.hero.gap h2 .num { color: #6B4206; }
+.hero p { font-size: 15.5px; line-height: 1.5; color: #3A4540; max-width: 62ch; }
+.hero-acts { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.hero-mark { width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; background: var(--leaf); color: var(--on-ink); display: grid; place-items: center; }
+@media (max-width: 640px) { .hero { padding: 18px; } .hero-acts, .hero-acts .btn { width: 100%; } }
+
+/* ---------- readable small text (projector and video) ---------- */
+.chart .axis .tick span, .xlabels small { font-size: 12px; }
+.chart .val small { font-size: 12px; }
+.small { font-size: 13px; }
+.chart-tip { font-size: 12.5px; }
+.offers-foot { font-size: 13px; }
+
+/* ---------- Setup: the price step gets the room; the farmer step is compact ---------- */
+.steps.linked .drop { padding: 14px; gap: 6px; }
+.steps.linked .drop .big { font-size: 18px; }
+@media (min-width: 1240px) { .steps.linked { grid-template-columns: 1fr 1.35fr 1fr; } }
+
+/* ---------- farmer table: row hover, sortable headers, row menu ---------- */
+table.farmers tbody tr:hover td { background: var(--fill); }
+th .sort { all: unset; cursor: pointer; font: inherit; color: inherit; border-radius: 4px; }
+th .sort:hover, th .sort.on { color: var(--ink); }
+th .sort:focus-visible { box-shadow: 0 0 0 3px var(--leaf-soft); }
+.btn.more { min-width: 36px; padding: 0 8px; font-size: 18px; line-height: 1; }
+.hc-menu { z-index: 50; min-width: 150px; padding: 6px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(16, 24, 20, .16); animation: hc-fade .12s ease-out; }
+.hc-menu-item { display: flex; align-items: center; min-height: 38px; padding: 0 12px; border-radius: 8px; font-size: 14px; font-weight: 600;
+  color: var(--ink); cursor: pointer; outline: none; }
+.hc-menu-item[data-highlighted] { background: var(--fill); }
+.hc-menu-item.danger { color: var(--danger); }
+
+/* Phone tab bar: as many equal columns as there are pages (Users makes four for an admin). */
+@media (max-width: 640px) {
+  .side nav { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+}

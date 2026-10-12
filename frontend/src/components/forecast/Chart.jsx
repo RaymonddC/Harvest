@@ -4,6 +4,15 @@ import { fmtT } from "../../lib.js";
 
 export const shortDate = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
+// Axis ticks every 5, 10, 20, 25, 50 or 100 tonnes, whichever gives about five steps.
+function ticks(maxKg) {
+  const raw = maxKg / 5 / 1000;
+  const step = ([5, 10, 20, 25, 50, 100, 200, 250, 500].find((n) => n >= raw) || 1000) * 1000;
+  const out = [];
+  for (let v = 0; v <= maxKg; v += step) out.push(v);
+  return out;
+}
+
 const Line = ({ label, kg }) => <div><span>{label}</span><b className="num">{fmtT(kg)} t</b></div>;
 
 // One week's breakdown (Radix keeps it on screen near the edges).
@@ -54,11 +63,16 @@ export default function Chart({ rows }) {
   const target = rows[0].target_kg;
   const max = Math.max(target * 1.15, ...rows.map((r) => r.expected_kg + r.pending_kg));
   const pct = (kg) => (grown ? `${(kg / max) * 100}%` : "0%");
+  const at = (kg) => `${(kg / max) * 100}%`;
   return (
     <Tooltip.Provider delayDuration={120}>
-      <div className={`chart ${entering ? "enter" : ""}`} role="img"
+      <div className={`chart has-axis ${entering ? "enter" : ""}`} role="img"
         aria-label={rows.map((r) => `${r.label} ${fmtT(r.expected_kg)} tonnes${r.is_gap ? ", gap" : ""}`).join("; ")}>
-        <div className="target" data-label={`Target ${fmtT(target)} t`} style={{ bottom: `${(target / max) * 100}%` }} />
+        <div className="axis" aria-hidden="true">
+          {ticks(max).map((v) => <div key={v} className="tick" style={{ bottom: at(v) }}><span>{fmtT(v)}</span></div>)}
+          <span className="unit">t</span>
+        </div>
+        <div className="target" data-label={`Target ${fmtT(target)} t`} style={{ bottom: at(target) }} />
         <div className="bars">
           {rows.map((r) => (
             <Col key={r.week} r={r} target={target}>
@@ -69,11 +83,14 @@ export default function Chart({ rows }) {
               </div>
               <div className="pend" hidden={!r.pending_kg} style={{ height: pct(r.pending_kg) }} title={`${fmtT(r.pending_kg)} t waiting for approval`} />
               <div className={`bar ${r.is_gap ? "gap" : ""}`} style={{ height: pct(r.expected_kg) }} />
+              {/* The missing tonnes, drawn from the top of the bar up to the target line. */}
+              {r.is_gap && <div className="shortfall" aria-hidden="true"
+                style={{ bottom: pct(r.expected_kg + r.pending_kg), height: grown ? at(Math.max(target - r.expected_kg - r.pending_kg, 0)) : "0%" }} />}
             </Col>
           ))}
         </div>
       </div>
-      <div className="xlabels" aria-hidden="true">
+      <div className="xlabels has-axis" aria-hidden="true">
         {rows.map((r) => <span key={r.week} className={r.is_gap ? "gap" : ""}>{r.label}<small>{shortDate(r.week_start)}</small></span>)}
       </div>
     </Tooltip.Provider>

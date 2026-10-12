@@ -1,7 +1,8 @@
 {
   "hosting": {
-    "public": "web",
+    "public": "frontend/dist",
     "ignore": ["**/.*"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }],
     "headers": [
       { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
       { "source": "**/*.@(html|js|css)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }

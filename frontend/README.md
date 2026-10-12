@@ -7,11 +7,12 @@ Vite + React single-page app for the planner pages (task C-04):
 | `/` | Live forecast |
 | `/setup` | Setup (3 steps) |
 | `/approvals` | Approvals |
-| `/login` | Demo role picker |
+| `/users` | Users and roles (only for someone with the `users.admin` right) |
+| `/login` | Demo sign-in: pick a person |
 
 Moving between pages does not reload: the live data connection (`/api/stream`) opens once and
 is shared. Each page is its own chunk, loaded the first time it is opened. The old addresses
-(`index.html`, `setup.html`, `approvals.html`, `login.html`, with their `?next=`) redirect to
+(`index.html`, `setup.html`, `approvals.html`, `users.html`, `login.html`, with their `?next=`) redirect to
 the routes, so the call client's links and old bookmarks still work.
 
 ## Layout
@@ -20,12 +21,12 @@ the routes, so the call client's links and old bookmarks still work.
 src/
   App.jsx          routes, old-URL redirects, lazy pages
   live.jsx         one shared live-state connection (useLive)
-  toast.jsx        Sonner toasts and useAct (viewer guard, 401 back to sign-in, Undo on the toast)
+  toast.jsx        Sonner toasts and useAct (watch-only guard, 401 back to sign-in, Undo on the toast)
   Shell.jsx        sidebar / phone tab bar, top bar, banners
   ui.jsx           Icon, Avatar, Pill, Dialog (Radix)
   react.css        styles for the toasts, dialogs and chart tooltip
   lib.js           re-exports from web/js/data.js, the page list
-  pages/           Forecast, Setup, Approvals, Login
+  pages/           Forecast, Setup, Approvals, Users, Login
   components/      the pieces of each page (forecast/, setup/, approvals/)
 ```
 
@@ -41,8 +42,9 @@ What is shared with `web/` (not copied):
 - `web/css/app.css`: the design tokens and all styles.
 - `web/js/data.js`: the API, demo sign-in, live stream and formatting.
 
-The call client (`call.html`, task B-03) stays vanilla JS in `web/`. `npm run build` copies it into
-`dist/` with `config.js` and the favicon, so one folder serves every page.
+The call client (`call.html`, task B-03) and `mic-test.html` stay vanilla JS in `web/`. `npm run build`
+copies them into `dist/` with `config.js`, the favicon and `farmers-template.csv`, so one folder serves
+every page.
 
 ## Run locally
 
@@ -65,18 +67,13 @@ npm run build
 
 The output goes to `frontend/dist/`. `npm run preview` serves it at http://localhost:4173.
 
-## Switching the deploy (B-07)
+## Deploy
 
-`web/` is still what Firebase Hosting serves. To serve the React app instead:
+Firebase Hosting serves `frontend/dist`. `deploy/deploy.sh` writes `web/config.js`, then runs
+`npm ci && npm run build` here (the build copies that `config.js` and the call client), then
+`firebase deploy`. `firebase.json` has the single-page rewrite, so `/setup` and the old `.html`
+addresses load the app, while real files such as `call.html` are served first.
 
-1. In `deploy/deploy.sh` and the Deploy workflow, run `npm ci && npm run build` in `frontend/`
-   after `web/config.js` is written, because the build copies it.
-2. In `firebase.json`, set `"public": "frontend/dist"` and add the single-page rewrite, so
-   `/setup` and the old `.html` addresses load the app (real files such as `call.html` are
-   served first):
+To go back to the vanilla pages, set `"public": "web"` in `firebase.json` and drop the rewrite.
 
-   ```json
-   "rewrites": [{ "source": "**", "destination": "/index.html" }]
-   ```
-
-The backend's own static serving (`STATIC_DIR`) has no such rewrite, so it only suits `web/`.
+The backend's own static serving (`STATIC_DIR`) has no single-page rewrite, so it only suits `web/`.
