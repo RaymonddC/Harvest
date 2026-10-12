@@ -1,10 +1,11 @@
-"""Demo-mode sign-in: pick a person, get a signed token. There is no password.
+"""Sign-in with a username and password, then a signed token.
 
 The token names a user. On every request the user and their role are read again from the store, so
 turning a user off or changing their role takes effect at once. What a user may do comes from
 `access.py` (capabilities held by their role). Reads stay open (the data is synthetic) and so does
-the farmer's call page. Swap `login` for a real identity check, such as Firebase Auth, before any
-real data goes in; the guards downstream only see a user id.
+the farmer's call page. The built-in accounts share a demo password (`DEMO_PASSWORD`) that the
+sign-in page shows, so judges can get in; set your own passwords, or empty `DEMO_PASSWORD`, before
+any real data goes in. The guards downstream only see a user id.
 """
 
 from __future__ import annotations

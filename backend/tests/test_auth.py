@@ -7,9 +7,13 @@ from app import auth
 from app.main import create_app
 
 
+DEMO = "demo-pass-123"
+USERNAMES = {"planner": "dewi", "coordinator": "budi", "viewer": "guest", "farmer": "farmer"}
+
+
 @pytest.fixture
 def secured(settings):
-    return dataclasses.replace(settings, auth_required=True, jwt_secret="t" * 32)
+    return dataclasses.replace(settings, auth_required=True, jwt_secret="t" * 32, demo_password=DEMO)
 
 
 @pytest.fixture
@@ -18,21 +22,24 @@ def client(secured, store):
         yield c
 
 
-def login(client, role=None, user_id=None):
-    r = client.post("/api/auth/login", json={"role": role} if role else {"user_id": user_id})
+def login(client, role=None, username=None, password=DEMO):
+    r = client.post("/api/auth/login", json={"username": username or USERNAMES[role], "password": password})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['token']}"}
 
 
-def test_login_returns_a_token_for_each_role(client):
-    for role in ("planner", "viewer", "farmer"):
-        body = client.post("/api/auth/login", json={"role": role}).json()
+def test_login_returns_a_token_for_each_built_in_account(client):
+    for role, username in USERNAMES.items():
+        body = client.post("/api/auth/login", json={"username": username, "password": DEMO}).json()
         assert body["role"] == role and body["token"] and body["exp"] > 0
-    assert client.post("/api/auth/login", json={"role": "planner"}).json()["name"] == "Dewi"
+    assert client.post("/api/auth/login", json={"username": " DEWI ", "password": DEMO}).json()["name"] == "Dewi"
 
 
-def test_login_rejects_an_unknown_role(client):
-    assert client.post("/api/auth/login", json={"role": "admin"}).status_code == 400
+def test_login_needs_the_right_password(client):
+    for body in ({"username": "dewi", "password": "wrong-password"}, {"username": "nobody", "password": DEMO},
+                 {"username": "dewi", "password": ""}, {}, {"role": "planner"}, {"user_id": "user-dewi"}):
+        r = client.post("/api/auth/login", json=body)
+        assert r.status_code == 401 and r.json()["detail"] == "Wrong username or password.", body
 
 
 def test_planner_can_act(client):
@@ -87,19 +94,51 @@ def test_every_planner_action_is_protected(client):
         assert r.status_code == 401, (method, path, r.status_code)
 
 
-def test_login_by_user_and_the_people_list(client):
-    people = client.get("/api/auth/people").json()["people"]
-    assert {p["id"] for p in people} >= {"user-dewi", "user-budi", "user-guest", "user-farmer"}
-    body = client.post("/api/auth/login", json={"user_id": "user-budi"}).json()
-    assert {p["id"] for p in people if p["demo"]} == {"user-farmer", "user-guest"}
+def test_demo_accounts_and_login_by_username(client):
+    demo = client.get("/api/auth/demo").json()
+    assert demo["password"] == DEMO
+    assert [a["username"] for a in demo["accounts"]] == ["dewi", "budi", "guest", "farmer"]
+    assert {a["id"] for a in demo["accounts"] if a["demo"]} == {"user-farmer", "user-guest"}
+    assert all("password_hash" not in a for a in demo["accounts"])
+    body = client.post("/api/auth/login", json={"username": "budi", "password": DEMO}).json()
     assert body["name"] == "Budi" and body["role"] == "coordinator"
     assert body["capabilities"] == ["campaign.run", "farmers.manage"]
-    assert client.post("/api/auth/login", json={"user_id": "nobody"}).status_code == 400
-    assert client.post("/api/auth/login", json={}).status_code == 400
+
+
+def test_passwords_are_stored_hashed_and_a_new_password_ends_the_demo_login(client, store):
+    login(client, "planner")  # the first sign-in gives the built-in accounts their credentials
+    saved = store.get("users", "user-budi")
+    assert saved["username"] == "budi" and saved["demo_login"] is True
+    assert DEMO not in saved["password_hash"] and saved["password_hash"].startswith("pbkdf2_sha256$")
+    admin = login(client, "planner")
+    r = client.put("/api/users/user-budi", headers=admin,
+                   json={"name": "Budi", "role": "coordinator", "active": True, "password": "budi-own-pass"})
+    assert r.status_code == 200 and "password_hash" not in r.json()
+    assert client.post("/api/auth/login", json={"username": "budi", "password": DEMO}).status_code == 401
+    assert client.post("/api/auth/login", json={"username": "budi", "password": "budi-own-pass"}).status_code == 200
+    assert "budi" not in [a["username"] for a in client.get("/api/auth/demo").json()["accounts"]]
+    # a blank password on an edit keeps the current one
+    client.put("/api/users/user-budi", headers=admin, json={"name": "Budi B", "role": "coordinator", "active": True})
+    assert client.post("/api/auth/login", json={"username": "budi", "password": "budi-own-pass"}).status_code == 200
+
+
+def test_an_empty_demo_password_turns_the_demo_accounts_off(settings, store):
+    closed = dataclasses.replace(settings, auth_required=True, jwt_secret="t" * 32, demo_password="")
+    with TestClient(create_app(closed, store)) as c:
+        assert c.get("/api/auth/demo").json() == {"password": "", "accounts": []}
+        assert c.post("/api/auth/login", json={"username": "dewi", "password": ""}).status_code == 401
+
+
+def test_older_users_get_a_username_but_no_password(client, store):
+    store.set("users", "user-old", {"name": "Old Timer", "role": "viewer", "active": True})
+    client.get("/api/auth/demo")
+    old = store.get("users", "user-old")
+    assert old["username"] == "old.timer" and not old.get("password_hash")
+    assert client.post("/api/auth/login", json={"username": "old.timer", "password": DEMO}).status_code == 401
 
 
 def test_coordinator_runs_campaigns_but_cannot_decide_or_change_prices(client):
-    h = login(client, user_id="user-budi")
+    h = login(client, "coordinator")
     assert client.post("/api/campaign/stop", headers=h).status_code == 200
     assert client.post("/api/offers/x/approve", headers=h).status_code == 403
     assert client.put("/api/limits/palm", headers=h, json={"floor_price": 1, "ceiling_price": 3, "reference_price": 2}).status_code == 403
@@ -107,7 +146,7 @@ def test_coordinator_runs_campaigns_but_cannot_decide_or_change_prices(client):
 
 
 def test_offer_records_who_approved_it(client, store):
-    h = login(client, user_id="user-dewi")
+    h = login(client, "planner")
     offer_id = client.post("/api/rival-quotes/rq01/offer", headers=h).json()["id"]
     client.post(f"/api/offers/{offer_id}/approve", headers=h)
     saved = store.get("offers", offer_id)
@@ -115,31 +154,38 @@ def test_offer_records_who_approved_it(client, store):
 
 
 def test_turning_a_user_off_or_changing_their_role_takes_effect_at_once(client):
-    admin = login(client, user_id="user-dewi")
-    budi = login(client, user_id="user-budi")
+    admin = login(client, "planner")
+    budi = login(client, "coordinator")
     assert client.post("/api/campaign/stop", headers=budi).status_code == 200
     client.put("/api/users/user-budi", headers=admin, json={"name": "Budi", "role": "viewer", "active": True})
     assert client.post("/api/campaign/stop", headers=budi).status_code == 403
     client.put("/api/users/user-budi", headers=admin, json={"name": "Budi", "role": "viewer", "active": False})
     assert client.post("/api/campaign/stop", headers=budi).status_code == 401
-    assert "user-budi" not in {p["id"] for p in client.get("/api/auth/people").json()["people"]}
+    assert "user-budi" not in {a["id"] for a in client.get("/api/auth/demo").json()["accounts"]}
+    assert client.post("/api/auth/login", json={"username": "budi", "password": DEMO}).status_code == 401
 
 
 def test_users_page_api(client, store):
-    admin = login(client, user_id="user-dewi")
+    admin = login(client, "planner")
     listing = client.get("/api/users", headers=admin).json()
     assert {r["id"] for r in listing["roles"]} == {"planner", "coordinator", "viewer", "farmer"}
     assert "users.admin" in listing["capabilities"]
-    made = client.post("/api/users", headers=admin, json={"name": "  Sari  Wulan ", "role": "coordinator"}).json()
+    new = {"name": "  Sari  Wulan ", "role": "coordinator", "username": "Sari", "password": "sari-pass-1"}
+    made = client.post("/api/users", headers=admin, json=new).json()
     assert made["name"] == "Sari Wulan" and made["role"] == "coordinator" and made["active"] is True
-    assert client.post("/api/users", headers=admin, json={"name": "", "role": "planner"}).status_code == 400
-    assert client.post("/api/users", headers=admin, json={"name": "X", "role": "boss"}).status_code == 400
+    assert made["username"] == "sari" and made["has_password"] is True and "password_hash" not in made
+    assert client.post("/api/auth/login", json={"username": "sari", "password": "sari-pass-1"}).status_code == 200
+    for bad in ({"name": "", "role": "planner"}, {"name": "X", "role": "boss"},
+                {"name": "X", "role": "viewer", "username": "sari", "password": "long-enough"},  # taken
+                {"name": "X", "role": "viewer", "username": "x y", "password": "long-enough"},  # bad characters
+                {"name": "X", "role": "viewer", "username": "xavier", "password": "short"}):
+        assert client.post("/api/users", headers=admin, json={"username": "ok.name", "password": "long-enough", **bad}).status_code == 400, bad
     assert client.delete(f"/api/users/{made['id']}", headers=admin).status_code == 200
     assert store.get("users", made["id"]) is None
 
 
 def test_the_last_user_manager_cannot_be_removed_or_lose_the_right(client):
-    admin = login(client, user_id="user-dewi")
+    admin = login(client, "planner")
     r = client.put("/api/users/user-dewi", headers=admin, json={"name": "Dewi", "role": "viewer", "active": True})
     assert r.status_code == 400 and "keep the right to manage users" in r.json()["detail"]
     r = client.put("/api/users/user-dewi", headers=admin, json={"name": "Dewi", "role": "planner", "active": False})
@@ -147,7 +193,7 @@ def test_the_last_user_manager_cannot_be_removed_or_lose_the_right(client):
     r = client.delete("/api/users/user-dewi", headers=admin)
     assert r.status_code == 400  # also the account you are signed in with
     # with a second planner, the first may step down
-    client.post("/api/users", headers=admin, json={"name": "Rina", "role": "planner"})
+    client.post("/api/users", headers=admin, json={"name": "Rina", "role": "planner", "username": "rina", "password": "rina-pass-1"})
     r = client.put("/api/users/user-dewi", headers=admin, json={"name": "Dewi", "role": "viewer", "active": True})
     assert r.status_code == 200
 
