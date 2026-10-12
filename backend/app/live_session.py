@@ -15,6 +15,7 @@ import contextlib
 import json
 import array
 import logging
+import os
 import time
 from typing import Any, Awaitable, Callable, Protocol
 
@@ -144,11 +145,24 @@ def build_live_config(settings: Settings, system_instruction: str) -> types.Live
     )
 
 
-def default_connect(model: str, config: types.LiveConnectConfig):
+def genai_client():
+    """The Gemini client. Reads GOOGLE_API_KEY, or GOOGLE_GENAI_USE_VERTEXAI with project and location
+    (Cloud Run signs in with its own service account). For local runs only, VERTEX_ACCESS_TOKEN (a short-lived
+    token from `gcloud auth print-access-token --impersonate-service-account=...`) is used as the credential."""
     from google import genai
 
-    client = genai.Client()  # GOOGLE_API_KEY, or GOOGLE_GENAI_USE_VERTEXAI with project and location
-    return client.aio.live.connect(model=model, config=config)
+    token = os.environ.get("VERTEX_ACCESS_TOKEN")
+    if token and os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("1", "true", "yes"):
+        from google.oauth2.credentials import Credentials
+
+        return genai.Client(vertexai=True, credentials=Credentials(token),
+                            project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
+                            location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"))
+    return genai.Client()
+
+
+def default_connect(model: str, config: types.LiveConnectConfig):
+    return genai_client().aio.live.connect(model=model, config=config)
 
 
 def make_translator(settings: Settings) -> Translate:
@@ -161,8 +175,7 @@ def make_translator(settings: Settings) -> Translate:
             return None
         try:
             if client is None:
-                from google import genai
-                client = genai.Client()
+                client = genai_client()
             resp = await client.aio.models.generate_content(
                 model=settings.text_model,
                 contents=f"Translate this phone-call line into {target}. Reply with the translation only.\n\n{text}")

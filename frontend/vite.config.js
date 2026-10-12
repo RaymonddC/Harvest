@@ -12,7 +12,8 @@ const backend = process.env.HARVEST_BACKEND || "http://localhost:8000";
 // files they load, the farmer CSV template, plus config.js (written by deploy/deploy.sh) and the favicon, are copied into the build
 // as they are, so one Hosting folder serves both.
 const VANILLA = ["call.html", "mic-test.html", "farmers-template.csv", "config.js", "favicon.svg",
-  "js/call.js", "js/data.js", "js/audio-worklets.js", "css/app.css", "css/call.css", "samples/gap-fill.json"];
+  "js/call.js", "js/data.js", "js/audio-worklets.js", "css/app.css", "css/call.css",
+  "samples/gap-fill.json", "samples/farmer-lines.json", "samples/clips"];  // clips/ is a folder of agent mp3 and farmer wav files
 
 function copyVanilla() {
   return {
@@ -22,7 +23,7 @@ function copyVanilla() {
       const out = resolve(here, "dist");
       for (const file of VANILLA) {
         mkdirSync(dirname(resolve(out, file)), { recursive: true });
-        cpSync(resolve(web, file), resolve(out, file));
+        cpSync(resolve(web, file), resolve(out, file), { recursive: true });
       }
     },
   };

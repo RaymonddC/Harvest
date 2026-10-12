@@ -31,10 +31,10 @@ Hackathon project (Google Cloud AI Builder Cup 2026, Manufacturing). Read `READM
 ## State on 12 Oct 2026
 - Done: deploy pipeline, demo sign-in with users, roles and capabilities (planner, coordinator; viewer and
   farmer are demo roles), Users page, farmer add/edit/delete/CSV with template, pagination, fixes for the
-  confirm call, read-back and microphone, demo guide, scripted sample call (silent).
-- Voice: the browser microphone bug is fixed; reply speed is unverified with the real model
-  (`LIVE_MODEL=gemini-2.5-flash-native-audio-preview-12-2025`, `VAD_SILENCE_MS=400`).
-- The Gemini key on production is a free-tier key: text models allow about 20 requests a day (caption
-  translation then pauses itself for 10 minutes).
-- Next (TODO item 12): with a real key, record a real call, build the sample call from it with audio, add a
-  stand-in farmer ("Play the farmer for me"), and measure the reply delay.
+  confirm call, read-back and microphone, demo guide.
+- Gemini now runs on Vertex AI (project harvest-511117, us-central1; the AI Studio key is out of credits). Locally,
+  `VERTEX_ACCESS_TOKEN` (short-lived, about 1 hour) is used by `live_session.genai_client()`; Cloud Run uses its own service account.
+- TODO item 12 is done: real call recorded with a scripted farmer, `web/samples/gap-fill.json` rebuilt with sound
+  (`web/samples/clips/`), the replay plays the clips, and the call page has "Play the farmer for me". Rebuild with
+  `backend/scripts/sample_call.py` (clips, record, build). Reply delay measured: about 1.3 to 2.4 s with the 400 ms VAD wait.
+- Open: prompt problems found in the recordings (TODO item 12), and check the new voice path on the deployed site.

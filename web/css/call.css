@@ -54,6 +54,7 @@
 #offer-saved[hidden] { display: none; }
 .consent { font-size: 12px; color: var(--on-ink-muted); }
 .controls { display: flex; gap: 12px; }
+.controls[hidden] { display: none; }
 .controls .btn { flex: 1 1 0; min-height: 52px; border-radius: 12px; }
 .btn.outline-mint { background: transparent; border-color: var(--mint); color: var(--on-ink); }
 .btn.outline-mint:hover, .btn.outline-mint[aria-pressed="true"] { background: var(--ink-2); color: var(--on-ink); }

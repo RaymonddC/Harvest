@@ -364,9 +364,9 @@ def _polish(settings: Settings, text: str, instruction: str) -> str | None:
     if text in _polish_cache:
         return _polish_cache[text]
     try:
-        from google import genai
+        from .live_session import genai_client
 
-        client = genai.Client()
+        client = genai_client()
         resp = client.models.generate_content(model=settings.text_model, contents=f"{instruction}\n\n{text}")
         out = (resp.text or "").strip() or None
     except Exception:  # noqa: BLE001 - no key or network: the template is fine

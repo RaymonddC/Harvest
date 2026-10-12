@@ -1,331 +1,187 @@
 {
  "title": "Sample gap-fill call",
- "note": "A scripted example, not a live call.",
- "farmer": "Pak Wahyu",
+ "note": "A recorded call between the AI agent and a scripted farmer (spoken by Gemini). Not a live call.",
+ "recorded": {
+  "model": "gemini-live-2.5-flash-native-audio",
+  "vad_silence_ms": 400,
+  "date": "2026-10-12"
+ },
+ "audio": true,
+ "farmer": "Pak Wahyu F.",
  "village": "Air Molek",
  "language": "Bahasa Indonesia",
  "kind": "gap_fill",
  "gap_week": 3,
  "events": [
-  {
-   "t": 300,
-   "msg": {
-    "type": "connected",
-    "farmer": "Pak Wahyu",
-    "village": "Air Molek",
-    "language": "Bahasa Indonesia",
-    "kind": "gap_fill",
-    "mill": "Koperasi Sawit Maju",
-    "gap_week": 3
-   }
-  },
-  {
-   "t": 900,
-   "msg": {
-    "type": "caption",
-    "who": "agent",
-    "index": 0,
-    "text": "Halo, ini asisten AI yang menelepon untuk Koperasi Sawit Maju. Apakah saya berbicara dengan Pak Wahyu?"
-   }
-  },
-  {
-   "t": 1600,
-   "msg": {
-    "type": "translation",
-    "index": 0,
-    "text": "Hello, this is an AI assistant calling for Koperasi Sawit Maju. Am I speaking with Pak Wahyu?"
-   }
-  },
-  {
-   "t": 6500,
-   "msg": {
-    "type": "caption",
-    "who": "farmer",
-    "index": 1,
-    "text": "Ya, betul."
-   }
-  },
-  {
-   "t": 7200,
-   "msg": {
-    "type": "translation",
-    "index": 1,
-    "text": "Yes, that's right."
-   }
-  },
-  {
-   "t": 8000,
-   "msg": {
-    "type": "caption",
-    "who": "agent",
-    "index": 2,
-    "text": "Dengan izin Bapak, koperasi menyimpan transkrip panggilan ini. Apakah Bapak setuju?"
-   }
-  },
-  {
-   "t": 8700,
-   "msg": {
-    "type": "translation",
-    "index": 2,
-    "text": "With your permission, the cooperative keeps a transcript of this call. Do you agree?"
-   }
-  },
-  {
-   "t": 13500,
-   "msg": {
-    "type": "caption",
-    "who": "farmer",
-    "index": 3,
-    "text": "Ya, boleh."
-   }
-  },
-  {
-   "t": 14200,
-   "msg": {
-    "type": "translation",
-    "index": 3,
-    "text": "Yes, that's fine."
-   }
-  },
-  {
-   "t": 15000,
-   "msg": {
-    "type": "tool",
-    "name": "get_reference_price",
-    "args": {
-     "crop": "palm"
-    },
-    "result": {
-     "reference_price": 3100
-    },
-    "ui": {}
-   }
-  },
-  {
-   "t": 15600,
-   "msg": {
-    "type": "caption",
-    "who": "agent",
-    "index": 4,
-    "text": "Harga pasar hari ini Rp 3.100 per kilo. Koperasi butuh sawit di minggu ke-3. Bisakah Bapak memanen lebih cepat, sekitar 1.600 kilo?"
-   }
-  },
-  {
-   "t": 16300,
-   "msg": {
-    "type": "translation",
-    "index": 4,
-    "text": "Today's market price is Rp 3,100 per kilo. The cooperative needs palm in week 3. Could you harvest earlier, about 1,600 kilo?"
-   }
-  },
-  {
-   "t": 24500,
-   "msg": {
-    "type": "caption",
-    "who": "farmer",
-    "index": 5,
-    "text": "Bisa, tapi harganya berapa?"
-   }
-  },
-  {
-   "t": 25200,
-   "msg": {
-    "type": "translation",
-    "index": 5,
-    "text": "I can, but what is the price?"
-   }
-  },
-  {
-   "t": 26000,
-   "msg": {
-    "type": "tool",
-    "name": "check_offer",
-    "args": {
-     "crop": "palm",
-     "kg": 1600
-    },
-    "result": {
-     "decision": "offer",
-     "price_per_kg": 3220
-    },
-    "ui": {
-     "rail": {
-      "floor": 2900,
-      "reference": 3100,
-      "ceiling": 3350,
-      "kg": 1600,
-      "currency": "IDR",
-      "offer": 3220,
-      "counter": null,
-      "decision": "offer",
-      "allowed": true
-     }
-    }
-   }
-  },
-  {
-   "t": 26600,
-   "msg": {
-    "type": "caption",
-    "who": "agent",
-    "index": 6,
-    "text": "Koperasi menawarkan Rp 3.220 per kilo."
-   }
-  },
-  {
-   "t": 27300,
-   "msg": {
-    "type": "translation",
-    "index": 6,
-    "text": "The cooperative offers Rp 3,220 per kilo."
-   }
-  },
-  {
-   "t": 31000,
-   "msg": {
-    "type": "caption",
-    "who": "farmer",
-    "index": 7,
-    "text": "Bisa naik jadi 3.300?"
-   }
-  },
-  {
-   "t": 31700,
-   "msg": {
-    "type": "translation",
-    "index": 7,
-    "text": "Could it go up to 3,300?"
-   }
-  },
-  {
-   "t": 32500,
-   "msg": {
-    "type": "tool",
-    "name": "check_offer",
-    "args": {
-     "crop": "palm",
-     "kg": 1600,
-     "farmer_counter_price": 3300
-    },
-    "result": {
-     "decision": "accept",
-     "price_per_kg": 3300
-    },
-    "ui": {
-     "rail": {
-      "floor": 2900,
-      "reference": 3100,
-      "ceiling": 3350,
-      "kg": 1600,
-      "currency": "IDR",
-      "offer": 3220,
-      "counter": 3300,
-      "decision": "accept",
-      "allowed": true
-     }
-    }
-   }
-  },
-  {
-   "t": 33200,
-   "msg": {
-    "type": "caption",
-    "who": "agent",
-    "index": 8,
-    "text": "Baik, Rp 3.300 per kilo bisa. Saya ulangi: 1.600 kilo, Rp 3.300 per kilo, panen minggu ke-3. Apakah setuju?"
-   }
-  },
-  {
-   "t": 33900,
-   "msg": {
-    "type": "translation",
-    "index": 8,
-    "text": "Fine, Rp 3,300 per kilo works. To repeat: 1,600 kilo, Rp 3,300 per kilo, harvest in week 3. Do you agree?"
-   }
-  },
-  {
-   "t": 41500,
-   "msg": {
-    "type": "caption",
-    "who": "farmer",
-    "index": 9,
-    "text": "Setuju."
-   }
-  },
-  {
-   "t": 42200,
-   "msg": {
-    "type": "translation",
-    "index": 9,
-    "text": "Agreed."
-   }
-  },
-  {
-   "t": 43000,
-   "msg": {
-    "type": "tool",
-    "name": "save_offer",
-    "args": {
-     "crop": "palm",
-     "kg": 1600,
-     "price_per_kg": 3300
-    },
-    "result": {
-     "saved": true,
-     "status": "pending"
-    },
-    "ui": {
-     "offer_saved": {
-      "status": "pending",
-      "kg": 1600,
-      "price": 3300
-     }
-    }
-   }
-  },
-  {
-   "t": 43600,
-   "msg": {
-    "type": "caption",
-    "who": "agent",
-    "index": 10,
-    "text": "Terima kasih, Pak. Koperasi harus menyetujui dulu, dan Bapak akan dikabari."
-   }
-  },
-  {
-   "t": 44300,
-   "msg": {
-    "type": "translation",
-    "index": 10,
-    "text": "Thank you. The cooperative has to approve it first, and you will be told."
-   }
-  },
-  {
-   "t": 50000,
-   "msg": {
-    "type": "tool",
-    "name": "end_call",
-    "args": {
-     "outcome": "completed"
-    },
-    "result": {
-     "ok": true
-    },
-    "ui": {
-     "consent": true
-    }
-   }
-  },
-  {
-   "t": 51500,
-   "msg": {
-    "type": "ended",
-    "status": "done",
-    "kind": "gap_fill",
-    "consent": true,
-    "retry_queued": false,
-    "summary": "Pak Wahyu agreed to bring 1,600 kg of palm forward to week 3 at Rp 3,300 per kg, inside the price range. Offer sent for approval."
-   }
-  }
+  {"t": 822, "msg": {"type": "connected", "farmer": "Pak Wahyu F.", "village": "Air Molek", "language": "Bahasa Indonesia", "kind": "gap_fill", "mill": "Koperasi Sawit Maju", "gap_week": 3}},
+  {"t": 1370, "msg": {"type": "caption", "who": "agent", "text": "Hello, this", "index": 0}},
+  {"t": 1408, "who": "agent", "audio": "samples/clips/agent-1.mp3", "ms": 9912},
+  {"t": 1699, "msg": {"type": "caption", "who": "agent", "text": " is an", "index": 0}},
+  {"t": 2019, "msg": {"type": "caption", "who": "agent", "text": " AI", "index": 0}},
+  {"t": 2299, "msg": {"type": "caption", "who": "agent", "text": " assistant", "index": 0}},
+  {"t": 2739, "msg": {"type": "caption", "who": "agent", "text": " calling", "index": 0}},
+  {"t": 3139, "msg": {"type": "caption", "who": "agent", "text": " for Koperasi", "index": 0}},
+  {"t": 3819, "msg": {"type": "caption", "who": "agent", "text": " Sawit", "index": 0}},
+  {"t": 4019, "msg": {"type": "caption", "who": "agent", "text": " Maju.", "index": 0}},
+  {"t": 4459, "msg": {"type": "caption", "who": "agent", "text": " Am I", "index": 0}},
+  {"t": 5059, "msg": {"type": "caption", "who": "agent", "text": " speaking", "index": 0}},
+  {"t": 5299, "msg": {"type": "caption", "who": "agent", "text": " with Pak", "index": 0}},
+  {"t": 5539, "msg": {"type": "caption", "who": "agent", "text": " Wahyu", "index": 0}},
+  {"t": 5779, "msg": {"type": "caption", "who": "agent", "text": " F.?", "index": 0}},
+  {"t": 6179, "msg": {"type": "caption", "who": "agent", "text": " With your", "index": 0}},
+  {"t": 6779, "msg": {"type": "caption", "who": "agent", "text": " permission", "index": 0}},
+  {"t": 7179, "msg": {"type": "caption", "who": "agent", "text": " Koperasi", "index": 0}},
+  {"t": 7579, "msg": {"type": "caption", "who": "agent", "text": " Sawit", "index": 0}},
+  {"t": 7979, "msg": {"type": "caption", "who": "agent", "text": " Maju", "index": 0}},
+  {"t": 8179, "msg": {"type": "caption", "who": "agent", "text": " keeps", "index": 0}},
+  {"t": 8619, "msg": {"type": "caption", "who": "agent", "text": " a written", "index": 0}},
+  {"t": 8819, "msg": {"type": "caption", "who": "agent", "text": " transcript", "index": 0}},
+  {"t": 9259, "msg": {"type": "caption", "who": "agent", "text": " of this", "index": 0}},
+  {"t": 9659, "msg": {"type": "caption", "who": "agent", "text": " call.", "index": 0}},
+  {"t": 9859, "msg": {"type": "caption", "who": "agent", "text": " Is that", "index": 0}},
+  {"t": 10179, "msg": {"type": "caption", "who": "agent", "text": " all right?", "index": 0}},
+  {"t": 11700, "who": "farmer", "audio": "samples/clips/farmer-1.wav", "ms": 3101},
+  {"t": 15922, "msg": {"type": "caption", "who": "farmer", "text": "Ya, betul. Boleh, tidak apa-apa.", "index": 1}},
+  {"t": 16233, "msg": {"type": "caption", "who": "agent", "text": "Terima kasih,", "index": 2}},
+  {"t": 16287, "who": "agent", "audio": "samples/clips/agent-2.mp3", "ms": 16472},
+  {"t": 16422, "msg": {"type": "translation", "index": 1, "text": "Yes, that's right. That's fine."}},
+  {"t": 16498, "msg": {"type": "caption", "who": "agent", "text": " Pak", "index": 2}},
+  {"t": 16498, "msg": {"type": "caption", "who": "agent", "text": " Wahyu.", "index": 2}},
+  {"t": 17098, "msg": {"type": "caption", "who": "agent", "text": " Kami", "index": 2}},
+  {"t": 17738, "msg": {"type": "caption", "who": "agent", "text": " melihat", "index": 2}},
+  {"t": 18138, "msg": {"type": "caption", "who": "agent", "text": " Bapak", "index": 2}},
+  {"t": 18578, "msg": {"type": "caption", "who": "agent", "text": " memiliki", "index": 2}},
+  {"t": 18978, "msg": {"type": "caption", "who": "agent", "text": " sekitar", "index": 2}},
+  {"t": 19618, "msg": {"type": "caption", "who": "agent", "text": " 1600", "index": 2}},
+  {"t": 20298, "msg": {"type": "caption", "who": "agent", "text": " kg", "index": 2}},
+  {"t": 20898, "msg": {"type": "caption", "who": "agent", "text": " Palm", "index": 2}},
+  {"t": 21098, "msg": {"type": "caption", "who": "agent", "text": " FFB", "index": 2}},
+  {"t": 21698, "msg": {"type": "caption", "who": "agent", "text": " yang siap", "index": 2}},
+  {"t": 22138, "msg": {"type": "caption", "who": "agent", "text": " panen", "index": 2}},
+  {"t": 22578, "msg": {"type": "caption", "who": "agent", "text": " sekitar", "index": 2}},
+  {"t": 23178, "msg": {"type": "caption", "who": "agent", "text": " tanggal", "index": 2}},
+  {"t": 23578, "msg": {"type": "caption", "who": "agent", "text": " 14", "index": 2}},
+  {"t": 23978, "msg": {"type": "caption", "who": "agent", "text": " November.", "index": 2}},
+  {"t": 24458, "msg": {"type": "caption", "who": "agent", "text": " Apakah", "index": 2}},
+  {"t": 25258, "msg": {"type": "caption", "who": "agent", "text": " Bapak", "index": 2}},
+  {"t": 25698, "msg": {"type": "caption", "who": "agent", "text": " bisa", "index": 2}},
+  {"t": 25898, "msg": {"type": "caption", "who": "agent", "text": " mengirimkan", "index": 2}},
+  {"t": 26338, "msg": {"type": "caption", "who": "agent", "text": " sebagian", "index": 2}},
+  {"t": 26978, "msg": {"type": "caption", "who": "agent", "text": " atau", "index": 2}},
+  {"t": 27378, "msg": {"type": "caption", "who": "agent", "text": " seluruhnya", "index": 2}},
+  {"t": 27978, "msg": {"type": "caption", "who": "agent", "text": " pada", "index": 2}},
+  {"t": 28378, "msg": {"type": "caption", "who": "agent", "text": " minggu", "index": 2}},
+  {"t": 28778, "msg": {"type": "caption", "who": "agent", "text": " pertama", "index": 2}},
+  {"t": 29178, "msg": {"type": "caption", "who": "agent", "text": " November,", "index": 2}},
+  {"t": 29578, "msg": {"type": "caption", "who": "agent", "text": " antara", "index": 2}},
+  {"t": 30218, "msg": {"type": "caption", "who": "agent", "text": " tanggal", "index": 2}},
+  {"t": 30418, "msg": {"type": "caption", "who": "agent", "text": " 2 sampai", "index": 2}},
+  {"t": 31298, "msg": {"type": "caption", "who": "agent", "text": " 8", "index": 2}},
+  {"t": 31498, "msg": {"type": "caption", "who": "agent", "text": " November?", "index": 2}},
+  {"t": 31998, "msg": {"type": "translation", "index": 2, "text": "Thank you, Mr. Wahyu. We see that you have around 1600 kg of Palm FFB ready for harvest around November 14th. Can you send some or all of it in the first week of November, between November 2nd and 8th?"}},
+  {"t": 33102, "who": "farmer", "audio": "samples/clips/farmer-2.wav", "ms": 3998},
+  {"t": 37985, "msg": {"type": "caption", "who": "farmer", "text": "Bisa Pak kira-kira 1600 kilo.", "index": 3}},
+  {"t": 38302, "msg": {"type": "caption", "who": "agent", "text": "Baik, saya", "index": 4}},
+  {"t": 38353, "who": "agent", "audio": "samples/clips/agent-3.mp3", "ms": 6432},
+  {"t": 38485, "msg": {"type": "translation", "index": 3, "text": "Yes, I can, approximately 1600 kilograms."}},
+  {"t": 38845, "msg": {"type": "caption", "who": "agent", "text": " catat", "index": 4}},
+  {"t": 39365, "msg": {"type": "caption", "who": "agent", "text": " 1600", "index": 4}},
+  {"t": 40245, "msg": {"type": "caption", "who": "agent", "text": " kg", "index": 4}},
+  {"t": 40845, "msg": {"type": "caption", "who": "agent", "text": " untuk", "index": 4}},
+  {"t": 41285, "msg": {"type": "caption", "who": "agent", "text": " minggu", "index": 4}},
+  {"t": 41485, "msg": {"type": "caption", "who": "agent", "text": " pertama", "index": 4}},
+  {"t": 41885, "msg": {"type": "caption", "who": "agent", "text": " November.", "index": 4}},
+  {"t": 42285, "msg": {"type": "caption", "who": "agent", "text": " Apakah", "index": 4}},
+  {"t": 42725, "msg": {"type": "caption", "who": "agent", "text": " sudah", "index": 4}},
+  {"t": 43565, "msg": {"type": "caption", "who": "agent", "text": " benar?", "index": 4}},
+  {"t": 44065, "msg": {"type": "translation", "index": 4, "text": "Okay, I've noted down 1600 kg for the first week of November. Is that correct?"}},
+  {"t": 45107, "who": "farmer", "audio": "samples/clips/farmer-3.wav", "ms": 1595},
+  {"t": 47565, "msg": {"type": "caption", "who": "farmer", "text": "Ya, benar.", "index": 5}},
+  {"t": 47991, "msg": {"type": "tool", "name": "record_harvest", "args": {"kg": 1600, "ready_date": "2026-11-02", "crop": "Palm FFB", "confidence": "firm", "confirmed_by_farmer": true}, "result": {"saved": false, "status": "read_back_required", "error": "Not saved. Call record_harvest with confirmed_by_farmer false and read these exact numbers back to the farmer first; save only after they say yes."}, "ui": {"captured": {"crop": "Palm FFB", "kg": 1600, "ready": "W3 · Mon", "confidence": "Firm", "status": "waiting"}}}},
+  {"t": 48065, "msg": {"type": "translation", "index": 5, "text": "Yes, correct."}},
+  {"t": 48559, "msg": {"type": "caption", "who": "agent", "text": "Mohon maaf,", "index": 6}},
+  {"t": 48610, "who": "agent", "audio": "samples/clips/agent-4.mp3", "ms": 8832},
+  {"t": 48901, "msg": {"type": "caption", "who": "agent", "text": " saya", "index": 6}},
+  {"t": 49101, "msg": {"type": "caption", "who": "agent", "text": " perlu", "index": 6}},
+  {"t": 49341, "msg": {"type": "caption", "who": "agent", "text": " mengkonfirmasi", "index": 6}},
+  {"t": 49941, "msg": {"type": "caption", "who": "agent", "text": " kembali.", "index": 6}},
+  {"t": 50581, "msg": {"type": "caption", "who": "agent", "text": " Bapak", "index": 6}},
+  {"t": 51181, "msg": {"type": "caption", "who": "agent", "text": " akan", "index": 6}},
+  {"t": 51381, "msg": {"type": "caption", "who": "agent", "text": " mengirimkan", "index": 6}},
+  {"t": 52021, "msg": {"type": "caption", "who": "agent", "text": " 1600", "index": 6}},
+  {"t": 52861, "msg": {"type": "caption", "who": "agent", "text": " kg", "index": 6}},
+  {"t": 53261, "msg": {"type": "caption", "who": "agent", "text": " Palm", "index": 6}},
+  {"t": 53461, "msg": {"type": "caption", "who": "agent", "text": " FFB", "index": 6}},
+  {"t": 54061, "msg": {"type": "caption", "who": "agent", "text": " pada", "index": 6}},
+  {"t": 54501, "msg": {"type": "caption", "who": "agent", "text": " minggu", "index": 6}},
+  {"t": 54701, "msg": {"type": "caption", "who": "agent", "text": " pertama", "index": 6}},
+  {"t": 55101, "msg": {"type": "caption", "who": "agent", "text": " November.", "index": 6}},
+  {"t": 55541, "msg": {"type": "caption", "who": "agent", "text": " Apakah", "index": 6}},
+  {"t": 56181, "msg": {"type": "caption", "who": "agent", "text": " benar?", "index": 6}},
+  {"t": 56681, "msg": {"type": "translation", "index": 6, "text": "Excuse me, I need to reconfirm. You will send 1600 kg of Palm FFB in the first week of November. Is that correct?"}},
+  {"t": 57801, "who": "farmer", "audio": "samples/clips/farmer-4.wav", "ms": 5099},
+  {"t": 63781, "msg": {"type": "caption", "who": "farmer", "text": "Harganya bisa naik jadi Rp 3.300/kg.", "index": 7}},
+  {"t": 63932, "msg": {"type": "tool", "name": "get_reference_price", "args": {"crop": "Palm FFB"}, "result": {"crop": "Palm FFB", "reference_price": 3100.0, "currency": "IDR", "unit": "kg", "say": "Today's market reference price is 3,100 IDR per kg."}, "ui": null}},
+  {"t": 64281, "msg": {"type": "translation", "index": 7, "text": "The price can go up to Rp 3,300/kg."}},
+  {"t": 64629, "msg": {"type": "tool", "name": "check_offer", "args": {"kg": 1600, "crop": "Palm FFB", "farmer_counter_price": 3300}, "result": {"decision": "accept", "allowed": true, "price_per_kg": 3300.0, "currency": "IDR", "reference_price": 3100.0, "premium_pct": 6.5, "is_best_price": false, "reason": "Counter is inside the limits, so the agent may accept it.", "deliver_week": "W3"}, "ui": {"rail": {"floor": 2900.0, "reference": 3100.0, "ceiling": 3350.0, "offer": 3300.0, "counter": 3300.0, "kg": 1600, "decision": "accept", "allowed": true, "currency": "IDR"}}}},
+  {"t": 65202, "msg": {"type": "caption", "who": "agent", "text": "Harga referensi", "index": 8}},
+  {"t": 65258, "who": "agent", "audio": "samples/clips/agent-5.mp3", "ms": 11192},
+  {"t": 65749, "msg": {"type": "caption", "who": "agent", "text": " pasar", "index": 8}},
+  {"t": 66029, "msg": {"type": "caption", "who": "agent", "text": " hari", "index": 8}},
+  {"t": 66229, "msg": {"type": "caption", "who": "agent", "text": " ini", "index": 8}},
+  {"t": 66429, "msg": {"type": "caption", "who": "agent", "text": " adalah", "index": 8}},
+  {"t": 66829, "msg": {"type": "caption", "who": "agent", "text": " Rp3.100", "index": 8}},
+  {"t": 67709, "msg": {"type": "caption", "who": "agent", "text": " per kg.", "index": 8}},
+  {"t": 68749, "msg": {"type": "caption", "who": "agent", "text": " Kami", "index": 8}},
+  {"t": 69389, "msg": {"type": "caption", "who": "agent", "text": " bisa", "index": 8}},
+  {"t": 69589, "msg": {"type": "caption", "who": "agent", "text": " menyetujui", "index": 8}},
+  {"t": 70189, "msg": {"type": "caption", "who": "agent", "text": " harga", "index": 8}},
+  {"t": 70389, "msg": {"type": "caption", "who": "agent", "text": " Rp3.300", "index": 8}},
+  {"t": 71429, "msg": {"type": "caption", "who": "agent", "text": " per kg", "index": 8}},
+  {"t": 71669, "msg": {"type": "caption", "who": "agent", "text": " yang Bapak", "index": 8}},
+  {"t": 72069, "msg": {"type": "caption", "who": "agent", "text": " minta", "index": 8}},
+  {"t": 72469, "msg": {"type": "caption", "who": "agent", "text": " untuk", "index": 8}},
+  {"t": 73069, "msg": {"type": "caption", "who": "agent", "text": " 1600", "index": 8}},
+  {"t": 73749, "msg": {"type": "caption", "who": "agent", "text": " kg.", "index": 8}},
+  {"t": 74349, "msg": {"type": "caption", "who": "agent", "text": " Apakah", "index": 8}},
+  {"t": 74989, "msg": {"type": "caption", "who": "agent", "text": " Bapak", "index": 8}},
+  {"t": 75229, "msg": {"type": "caption", "who": "agent", "text": " setuju?", "index": 8}},
+  {"t": 75729, "msg": {"type": "translation", "index": 8, "text": "Today's market reference price is Rp3,100 per kg. We can agree to the price of Rp3,300 per kg that you requested for 1600 kg. Do you agree?"}},
+  {"t": 76801, "who": "farmer", "audio": "samples/clips/farmer-5.wav", "ms": 1701},
+  {"t": 80650, "msg": {"type": "caption", "who": "farmer", "text": "Ya, setuju.", "index": 9}},
+  {"t": 80944, "msg": {"type": "tool", "name": "save_offer", "args": {"price_per_kg": 3300, "crop": "Palm FFB", "kg": 1600}, "result": {"saved": true, "status": "pending", "offer_id": "offer-c04568a7", "kg": 1600, "price_per_kg": 3300.0, "deliver_week": "W3", "say": "Repeat the terms and say the cooperative must approve the deal before it is final."}, "ui": {"offer_saved": {"status": "pending", "kg": 1600, "price": 3300.0}}}},
+  {"t": 81150, "msg": {"type": "translation", "index": 9, "text": "Yes, I agree."}},
+  {"t": 81497, "msg": {"type": "caption", "who": "agent", "text": "Baik, sudah", "index": 10}},
+  {"t": 81549, "who": "agent", "audio": "samples/clips/agent-6.mp3", "ms": 13952},
+  {"t": 82080, "msg": {"type": "caption", "who": "agent", "text": " kami", "index": 10}},
+  {"t": 82280, "msg": {"type": "caption", "who": "agent", "text": " catat.", "index": 10}},
+  {"t": 82680, "msg": {"type": "caption", "who": "agent", "text": " Bapak", "index": 10}},
+  {"t": 83280, "msg": {"type": "caption", "who": "agent", "text": " akan", "index": 10}},
+  {"t": 83480, "msg": {"type": "caption", "who": "agent", "text": " mengirimkan", "index": 10}},
+  {"t": 84160, "msg": {"type": "caption", "who": "agent", "text": " 1600", "index": 10}},
+  {"t": 85000, "msg": {"type": "caption", "who": "agent", "text": " kg", "index": 10}},
+  {"t": 85400, "msg": {"type": "caption", "who": "agent", "text": " Palm", "index": 10}},
+  {"t": 85600, "msg": {"type": "caption", "who": "agent", "text": " FFB", "index": 10}},
+  {"t": 86240, "msg": {"type": "caption", "who": "agent", "text": " dengan", "index": 10}},
+  {"t": 86440, "msg": {"type": "caption", "who": "agent", "text": " harga", "index": 10}},
+  {"t": 86880, "msg": {"type": "caption", "who": "agent", "text": " Rp3.300", "index": 10}},
+  {"t": 87720, "msg": {"type": "caption", "who": "agent", "text": " per kg", "index": 10}},
+  {"t": 88160, "msg": {"type": "caption", "who": "agent", "text": " pada", "index": 10}},
+  {"t": 89000, "msg": {"type": "caption", "who": "agent", "text": " minggu", "index": 10}},
+  {"t": 89400, "msg": {"type": "caption", "who": "agent", "text": " pertama", "index": 10}},
+  {"t": 89800, "msg": {"type": "caption", "who": "agent", "text": " November.", "index": 10}},
+  {"t": 90240, "msg": {"type": "caption", "who": "agent", "text": " Penawaran", "index": 10}},
+  {"t": 91120, "msg": {"type": "caption", "who": "agent", "text": " ini", "index": 10}},
+  {"t": 91520, "msg": {"type": "caption", "who": "agent", "text": " masih", "index": 10}},
+  {"t": 91720, "msg": {"type": "caption", "who": "agent", "text": " menunggu", "index": 10}},
+  {"t": 91920, "msg": {"type": "caption", "who": "agent", "text": " persetujuan", "index": 10}},
+  {"t": 92560, "msg": {"type": "caption", "who": "agent", "text": " koperasi.", "index": 10}},
+  {"t": 93000, "msg": {"type": "caption", "who": "agent", "text": " Apakah", "index": 10}},
+  {"t": 93840, "msg": {"type": "caption", "who": "agent", "text": " ada", "index": 10}},
+  {"t": 94040, "msg": {"type": "caption", "who": "agent", "text": " pertanyaan", "index": 10}},
+  {"t": 94440, "msg": {"type": "caption", "who": "agent", "text": " lain?", "index": 10}},
+  {"t": 94880, "msg": {"type": "tool", "name": "end_call", "args": {"transcript_consent": true, "outcome": "completed", "summary": "Farmer agreed to bring forward 1600kg of Palm FFB to W3 for 3300 IDR/kg."}, "result": {"ok": true, "say": "Say goodbye in one short sentence. The line closes after it."}, "ui": {"consent": true}}},
+  {"t": 94940, "msg": {"type": "translation", "index": 10, "text": "Okay, we have noted that. You will send 1600 kg of Palm FFB at a price of Rp3,300 per kg in the first week of November. This offer is still pending cooperative approval. Do you have any other questions?"}},
+  {"t": 96500, "msg": {"type": "ended", "status": "done", "summary": "Farmer agreed to bring forward 1600kg of Palm FFB to W3 for 3300 IDR/kg.", "kind": "gap_fill", "consent": true, "retry_queued": false, "deal": null}}
  ]
 }

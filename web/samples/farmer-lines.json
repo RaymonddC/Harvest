@@ -1,0 +1,26 @@
+[
+  {
+    "text": "Ya, betul. Boleh, tidak apa-apa.",
+    "audio": "samples/clips/farmer-1.wav"
+  },
+  {
+    "text": "Bisa, Pak. Kira-kira seribu enam ratus kilo.",
+    "audio": "samples/clips/farmer-2.wav"
+  },
+  {
+    "text": "Ya, benar.",
+    "audio": "samples/clips/farmer-3.wav"
+  },
+  {
+    "text": "Harganya bisa naik jadi tiga ribu tiga ratus rupiah per kilo?",
+    "audio": "samples/clips/farmer-4.wav"
+  },
+  {
+    "text": "Ya, setuju.",
+    "audio": "samples/clips/farmer-5.wav"
+  },
+  {
+    "text": "Tidak ada, terima kasih. Sampai jumpa.",
+    "audio": "samples/clips/farmer-6.wav"
+  }
+]

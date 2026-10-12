@@ -61,6 +61,8 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | `VOICE_NAME` | `Kore` | No | The agent's voice. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `VAD_SILENCE_MS` | `400` | No | How many milliseconds of silence end the farmer's turn, so the agent starts answering. Lower is faster but can cut off someone who pauses mid-sentence; raise it to 700 to 1000 if the agent interrupts. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `STORE_BACKEND` | `memory` | No | `memory` (local, in-process) or `firestore`. | Set by `deploy.sh` (`firestore`); not changeable from GitHub |
+| `GOOGLE_GENAI_USE_VERTEXAI` | unset | No | `true` makes the Google SDK use Vertex AI (with `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION`) instead of `GOOGLE_API_KEY`. Cloud Run sets it from `GEMINI_BACKEND=vertex`. | Set by `deploy.sh`; locally in `.env` |
+| `VERTEX_ACCESS_TOKEN` | unset | No | **Local runs only.** A short-lived (about 1 hour) Google access token, e.g. from `gcloud auth print-access-token --impersonate-service-account=<service account>`. When set together with `GOOGLE_GENAI_USE_VERTEXAI`, `live_session.genai_client()` uses it as the Vertex credential, so the voice call and `backend/scripts/sample_call.py` work without application default credentials. Never commit it; leave it unset on Cloud Run (the service signs in with its own account). | Local `.env` or the shell; expires, so generate a new one when a call fails with 401 |
 | `GOOGLE_CLOUD_PROJECT` | none | No | Project id, needed when `STORE_BACKEND=firestore`. | Set by `deploy.sh` from GitHub variable `GCP_PROJECT` |
 | `SEED_ON_START` | true for `memory`, false for `firestore` | No | Reload the demo data on every start. | Set by `deploy.sh` (`false`); not changeable from GitHub |
 | `MILL_NAME` | `Koperasi Sawit Maju` | No | The buying mill, spoken by the agent and shown in the header. | GitHub variable `MILL_NAME`, then redeploy |
@@ -91,6 +93,11 @@ Using Vertex AI instead of an API key (the cloud default): set `GOOGLE_GENAI_USE
 `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` and a Vertex `LIVE_MODEL`, and leave `GOOGLE_API_KEY`
 unset. The Google SDK reads these itself. Locally, sign in once with `gcloud auth application-default login`.
 In the cloud the service signs in with its own account, which needs `roles/aiplatform.user`.
+Without application default credentials, a local run can use `VERTEX_ACCESS_TOKEN` (see its row above).
+
+The sample-call script `backend/scripts/sample_call.py` also reads `SAMPLE_WORK_DIR` (where it keeps its recording, default `./sample_work`),
+`TTS_MODEL` (default `gemini-2.5-flash-tts`), `FARMER_VOICE` (default `Charon`) and `MAX_CALL_WALL_S` (default 300). They are
+options of that one script, not of the service, and need no entry elsewhere.
 
 ## Deploy settings (`deploy/deploy.env` or the shell)
 

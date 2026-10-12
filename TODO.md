@@ -95,14 +95,23 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     - The agent's opening is partly English, partly the farmer's language (`backend/app/prompt.py`).
     - Farmer list: Delete is permanent (a confirm popup, no undo; accepted).
 
-12. **Demo resilience (agreed 12 Oct).** Built: the Demo guide in the sidebar, and a silent scripted sample call
-    (`web/samples/gap-fill.json`, replay engine in `web/js/call.js`). Still to do, needs a Gemini key:
-    - Record a real call with the live agent and rebuild the sample from it (real transcript and tool events),
-      with audio clips (Gemini speech generation) so the sample has sound. The replay already plays a clip
-      when an event has an `audio` URL (not wired yet; add it with the clips).
-    - **Stand-in farmer:** a "Play the farmer for me" button that sends scripted farmer audio into a live call,
-      so the demo and the video need no teammate or microphone.
-    - Measure the reply delay of the real model (end of the farmer's speech to the agent's first audio).
+12. **Demo resilience (done 12 Oct, on Vertex AI).** Built: the Demo guide in the sidebar, a recorded sample call with
+    sound (`web/samples/gap-fill.json` plus `web/samples/clips/`, replay engine in `web/js/call.js`), and the
+    **Play the farmer for me** button on the call page (sends the clips in `web/samples/farmer-lines.json` into a live
+    call, one line after each agent reply; see `backend/scripts/sample_call.py` to re-record). Rebuild the sample with:
+    `cd backend && python scripts/sample_call.py clips` (only new lines), `record` (needs a Vertex token), `build <run dir>`.
+    - Vertex us-central1 names that work: `gemini-live-2.5-flash-native-audio` (Live), `gemini-2.5-flash` and
+      `gemini-2.5-flash-lite` (text), `gemini-2.5-flash-tts`, `gemini-2.5-flash-preview-tts` and
+      `gemini-2.5-pro-preview-tts` (speech). Not available: `gemini-live-2.5-flash-preview-native-audio-09-2025`.
+      Note `.env.example` still says `TEXT_MODEL=gemini-3.8-flash`; that name was not checked on Vertex.
+    - Measured reply delay (end of the farmer's last audio chunk to the agent's first audio, at the gateway,
+      `VAD_SILENCE_MS=400`), 6 scripted calls, per farmer turn: 1.5 to 1.8 s (name and consent), 1.3 to 1.4 s (volume),
+      1.8 to 2.0 s (read-back, sometimes a `record_harvest` first), 1.4 to 2.4 s (counter-offer, `check_offer`), 1.8 to 3.0 s (final
+      yes, `save_offer` and `end_call`); about 0.4 s less without the VAD wait. Connect to first agent audio: 1.35 to 2.7 s. A browser adds network and buffering.
+    - Prompt problems seen in the recordings (not fixed): in 2 of 6 calls the farmer's "naik jadi 3300" was taken
+      as a harvest weight and `record_harvest` was called with 3,300 kg; the agent sometimes says the reference price in
+      English; it often repeats the consent question; it does not always call `end_call` (the last farmer line, "Tidak ada,
+      terima kasih", exists to let it finish).
 
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

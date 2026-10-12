@@ -22,11 +22,11 @@
     <section id="view-waiting" class="view">
       <div>
         <h1>Incoming calls</h1>
-        <p class="sub">This browser stands in for the farmer's phone. A teammate answers and plays the farmer. Use headphones so the agent does not hear itself.</p>
+        <p class="sub">This browser stands in for the farmer's phone. A teammate answers and plays the farmer, or press Play the farmer for me during the call. Use headphones so the agent does not hear itself.</p>
       </div>
       <ul class="incoming" id="incoming"></ul>
       <button class="btn outline-mint" id="sample" type="button">Watch a sample call</button>
-      <p class="sub" style="margin:0">A scripted example of a gap-fill call, with no microphone or live agent. Use it when nobody can play the farmer.</p>
+      <p class="sub" style="margin:0">A recording of a real gap-fill call, with sound: the AI agent and a scripted farmer. No microphone or live agent needed. Use it when nobody can play the farmer, or if the live model is down.</p>
       <a class="back-link" href="index.html">Planner dashboard</a>
     </section>
 
@@ -35,7 +35,7 @@
         <div class="caller" id="call-farmer">Farmer</div>
         <div class="sub mint-text" id="call-meta"></div>
       </div>
-      <p class="sub" id="replay-note" role="note" hidden style="margin:0;color:var(--amber, #E3A72F)">Sample call: scripted, not a live call. Nothing is saved.</p>
+      <p class="sub" id="replay-note" role="note" hidden style="margin:0;color:var(--amber, #E3A72F)">Sample call: a recording, not a live call. Nothing is saved.</p>
       <ol class="stages" id="stages" aria-label="Call stages"></ol>
       <div class="captions" id="captions" aria-live="polite" aria-label="Live captions"></div>
       <div id="captured" class="panel" hidden></div>
@@ -52,6 +52,9 @@
         <output id="volume-out" for="volume">100%</output>
       </label>
       <p class="mic-note" id="mic-note" role="status" hidden></p>
+      <div class="controls" id="stand-in-row">
+        <button class="btn outline-mint" id="stand-in" type="button" aria-pressed="false">Play the farmer for me</button>
+      </div>
       <div class="controls">
         <button class="btn outline-mint" id="mute" aria-pressed="false">Mute</button>
         <button class="btn end" id="hangup">End call</button>

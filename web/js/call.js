@@ -44,6 +44,9 @@ function openCallView(call) {
   $("consent").textContent = "The agent asks for consent before a transcript is kept.";
   $("mute").textContent = "Mute";
   $("mute").setAttribute("aria-pressed", "false");
+  $("stand-in-row").hidden = false;
+  $("stand-in").textContent = STAND_IN_LABEL;
+  $("stand-in").setAttribute("aria-pressed", "false");
   setStage(0);
   meta("Connecting…");
   show("call");
@@ -87,10 +90,14 @@ async function answer(call) {
   active.timer = setInterval(() => { meta(); micCheck(); }, 500);
 
   capture.port.onmessage = (e) => {
-    if (e.data.level !== undefined) return hearYou(e.data.level);
+    const standIn = active?.standIn?.on ? active.standIn : null;
+    if (e.data.level !== undefined) return standIn ? undefined : hearYou(e.data.level);
     if (active) active.made = (active.made || 0) + 1;  // chunks the microphone worklet produced
-    if (e.data.pcm && ws.readyState === WebSocket.OPEN && !active?.muted) {
-      ws.send(e.data.pcm);
+    // With the stand-in farmer on, the scripted clip (or silence between lines) replaces the microphone,
+    // chunk for chunk, so the model hears a steady stream like a real call.
+    const pcm = standIn ? standInChunk(standIn, e.data.pcm.byteLength / 2) : e.data.pcm;
+    if (pcm && ws.readyState === WebSocket.OPEN && (standIn || !active?.muted)) {
+      ws.send(pcm);
       active.sent = (active.sent || 0) + 1;  // chunks actually sent to the server
     }
   };
@@ -110,7 +117,7 @@ function handleMessage(msg) {
   else if (msg.type === "caption") caption(msg);
   else if (msg.type === "translation") translation(msg);
   else if (msg.type === "interrupted") flush();
-  else if (msg.type === "tool") toolEvent(msg);
+  else if (msg.type === "tool") { active.lastTool = performance.now(); toolEvent(msg); }
   else if (msg.type === "error") toast(msg.message, true);
   else if (msg.type === "ended") finish(msg);
 }
@@ -119,34 +126,71 @@ function handleMessage(msg) {
 
 const SAMPLE_URL = "samples/gap-fill.json";
 
+// The sample's clips are decoded up front (the click that starts the replay allows sound), so playback starts on time.
+async function loadSampleAudio(sample, actx) {
+  const urls = [...new Set(sample.events.filter((e) => e.audio).map((e) => e.audio))];
+  if (!urls.length) return null;
+  try {
+    const gain = actx.createGain();
+    gain.gain.value = volumeGain(Number($("volume").value));
+    gain.connect(actx.destination);
+    const buffers = new Map(await Promise.all(urls.map(async (u) => [u, await actx.decodeAudioData(await (await fetch(u)).arrayBuffer())])));
+    return { ctx: actx, gain, buffers, sources: [] };
+  } catch {
+    toast("The sample call's sound could not be loaded. It plays without sound.", true);
+    return null;
+  }
+}
+
 async function replay() {
   if (active) return;
+  let actx = null;
+  try {
+    actx = new AudioContext();
+    if (actx.state !== "running") await actx.resume().catch(() => {});
+  } catch { /* no audio engine: the sample still plays as captions */ }
   let sample;
   try {
     sample = await (await fetch(SAMPLE_URL)).json();
   } catch {
     toast("The sample call could not be loaded.", true);
+    actx?.close();
     return;
   }
+  const audio = actx && sample.audio ? await loadSampleAudio(sample, actx) : null;
+  if (!audio) actx?.close();
+  if (active) return;
   const clock0 = performance.now();
   const ctx = { state: "running", sampleRate: 48000, get currentTime() { return (performance.now() - clock0) / 1000; }, close() {}, resume() { return Promise.resolve(); } };
   const call = { id: "sample", kind: sample.kind, farmer_name: sample.farmer, gap_week: sample.gap_week };
   active = { call, ws: { readyState: WebSocket.OPEN, send() {}, close() {} }, ctx, stream: null, player: { port: { postMessage() {} } },
-    volume: { gain: { value: 1 } }, micName: "", startedAt: Date.now(), playEnd: 0, ended: false, muted: false, stage: 0, lines: {},
+    volume: audio ? audio.gain : { gain: { value: 1 } }, replayAudio: audio, micName: "", startedAt: Date.now(), playEnd: 0, ended: false, muted: false, stage: 0, lines: {},
     village: sample.village, language: sample.language, gapWeek: sample.gap_week, replay: true, timeouts: [] };
   openCallView(call);
+  $("replay-note").textContent = audio ? "Sample call: a recording, not a live call. Nothing is saved." : "Sample call: a recording shown without sound, not a live call. Nothing is saved.";
   $("replay-note").hidden = false;
+  $("stand-in-row").hidden = true;
   active.timer = setInterval(() => meta(), 500);
   active.voiceTimer = setInterval(showVoices, 80);
   const speak = (ms) => { active.playEnd = Math.max(active.playEnd, ctx.currentTime) + ms / 1000; };
+  const farmerSpeaks = (ms) => { active.micLevel = 0.7; setTimeout(() => { if (active) active.micLevel = 0; }, ms); };
   for (const ev of sample.events) {
     active.timeouts.push(setTimeout(() => {
+      if (!active) return;
+      const buf = ev.audio && audio ? audio.buffers.get(ev.audio) : null;
+      if (buf) {
+        const src = audio.ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(audio.gain);
+        src.start();
+        audio.sources.push(src);
+        if (ev.who === "agent") speak(buf.duration * 1000); else farmerSpeaks(buf.duration * 1000);
+      }
       const msg = ev.msg;
-      if (msg.type === "caption") {
-        // The sample has no sound: show who is talking for about as long as the line takes to say.
-        const ms = Math.min(6000, 700 + msg.text.length * 55);
-        if (msg.who === "agent") speak(ms);
-        else { active.micLevel = 0.7; setTimeout(() => { if (active) active.micLevel = 0; }, ms); }
+      if (!msg) return;
+      if (msg.type === "caption" && !audio) {
+        // No sound: show who is talking for about as long as the words take to say.
+        if (msg.who === "agent") speak(msg.text.length * 70); else farmerSpeaks(Math.min(6000, 700 + msg.text.length * 55));
       }
       handleMessage(msg);
     }, ev.t));
@@ -158,11 +202,84 @@ function stopReplay() {
   active.timeouts.forEach(clearTimeout);
   clearInterval(active.timer);
   clearInterval(active.voiceTimer);
+  active.replayAudio?.sources.forEach((src) => { try { src.stop(); } catch { /* already finished */ } });
+  active.replayAudio?.ctx.close().catch(() => {});
   active = null;
   $("replay-note").hidden = true;
   show("waiting");
   renderIncoming();
 }
+
+// ---------- stand-in farmer: scripted farmer audio sent into a live call ----------
+// "Play the farmer for me" replaces the microphone with the farmer's lines from samples/farmer-lines.json (spoken
+// by Gemini, the same clips the sample call uses). Each line goes in once the agent has finished talking and has
+// answered the previous line, so the demo and the video need no teammate.
+
+const FARMER_LINES_URL = "samples/farmer-lines.json";
+const STAND_IN_LABEL = "Play the farmer for me";
+
+function parseWav(buf) {  // 16 kHz mono PCM16 WAV -> Int16Array
+  const view = new DataView(buf);
+  for (let pos = 12; pos + 8 <= buf.byteLength;) {
+    const size = view.getUint32(pos + 4, true);
+    if (String.fromCharCode(...new Uint8Array(buf, pos, 4)) === "data") return new Int16Array(buf.slice(pos + 8, pos + 8 + size));
+    pos += 8 + size + (size & 1);
+  }
+  throw new Error("not a WAV file");
+}
+
+async function loadFarmerLines() {
+  const lines = await (await fetch(FARMER_LINES_URL)).json();
+  return Promise.all(lines.map(async (l) => parseWav(await (await fetch(l.audio)).arrayBuffer())));
+}
+
+function setStandIn(on) {
+  const s = active?.standIn;
+  if (!s) return;
+  s.on = on;
+  if (!on) { s.clip = null; active.micLevel = 0; }
+  $("stand-in").setAttribute("aria-pressed", String(on));
+  $("stand-in").textContent = on ? "Stop playing the farmer" : STAND_IN_LABEL;
+}
+
+function agentDone(s) {
+  const now = performance.now();
+  return active.lastAgentAudio > s.endedAt                       // the agent has answered the last line (or opened the call)
+    && now - active.lastAgentAudio >= 1000                       // and has stopped generating
+    && active.ctx.currentTime >= active.playEnd + 0.4            // and has finished playing
+    && now - (active.lastTool || 0) >= 2500;                     // and is not in the middle of a tool call
+}
+
+function standInChunk(s, samples) {
+  const out = new Int16Array(samples);
+  if (!s.clip && s.next < s.lines.length && agentDone(s)) { s.clip = s.lines[s.next++]; s.pos = 0; }
+  if (s.clip) {
+    out.set(s.clip.subarray(s.pos, s.pos + samples));
+    s.pos += samples;
+    active.micLevel = 0.7;
+    active.heardAt = Date.now();
+    if (s.pos >= s.clip.length) {
+      s.clip = null;
+      s.endedAt = performance.now();
+      active.micLevel = 0;
+      if (s.next >= s.lines.length) { setStandIn(false); toast("The scripted farmer has said all its lines. Your microphone is back on."); }
+    }
+  } else {
+    active.micLevel = 0;
+  }
+  return out.buffer;
+}
+
+$("stand-in").onclick = async () => {
+  if (!active || active.replay) return;
+  const s = active.standIn ||= { lines: null, next: 0, clip: null, pos: 0, endedAt: 0, on: false };
+  if (s.on) return setStandIn(false);
+  if (!s.lines) {
+    try { s.lines = await loadFarmerLines(); } catch { toast("The scripted farmer's lines could not be loaded.", true); return; }
+  }
+  if (s.next >= s.lines.length) { toast("The scripted farmer has said all its lines already.", true); return; }
+  setStandIn(true);
+};
 
 // ---------- who is speaking: mic level for the farmer, playback for the agent ----------
 // The "You" bars show what the browser hears, so "it does not answer me" can be told apart from
@@ -200,6 +317,9 @@ function micCheck() {
     note.textContent = "Your browser has paused the call's audio. Tap anywhere on this page to start it.";
     note.hidden = false;
     active.ctx.resume().catch(() => {});
+  } else if (active.standIn?.on) {
+    note.textContent = "A scripted farmer is speaking for you. Your microphone is not used.";
+    note.hidden = false;
   } else if (active.muted) {
     note.textContent = "Muted: the agent cannot hear you.";
     note.hidden = false;
@@ -237,6 +357,7 @@ function setStage(i) {
 
 function play(buf) {
   const { ctx, player } = active;
+  active.lastAgentAudio = performance.now();
   const pcm = new Int16Array(buf);
   const ratio = ctx.sampleRate / OUTPUT_RATE;
   const out = new Float32Array(Math.round(pcm.length * ratio));
@@ -368,6 +489,7 @@ function finish(msg) {
     clearInterval(a.voiceTimer);
     a.stream?.getTracks().forEach((t) => t.stop());
     a.ctx.close();
+    a.replayAudio?.ctx.close().catch(() => {});
     $("replay-note").hidden = true;
     if (a.ws.readyState <= WebSocket.OPEN) a.ws.close();
     active = null;
