@@ -106,7 +106,7 @@ export default function Users() {
               {data.users.map((u) => (
                 <tr key={u.id}>
                   <td style={{ paddingLeft: 22 }}><div className="who-cell"><Avatar name={u.name} cls="sm" /><div><b>{u.name}</b>{u.id === me.user_id && <span>You</span>}</div></div></td>
-                  <td>{roleName(u.role)}</td>
+                  <td>{roleName(u.role)}{u.demo && <>{" "}<Pill cls="amber">Demo user</Pill></>}</td>
                   <td>{u.active ? <Pill cls="mint">Can sign in</Pill> : <Pill>Turned off</Pill>}</td>
                   <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
                     <button className="btn sm" type="button" onClick={() => setForm(u)}>Edit</button>{" "}
@@ -123,7 +123,7 @@ export default function Users() {
         <div className="card-head"><h2 id="roles-title">What each role may do</h2></div>
         <div className="table-wrap">
           <table style={{ minWidth: 640 }}>
-            <thead><tr><th style={{ paddingLeft: 22 }}>Right</th>{data.roles.map((r) => <th key={r.id} className="r" title={r.description}>{r.label}</th>)}</tr></thead>
+            <thead><tr><th style={{ paddingLeft: 22 }}>Right</th>{data.roles.map((r) => <th key={r.id} className="r" title={r.description}>{r.label}{r.demo && <div className="sub">demo</div>}</th>)}</tr></thead>
             <tbody>
               {caps.map(([key, label]) => (
                 <tr key={key}><td style={{ paddingLeft: 22 }}>{label}</td>

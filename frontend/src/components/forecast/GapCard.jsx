@@ -53,7 +53,7 @@ export function Hero({ gap, rows, state }) {
       <div className="hero-acts">
         {/* While gap-fill calls run, the next step is answering them, not starting more. */}
         {calling ? <a className="btn solid big" href="/call.html" target="_blank" rel="noopener"><Icon name="phone" size={16} />Open call client</a> : (
-        <ActButton className="btn solid big" busy="Queuing calls…" disabled={!canFill}
+        <ActButton need="campaign.run" className="btn solid big" busy="Queuing calls…" disabled={!canFill}
           run={() => act(() => api("/api/campaign/start", { body: { kind: "gap_fill" } }), (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`)}>
           <Icon name="phone" size={16} />Start gap-fill calls
         </ActButton>)}
@@ -89,7 +89,7 @@ export function FillList({ gap, state }) {
               <span>{q.supplier_name}, quote {fmtPrice(q.price_per_kg, q.currency || "IDR")}</span>
               <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 {used(q) ? <Pill cls="mint">Offer added</Pill>
-                  : <ActButton className="btn sm" busy="Adding…" run={() => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added to approvals.")}>Add as offer</ActButton>}
+                  : <ActButton need="offers.decide" className="btn sm" busy="Adding…" run={() => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added to approvals.")}>Add as offer</ActButton>}
                 <strong>{fmtT(q.kg)} t</strong>
               </span>
             </div>

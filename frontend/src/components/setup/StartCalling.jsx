@@ -32,9 +32,9 @@ export default function StartCalling({ state, toCall }) {
         {running ? <>
           <span className="pill lg dot running" style={{ alignSelf: "flex-start", background: "var(--ink-2)", color: "var(--on-ink)" }}>{campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Calling farmers now"}</span>
           <a className="btn mint big block" href="/call.html" target="_blank" rel="noopener">Open call client</a>
-          <ActButton className="btn on-ink block" busy="Stopping…" run={() => act(() => api("/api/campaign/stop"), "Calling stopped.")}>Stop calling</ActButton>
+          <ActButton need="campaign.run" className="btn on-ink block" busy="Stopping…" run={() => act(() => api("/api/campaign/stop"), "Calling stopped.")}>Stop calling</ActButton>
         </> : (
-          <ActButton className="btn mint big block" busy="Starting…" disabled={!toCall} run={start}>
+          <ActButton need="campaign.run" className="btn mint big block" busy="Starting…" disabled={!toCall} run={start}>
             <Icon name="phone" />{toCall ? `Start calling ${toCall} farmers` : "Add farmers to start"}
           </ActButton>
         )}

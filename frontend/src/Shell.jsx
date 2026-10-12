@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, NavLink, useLocation } from "react-router-dom";
 import { can, cfg, fmtT, getSession, PAGES, roleLabel } from "./lib.js";
 import { useLive } from "./live.jsx";
@@ -20,6 +20,43 @@ function WeekCard({ state }) {
       <div className="wc-row"><i className={`wc-dot ${gap ? "amber" : "on"}`} />{gap ? `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short` : "Every week on track"}</div>
       {waiting > 0 && <Link className="wc-row wc-link" to="/approvals"><i className="wc-dot amber" />{waiting} waiting for a decision</Link>}
     </div>
+  );
+}
+
+// A short checklist for someone seeing the demo cold. Each step ticks from the live data, and the
+// first open one links to the page where it is done. Collapsible; the choice is remembered.
+const GUIDE_KEY = "harvestGuideOpen";
+function DemoGuide({ state }) {
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(GUIDE_KEY) !== "0"; } catch { return true; } });
+  if (!state) return null;
+  const { calls, offers } = state;
+  const campaign = state.campaigns.find((x) => x.id === "current") || {};
+  const steps = [
+    ["Check the farmers and the price range", "/setup", state.farmers.length > 0 && state.limits.length > 0],
+    ["Start calling", "/setup", campaign.status === "running" || calls.some((c) => c.status !== "queued")],
+    ["Answer a call as the farmer", "/call.html", calls.some((c) => ["done", "on_call"].includes(c.status))],
+    ["Fill the gap: gap-fill calls or the rival quote", "/", offers.length > 0],
+    ["Approve the offers", "/approvals", offers.some((o) => o.status === "approved")],
+    ["Answer the confirmation call", "/call.html", offers.some((o) => o.confirmed_by_voice)],
+  ];
+  const next = steps.findIndex((s) => !s[2]);
+  const toggle = () => { setOpen(!open); try { localStorage.setItem(GUIDE_KEY, open ? "0" : "1"); } catch { /* storage blocked */ } };
+  return (
+    <section className="guide" aria-label="Demo guide">
+      <button className="guide-toggle" type="button" aria-expanded={open} onClick={toggle}>Demo guide</button>
+      {open && (
+        <ol className="guide-steps">
+          {steps.map(([label, to, done], i) => (
+            <li key={label} className={done ? "done" : i === next ? "next" : ""}>
+              <span className="tick" aria-hidden="true">{done ? "✓" : i + 1}</span>
+              {i === next
+                ? (to.endsWith(".html") ? <a href={to}>{label}<span className="sr-only"> (next step)</span></a> : <Link to={to}>{label}<span className="sr-only"> (next step)</span></Link>)
+                : <span>{label}</span>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
 
@@ -51,6 +88,7 @@ export default function Shell({ title, head, children }) {
           ))}
         </nav>
         <WeekCard state={state} />
+        <DemoGuide state={state} />
         <div className="spacer" />
         <div className="planner">
           <Avatar name={session.name} cls="ink" />

@@ -1,6 +1,6 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useState } from "react";
-import { api, cropLabel, fmtKg, maskPhone } from "../../lib.js";
+import { api, can, cropLabel, fmtKg, maskPhone } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar } from "../../ui.jsx";
 
@@ -98,13 +98,13 @@ export default function FarmerList({ farmers, onEdit }) {
                 <td>{cropLabel(f.crop)}</td>
                 <td className="r num">{f.usual_kg_week ? fmtKg(f.usual_kg_week) : "–"}</td>
                 <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
-                  <ActButton className="btn sm" busy="Queuing…" run={() => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`)}>Call now</ActButton>{" "}
+                  <ActButton need="campaign.run" className="btn sm" busy="Queuing…" run={() => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`)}>Call now</ActButton>{" "}
                   <Menu.Root>
                     <Menu.Trigger asChild><button className="btn sm more" type="button" aria-label={`More for ${f.name}`}>⋯</button></Menu.Trigger>
                     <Menu.Portal>
                       <Menu.Content className="hc-menu" align="end" sideOffset={4}>
-                        <Menu.Item className="hc-menu-item" onSelect={() => onEdit(f)}>Edit</Menu.Item>
-                        <Menu.Item className="hc-menu-item danger" onSelect={() => remove(f)}>Delete…</Menu.Item>
+                        <Menu.Item className="hc-menu-item" disabled={!can("farmers.manage")} onSelect={() => onEdit(f)}>Edit</Menu.Item>
+                        <Menu.Item className="hc-menu-item danger" disabled={!can("farmers.manage")} onSelect={() => remove(f)}>Delete…</Menu.Item>
                       </Menu.Content>
                     </Menu.Portal>
                   </Menu.Root>

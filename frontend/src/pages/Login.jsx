@@ -55,11 +55,13 @@ export default function Login() {
           <button key={p.id} className={`role-tile ${i === 0 ? "main" : ""}`} disabled={!!busy} aria-busy={busy === p.id || undefined} onClick={() => pick(p)}>
             <span className="role-icon"><Icon name={ROLE_ICON[p.role] || "users"} size={20} /></span>
             <span className="role-name">{p.name}</span>
+            {p.demo && <span className="pill">Demo user</span>}
             <span className="role-desc">{`${p.role_label}. ${p.description || ""}`.trim()}</span>
             <span className="role-go">{busy === p.id ? <><Spinner />Signing in…</> : p.role === "farmer" ? "Open the call client" : "Open the live forecast"}</span>
           </button>
         ))}
       </div>
+      <p className="small muted">No microphone, or nobody to play the farmer? <a href="/call.html?sample=1">Watch a sample call</a>.</p>
       {current && <p className="small muted">Currently signed in as {current.name} ({roleLabel(current)}). Picking someone below switches you.</p>}
     </main>
   );

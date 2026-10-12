@@ -38,7 +38,7 @@ export default function Setup() {
       </div>
       {state && <FarmerList farmers={farmers} onEdit={setFarmerForm} />}
       <FarmerForm farmer={farmerForm} onClose={() => setFarmerForm(null)} />
-      <p className="small muted">All data is synthetic. <ActButton className="btn sm" busy="Resetting…" style={{ marginLeft: 8 }} run={() => act(() => api("/api/demo/reset"), "Demo data reset.")}>Reset demo data</ActButton></p>
+      <p className="small muted">All data is synthetic. <ActButton need="demo.reset" className="btn sm" busy="Resetting…" style={{ marginLeft: 8 }} run={() => act(() => api("/api/demo/reset"), "Demo data reset.")}>Reset demo data</ActButton></p>
     </Shell>
   );
 }

@@ -1,6 +1,10 @@
 import * as RDialog from "@radix-ui/react-dialog";
 import { useEffect, useRef, useState } from "react";
-import { ICON_PATHS, initials } from "./lib.js";
+import { can, getSession, ICON_PATHS, initials, roleLabel } from "./lib.js";
+
+// Props that switch a control off, with the reason, when the signed-in role lacks the right.
+// The server still checks every request.
+export const needs = (capability) => (!capability || can(capability) ? {} : { disabled: true, title: `Your role (${roleLabel(getSession())}) cannot do this.` });
 
 export function Icon({ name, size = 18 }) {
   return (
@@ -37,7 +41,8 @@ export const DialogClose = ({ children = "Close" }) => (
 
 // A button for a server action. run() returns a promise; while it runs the button is disabled,
 // shows a small spinner and says what is happening ("Approving…"), so nobody clicks twice.
-export function ActButton({ run, busy: busyText, children, className = "btn", disabled, ...rest }) {
+export function ActButton({ run, busy: busyText, children, className = "btn", disabled, need, ...rest }) {
+  const gate = needs(need);
   const [busy, setBusy] = useState(false);
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; }, []);
@@ -46,7 +51,7 @@ export function ActButton({ run, busy: busyText, children, className = "btn", di
     try { await run(e); } finally { if (alive.current) setBusy(false); }
   };
   return (
-    <button type="button" className={className} disabled={disabled || busy} aria-busy={busy || undefined} onClick={click} {...rest}>
+    <button type="button" className={className} disabled={disabled || busy || gate.disabled} aria-busy={busy || undefined} onClick={click} {...rest} title={gate.title || rest.title}>
       {busy ? <><Spinner />{busyText}</> : children}
     </button>
   );

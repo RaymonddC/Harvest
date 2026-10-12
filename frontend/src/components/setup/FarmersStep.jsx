@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
-import { ActButton, Avatar, Dialog, DialogClose } from "../../ui.jsx";
+import { ActButton, Avatar, Dialog, DialogClose, needs } from "../../ui.jsx";
 import StepTop from "./StepTop.jsx";
 
 const SAMPLE_CSV = "name,phone,crop,language,village,usual_kg_week,can_pull_forward\nPak Contoh,+62 812 0000 5001,palm,Bahasa Indonesia,Sungai Lala,1500,yes";
@@ -36,8 +36,8 @@ export default function FarmersStep({ farmers, toCall, onAdd }) {
           ? `${toCall} to call this week · ${langs.join(", ") || "language not set"} · synthetic data`
           : "Upload a CSV with name, phone, crop and language."}</span>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-          <button className="btn" type="button" onClick={onAdd}>Add farmer</button>
-          <button className="btn" type="button" onClick={() => setOpen(true)}>Upload CSV</button>
+          <button className="btn" type="button" onClick={onAdd} {...needs("farmers.manage")}>Add farmer</button>
+          <button className="btn" type="button" onClick={() => setOpen(true)} {...needs("farmers.manage")}>Upload CSV</button>
           <a className="btn ghost" href="#farmer-list">See the list</a>
         </div>
       </div>

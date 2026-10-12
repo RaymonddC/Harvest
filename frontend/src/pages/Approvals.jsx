@@ -56,7 +56,7 @@ export default function Approvals() {
               <div className="who"><Avatar name={q.supplier_name} cls="ink" /><div><b>{q.supplier_name}</b><span>Logged quote for week {q.deliver_week}, not used yet</span></div></div>
               <div className="fig"><span>Volume</span><b className="num">{(q.kg / 1000).toFixed(1)} t</b></div>
               <div className="fig"><span>Price, {q.currency || "IDR"}/kg</span><b className="num">{plainPrice(q.price_per_kg, q.currency || "IDR")}</b></div>
-              <div className="acts"><ActButton busy="Adding…" run={() => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added as a pending offer.")}>Add as offer</ActButton></div>
+              <div className="acts"><ActButton need="offers.decide" busy="Adding…" run={() => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added as a pending offer.")}>Add as offer</ActButton></div>
             </motion.div>
           ))}
           </AnimatePresence>

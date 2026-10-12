@@ -1,6 +1,6 @@
 import * as Slider from "@radix-ui/react-slider";
 import { useEffect, useState } from "react";
-import { api, cropLabel, plainPrice } from "../../lib.js";
+import { api, can, cropLabel, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { SubmitButton } from "../../ui.jsx";
 import StepTop from "./StepTop.jsx";
@@ -96,7 +96,8 @@ export default function PriceRange({ l }) {
         </div>
       </details>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: "auto" }}>
-        <SubmitButton busy={saving || !l} busyText={l ? "Saving…" : "Save price range"}>Save price range</SubmitButton>
+        {can("limits.edit") ? <SubmitButton busy={saving || !l} busyText={l ? "Saving…" : "Save price range"}>Save price range</SubmitButton>
+          : <button type="button" className="btn solid" disabled title="Your role cannot change the price range.">Save price range</button>}
         <span className="small muted">Illustrative prices for the demo.</span>
       </div>
     </form>
