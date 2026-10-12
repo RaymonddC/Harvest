@@ -36,6 +36,11 @@ API key, everything works except the voice session itself.
 
 ### Demo walk-through (matches the design canvas and the 3-minute video plan)
 
+The sidebar has a **Demo guide** that ticks each step from the live data and links to the next one.
+If nobody can play the farmer (or the live agent is unavailable), open `call.html?sample=1` or press
+**Watch a sample call** on the call page: a scripted gap-fill call replays on the same screen
+(`web/samples/gap-fill.json`). It is clearly labelled as a sample and saves nothing.
+
 1. **Setup:** check the farmer list and the price limits (floor Rp 2,900, reference 3,100,
    ceiling 3,350), then **Start campaign**.
 2. **Live forecast:** shows the week 3 gap, why it is short, and a shortlist of 15 farmers

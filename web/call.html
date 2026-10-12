@@ -25,6 +25,8 @@
         <p class="sub">This browser stands in for the farmer's phone. A teammate answers and plays the farmer. Use headphones so the agent does not hear itself.</p>
       </div>
       <ul class="incoming" id="incoming"></ul>
+      <button class="btn outline-mint" id="sample" type="button">Watch a sample call</button>
+      <p class="sub" style="margin:0">A scripted example of a gap-fill call, with no microphone or live agent. Use it when nobody can play the farmer.</p>
       <a class="back-link" href="index.html">Planner dashboard</a>
     </section>
 
@@ -33,6 +35,7 @@
         <div class="caller" id="call-farmer">Farmer</div>
         <div class="sub mint-text" id="call-meta"></div>
       </div>
+      <p class="sub" id="replay-note" role="note" hidden style="margin:0;color:var(--amber, #E3A72F)">Sample call: scripted, not a live call. Nothing is saved.</p>
       <ol class="stages" id="stages" aria-label="Call stages"></ol>
       <div class="captions" id="captions" aria-live="polite" aria-label="Live captions"></div>
       <div id="captured" class="panel" hidden></div>

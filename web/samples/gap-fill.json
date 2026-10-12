@@ -1,0 +1,331 @@
+{
+ "title": "Sample gap-fill call",
+ "note": "A scripted example, not a live call.",
+ "farmer": "Pak Wahyu",
+ "village": "Air Molek",
+ "language": "Bahasa Indonesia",
+ "kind": "gap_fill",
+ "gap_week": 3,
+ "events": [
+  {
+   "t": 300,
+   "msg": {
+    "type": "connected",
+    "farmer": "Pak Wahyu",
+    "village": "Air Molek",
+    "language": "Bahasa Indonesia",
+    "kind": "gap_fill",
+    "mill": "Koperasi Sawit Maju",
+    "gap_week": 3
+   }
+  },
+  {
+   "t": 900,
+   "msg": {
+    "type": "caption",
+    "who": "agent",
+    "index": 0,
+    "text": "Halo, ini asisten AI yang menelepon untuk Koperasi Sawit Maju. Apakah saya berbicara dengan Pak Wahyu?"
+   }
+  },
+  {
+   "t": 1600,
+   "msg": {
+    "type": "translation",
+    "index": 0,
+    "text": "Hello, this is an AI assistant calling for Koperasi Sawit Maju. Am I speaking with Pak Wahyu?"
+   }
+  },
+  {
+   "t": 6500,
+   "msg": {
+    "type": "caption",
+    "who": "farmer",
+    "index": 1,
+    "text": "Ya, betul."
+   }
+  },
+  {
+   "t": 7200,
+   "msg": {
+    "type": "translation",
+    "index": 1,
+    "text": "Yes, that's right."
+   }
+  },
+  {
+   "t": 8000,
+   "msg": {
+    "type": "caption",
+    "who": "agent",
+    "index": 2,
+    "text": "Dengan izin Bapak, koperasi menyimpan transkrip panggilan ini. Apakah Bapak setuju?"
+   }
+  },
+  {
+   "t": 8700,
+   "msg": {
+    "type": "translation",
+    "index": 2,
+    "text": "With your permission, the cooperative keeps a transcript of this call. Do you agree?"
+   }
+  },
+  {
+   "t": 13500,
+   "msg": {
+    "type": "caption",
+    "who": "farmer",
+    "index": 3,
+    "text": "Ya, boleh."
+   }
+  },
+  {
+   "t": 14200,
+   "msg": {
+    "type": "translation",
+    "index": 3,
+    "text": "Yes, that's fine."
+   }
+  },
+  {
+   "t": 15000,
+   "msg": {
+    "type": "tool",
+    "name": "get_reference_price",
+    "args": {
+     "crop": "palm"
+    },
+    "result": {
+     "reference_price": 3100
+    },
+    "ui": {}
+   }
+  },
+  {
+   "t": 15600,
+   "msg": {
+    "type": "caption",
+    "who": "agent",
+    "index": 4,
+    "text": "Harga pasar hari ini Rp 3.100 per kilo. Koperasi butuh sawit di minggu ke-3. Bisakah Bapak memanen lebih cepat, sekitar 1.600 kilo?"
+   }
+  },
+  {
+   "t": 16300,
+   "msg": {
+    "type": "translation",
+    "index": 4,
+    "text": "Today's market price is Rp 3,100 per kilo. The cooperative needs palm in week 3. Could you harvest earlier, about 1,600 kilo?"
+   }
+  },
+  {
+   "t": 24500,
+   "msg": {
+    "type": "caption",
+    "who": "farmer",
+    "index": 5,
+    "text": "Bisa, tapi harganya berapa?"
+   }
+  },
+  {
+   "t": 25200,
+   "msg": {
+    "type": "translation",
+    "index": 5,
+    "text": "I can, but what is the price?"
+   }
+  },
+  {
+   "t": 26000,
+   "msg": {
+    "type": "tool",
+    "name": "check_offer",
+    "args": {
+     "crop": "palm",
+     "kg": 1600
+    },
+    "result": {
+     "decision": "offer",
+     "price_per_kg": 3220
+    },
+    "ui": {
+     "rail": {
+      "floor": 2900,
+      "reference": 3100,
+      "ceiling": 3350,
+      "kg": 1600,
+      "currency": "IDR",
+      "offer": 3220,
+      "counter": null,
+      "decision": "offer",
+      "allowed": true
+     }
+    }
+   }
+  },
+  {
+   "t": 26600,
+   "msg": {
+    "type": "caption",
+    "who": "agent",
+    "index": 6,
+    "text": "Koperasi menawarkan Rp 3.220 per kilo."
+   }
+  },
+  {
+   "t": 27300,
+   "msg": {
+    "type": "translation",
+    "index": 6,
+    "text": "The cooperative offers Rp 3,220 per kilo."
+   }
+  },
+  {
+   "t": 31000,
+   "msg": {
+    "type": "caption",
+    "who": "farmer",
+    "index": 7,
+    "text": "Bisa naik jadi 3.300?"
+   }
+  },
+  {
+   "t": 31700,
+   "msg": {
+    "type": "translation",
+    "index": 7,
+    "text": "Could it go up to 3,300?"
+   }
+  },
+  {
+   "t": 32500,
+   "msg": {
+    "type": "tool",
+    "name": "check_offer",
+    "args": {
+     "crop": "palm",
+     "kg": 1600,
+     "farmer_counter_price": 3300
+    },
+    "result": {
+     "decision": "accept",
+     "price_per_kg": 3300
+    },
+    "ui": {
+     "rail": {
+      "floor": 2900,
+      "reference": 3100,
+      "ceiling": 3350,
+      "kg": 1600,
+      "currency": "IDR",
+      "offer": 3220,
+      "counter": 3300,
+      "decision": "accept",
+      "allowed": true
+     }
+    }
+   }
+  },
+  {
+   "t": 33200,
+   "msg": {
+    "type": "caption",
+    "who": "agent",
+    "index": 8,
+    "text": "Baik, Rp 3.300 per kilo bisa. Saya ulangi: 1.600 kilo, Rp 3.300 per kilo, panen minggu ke-3. Apakah setuju?"
+   }
+  },
+  {
+   "t": 33900,
+   "msg": {
+    "type": "translation",
+    "index": 8,
+    "text": "Fine, Rp 3,300 per kilo works. To repeat: 1,600 kilo, Rp 3,300 per kilo, harvest in week 3. Do you agree?"
+   }
+  },
+  {
+   "t": 41500,
+   "msg": {
+    "type": "caption",
+    "who": "farmer",
+    "index": 9,
+    "text": "Setuju."
+   }
+  },
+  {
+   "t": 42200,
+   "msg": {
+    "type": "translation",
+    "index": 9,
+    "text": "Agreed."
+   }
+  },
+  {
+   "t": 43000,
+   "msg": {
+    "type": "tool",
+    "name": "save_offer",
+    "args": {
+     "crop": "palm",
+     "kg": 1600,
+     "price_per_kg": 3300
+    },
+    "result": {
+     "saved": true,
+     "status": "pending"
+    },
+    "ui": {
+     "offer_saved": {
+      "status": "pending",
+      "kg": 1600,
+      "price": 3300
+     }
+    }
+   }
+  },
+  {
+   "t": 43600,
+   "msg": {
+    "type": "caption",
+    "who": "agent",
+    "index": 10,
+    "text": "Terima kasih, Pak. Koperasi harus menyetujui dulu, dan Bapak akan dikabari."
+   }
+  },
+  {
+   "t": 44300,
+   "msg": {
+    "type": "translation",
+    "index": 10,
+    "text": "Thank you. The cooperative has to approve it first, and you will be told."
+   }
+  },
+  {
+   "t": 50000,
+   "msg": {
+    "type": "tool",
+    "name": "end_call",
+    "args": {
+     "outcome": "completed"
+    },
+    "result": {
+     "ok": true
+    },
+    "ui": {
+     "consent": true
+    }
+   }
+  },
+  {
+   "t": 51500,
+   "msg": {
+    "type": "ended",
+    "status": "done",
+    "kind": "gap_fill",
+    "consent": true,
+    "retry_queued": false,
+    "summary": "Pak Wahyu agreed to bring 1,600 kg of palm forward to week 3 at Rp 3,300 per kg, inside the price range. Offer sent for approval."
+   }
+  }
+ ]
+}

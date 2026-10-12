@@ -65,6 +65,17 @@ body.app { display: flex; flex-wrap: wrap; min-height: 100vh; }
 .side .workspace-card { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; gap: 2px; }
 .side .workspace-card span { font-size: 12px; color: var(--muted); }
 .side .workspace-card b { font-size: 14px; }
+.guide { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px 10px; }
+.guide-toggle { all: unset; cursor: pointer; display: block; width: 100%; padding: 8px 2px; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.guide-toggle:focus-visible { outline: 2px solid var(--leaf); outline-offset: 2px; border-radius: 6px; }
+.guide-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.guide-steps li { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.35; color: var(--muted); }
+.guide-steps li.done { color: var(--faint, #8A948E); text-decoration: line-through; text-decoration-color: rgba(138,148,142,.5); }
+.guide-steps li.next { color: var(--ink); font-weight: 700; }
+.guide-steps li.next a { color: var(--leaf-deep); text-decoration: underline; }
+.guide-steps .tick { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; background: var(--line-2); color: #3A4540; }
+.guide-steps li.done .tick { background: var(--leaf); color: var(--on-ink); }
+.guide-steps li.next .tick { background: var(--ink); color: var(--on-ink); }
 .side nav { display: flex; flex-direction: column; gap: 2px; }
 .side nav a { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-radius: 10px; color: #3A4540; text-decoration: none; font-size: 14px; font-weight: 600; }
 .side nav a:hover { background: var(--fill); color: var(--ink); }

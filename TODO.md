@@ -95,5 +95,14 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     - The agent's opening is partly English, partly the farmer's language (`backend/app/prompt.py`).
     - Farmer list: Delete is permanent (a confirm popup, no undo; accepted).
 
+12. **Demo resilience (agreed 12 Oct).** Built: the Demo guide in the sidebar, and a silent scripted sample call
+    (`web/samples/gap-fill.json`, replay engine in `web/js/call.js`). Still to do, needs a Gemini key:
+    - Record a real call with the live agent and rebuild the sample from it (real transcript and tool events),
+      with audio clips (Gemini speech generation) so the sample has sound. The replay already plays a clip
+      when an event has an `audio` URL (not wired yet; add it with the clips).
+    - **Stand-in farmer:** a "Play the farmer for me" button that sends scripted farmer audio into a live call,
+      so the demo and the video need no teammate or microphone.
+    - Measure the reply delay of the real model (end of the farmer's speech to the agent's first audio).
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

@@ -231,6 +231,42 @@ export function icon(name, size = 18) {
   return span;
 }
 
+// A short checklist for someone seeing the demo cold. Each step is ticked from the live data,
+// and the first open one links to the page where it is done.
+const GUIDE_KEY = "harvestGuideOpen";
+function demoGuide() {
+  let open = true;
+  try { open = localStorage.getItem(GUIDE_KEY) !== "0"; } catch { /* storage blocked: stays open */ }
+  const list = el("ol", { class: "guide-steps" });
+  const toggle = el("button", { class: "guide-toggle", type: "button", "aria-expanded": String(open) }, "Demo guide");
+  const box = el("section", { class: "guide", "aria-label": "Demo guide" }, toggle, list);
+  list.hidden = !open;
+  toggle.onclick = () => {
+    list.hidden = !list.hidden;
+    toggle.setAttribute("aria-expanded", String(!list.hidden));
+    try { localStorage.setItem(GUIDE_KEY, list.hidden ? "0" : "1"); } catch { /* storage blocked */ }
+  };
+  return {
+    box,
+    update(state) {
+      const calls = state.calls || [], offers = state.offers || [];
+      const campaign = (state.campaigns || [])[0] || {};
+      const steps = [
+        ["Check the farmers and the price range", "setup.html", (state.farmers || []).length > 0 && (state.limits || []).length > 0],
+        ["Start calling", "setup.html", campaign.status === "running" || calls.some((c) => c.status !== "queued")],
+        ["Answer a call as the farmer", "call.html", calls.some((c) => ["done", "on_call"].includes(c.status))],
+        ["Fill the gap: gap-fill calls or the rival quote", "index.html", offers.length > 0],
+        ["Approve the offers", "approvals.html", offers.some((o) => o.status === "approved")],
+        ["Answer the confirmation call", "call.html", offers.some((o) => o.confirmed_by_voice)],
+      ];
+      const next = steps.findIndex((s) => !s[2]);
+      list.replaceChildren(...steps.map(([label, href, done], i) => el("li", { class: done ? "done" : i === next ? "next" : "" },
+        done ? el("span", { class: "tick", "aria-hidden": "true" }, "✓") : el("span", { class: "tick", "aria-hidden": "true" }, String(i + 1)),
+        i === next ? el("a", { href }, label, el("span", { class: "sr-only" }, " (next step)")) : el("span", {}, label))));
+    },
+  };
+}
+
 // Shared frame: sidebar (brand, workspace, pages, planner) and a top bar that takes the
 // page's .page-head. Returns update(state) and status(s).
 export function mountShell(active) {
@@ -240,6 +276,7 @@ export function mountShell(active) {
     ...(can("users.admin") ? [["users", "users.html", "Users"]] : [])];
   const links = {};
   const count = el("span", { class: "count", hidden: true });
+  const guide = demoGuide();
   const nav = el("nav", { "aria-label": "Planner pages" }, pages.map(([key, href, label]) => {
     links[key] = el("a", { href, "aria-current": key === active ? "page" : null }, icon(key), el("span", { class: "label" }, label),
       key === "approvals" ? count : null);
@@ -249,6 +286,7 @@ export function mountShell(active) {
     el("a", { class: "brand", href: "index.html" }, el("span", { class: "mark" }, icon("leaf", 18)), "Harvest-Call"),
     el("div", { class: "workspace-card" }, el("span", {}, "Workspace"), el("b", {}, cfg.millName)),
     nav,
+    guide.box,
     el("div", { class: "spacer" }),
     el("div", { class: "planner" }, avatar(session ? session.name : "?", "ink"),
       el("div", {}, el("b", {}, session ? session.name : "Signed out"),
@@ -275,6 +313,7 @@ export function mountShell(active) {
       count.hidden = !n;
       count.textContent = String(n);
       links.approvals.setAttribute("aria-label", n ? `Approvals, ${n} waiting` : "Approvals");
+      guide.update(state);
     },
     status(s) {
       if (s === "error") document.body.classList.remove("loading"); // no data is coming, so stop the placeholders

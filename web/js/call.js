@@ -37,6 +37,19 @@ function renderIncoming() {
 
 // ---------- call ----------
 
+function openCallView(call) {
+  $("call-farmer").textContent = call.farmer_name;
+  $("captions").replaceChildren(el("p", { class: "hint" }, "Captions appear here as you and the agent speak."));
+  for (const id of ["captured", "rail", "offer-saved"]) $(id).hidden = true;
+  $("consent").textContent = "The agent asks for consent before a transcript is kept.";
+  $("mute").textContent = "Mute";
+  $("mute").setAttribute("aria-pressed", "false");
+  setStage(0);
+  meta("Connecting…");
+  show("call");
+  $("mic-note").hidden = true;
+}
+
 async function answer(call) {
   if (active) return;
   let stream;
@@ -69,16 +82,8 @@ async function answer(call) {
   active = { call, ws, ctx, stream, player, volume, micName, startedAt: Date.now(), playEnd: 0, ended: false, muted: false,
     stage: 0, lines: {}, village: f.village, language: f.language, gapWeek: call.gap_week };
 
-  $("call-farmer").textContent = call.farmer_name;
-  $("captions").replaceChildren(el("p", { class: "hint" }, "Captions appear here as you and the agent speak."));
-  for (const id of ["captured", "rail", "offer-saved"]) $(id).hidden = true;
-  $("consent").textContent = "The agent asks for consent before a transcript is kept.";
-  $("mute").textContent = "Mute";
-  $("mute").setAttribute("aria-pressed", "false");
-  setStage(0);
-  meta("Connecting…");
-  show("call");
-  $("mic-note").hidden = true;
+  openCallView(call);
+  $("replay-note").hidden = true;
   active.timer = setInterval(() => { meta(); micCheck(); }, 500);
 
   capture.port.onmessage = (e) => {
@@ -93,16 +98,70 @@ async function answer(call) {
 
   ws.onmessage = (e) => {
     if (e.data instanceof ArrayBuffer) return play(e.data);
-    const msg = JSON.parse(e.data);
-    if (msg.type === "connected") { Object.assign(active, { village: msg.village, language: msg.language, gapWeek: msg.gap_week }); active.connected = true; meta(); }
-    else if (msg.type === "caption") caption(msg);
-    else if (msg.type === "translation") translation(msg);
-    else if (msg.type === "interrupted") flush();
-    else if (msg.type === "tool") toolEvent(msg);
-    else if (msg.type === "error") toast(msg.message, true);
-    else if (msg.type === "ended") finish(msg);
+    handleMessage(JSON.parse(e.data));
   };
   ws.onclose = () => { if (active && !active.ended) finish({ status: "dropped", kind: call.kind }); };
+}
+
+// One server message (from the live socket or from a sample call) -> the call screen.
+function handleMessage(msg) {
+  if (!active) return;
+  if (msg.type === "connected") { Object.assign(active, { village: msg.village, language: msg.language, gapWeek: msg.gap_week }); active.connected = true; meta(); }
+  else if (msg.type === "caption") caption(msg);
+  else if (msg.type === "translation") translation(msg);
+  else if (msg.type === "interrupted") flush();
+  else if (msg.type === "tool") toolEvent(msg);
+  else if (msg.type === "error") toast(msg.message, true);
+  else if (msg.type === "ended") finish(msg);
+}
+
+// ---------- sample call: a scripted call replayed on the same screen, for when no one can play the farmer ----------
+
+const SAMPLE_URL = "samples/gap-fill.json";
+
+async function replay() {
+  if (active) return;
+  let sample;
+  try {
+    sample = await (await fetch(SAMPLE_URL)).json();
+  } catch {
+    toast("The sample call could not be loaded.", true);
+    return;
+  }
+  const clock0 = performance.now();
+  const ctx = { state: "running", sampleRate: 48000, get currentTime() { return (performance.now() - clock0) / 1000; }, close() {}, resume() { return Promise.resolve(); } };
+  const call = { id: "sample", kind: sample.kind, farmer_name: sample.farmer, gap_week: sample.gap_week };
+  active = { call, ws: { readyState: WebSocket.OPEN, send() {}, close() {} }, ctx, stream: null, player: { port: { postMessage() {} } },
+    volume: { gain: { value: 1 } }, micName: "", startedAt: Date.now(), playEnd: 0, ended: false, muted: false, stage: 0, lines: {},
+    village: sample.village, language: sample.language, gapWeek: sample.gap_week, replay: true, timeouts: [] };
+  openCallView(call);
+  $("replay-note").hidden = false;
+  active.timer = setInterval(() => meta(), 500);
+  active.voiceTimer = setInterval(showVoices, 80);
+  const speak = (ms) => { active.playEnd = Math.max(active.playEnd, ctx.currentTime) + ms / 1000; };
+  for (const ev of sample.events) {
+    active.timeouts.push(setTimeout(() => {
+      const msg = ev.msg;
+      if (msg.type === "caption") {
+        // The sample has no sound: show who is talking for about as long as the line takes to say.
+        const ms = Math.min(6000, 700 + msg.text.length * 55);
+        if (msg.who === "agent") speak(ms);
+        else { active.micLevel = 0.7; setTimeout(() => { if (active) active.micLevel = 0; }, ms); }
+      }
+      handleMessage(msg);
+    }, ev.t));
+  }
+}
+
+function stopReplay() {
+  if (!active?.replay) return;
+  active.timeouts.forEach(clearTimeout);
+  clearInterval(active.timer);
+  clearInterval(active.voiceTimer);
+  active = null;
+  $("replay-note").hidden = true;
+  show("waiting");
+  renderIncoming();
 }
 
 // ---------- who is speaking: mic level for the farmer, playback for the agent ----------
@@ -307,8 +366,9 @@ function finish(msg) {
   setTimeout(() => {
     clearInterval(a.timer);
     clearInterval(a.voiceTimer);
-    a.stream.getTracks().forEach((t) => t.stop());
+    a.stream?.getTracks().forEach((t) => t.stop());
     a.ctx.close();
+    $("replay-note").hidden = true;
     if (a.ws.readyState <= WebSocket.OPEN) a.ws.close();
     active = null;
     renderEnded(a, msg);
@@ -389,6 +449,7 @@ document.addEventListener("pointerdown", () => { if (active && active.ctx.state 
 
 $("hangup").onclick = () => {
   if (!active) return;
+  if (active.replay) return stopReplay();
   if (active.ws.readyState === WebSocket.OPEN) active.ws.send(JSON.stringify({ type: "hangup" }));
   flush();
 };
@@ -399,3 +460,5 @@ $("mute").onclick = () => {
   $("mute").setAttribute("aria-pressed", String(active.muted));
 };
 $("back").onclick = () => { show("waiting"); renderIncoming(); };
+$("sample").onclick = replay;
+if (new URLSearchParams(location.search).has("sample")) replay();
