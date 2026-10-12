@@ -7,12 +7,17 @@ Hackathon project (Google Cloud AI Builder Cup 2026, Manufacturing). Read `READM
 - `backend/app/`: FastAPI gateway (`main.py`), Gemini Live relay (`live_session.py`), the agent's tools
   (`tools.py`), prompt (`prompt.py`), price rules (`rules_engine.py`), services, `access.py` and `auth.py`
   (users, roles, capabilities), stores (memory or Firestore).
-- `web/`: the whole front end (plain HTML and ES modules, no build). `frontend/` is an unused React experiment.
+- `frontend/`: the React dashboard (Vite), built into `frontend/dist` and served by Firebase Hosting. A teammate (Wilbert) owns it.
+- `web/`: the call client (`call.html`, `js/call.js`, `js/audio-worklets.js`), `mic-test.html`, shared `js/data.js` and `samples/`;
+  the build copies these into `dist` (list in `frontend/vite.config.js`: add any new file there). The other pages in `web/`
+  (`index.html`, `setup.html`, ...) are the old vanilla dashboard and are no longer deployed; change the React app instead.
 - `deploy/deploy.sh`, `.github/workflows/deploy.yml`: push to `main` deploys Cloud Run, Firestore rules and Hosting.
 
 ## Working rules
 - Develop on the branch the session names, push it, and push to `main` only when the user has said to
-  ("push it"). Pushing to `main` deploys to production.
+  ("push it"). Pushing to `main` deploys to production. `main` also receives teammates' PRs: always
+  `git fetch origin main`, merge it into your branch, test, push, then check `git merge-base --is-ancestor HEAD origin/main`.
+  Never chain the push behind a silent `&&` guard (that once skipped four pushes without any message).
 - Run tests: `cd backend && python -m pytest -q`. One known failure on Python 3.13:
   `test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` (`audioop` was removed).
 - Local run: `cd backend && HARVEST_NO_DOTENV=1 python -m uvicorn app.main:app --port 8765` (in-memory store,
