@@ -50,14 +50,16 @@ class CampaignIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    user_id: str | None = None
-    role: str | None = None  # picks the first active user with this role
+    username: str = ""
+    password: str = ""
 
 
 class UserIn(BaseModel):
     name: str = ""
     role: str = ""
     active: bool = True
+    username: str = ""
+    password: str = ""  # required for a new user; blank keeps the current one on an edit
 
 
 class CallNowIn(BaseModel):
@@ -74,7 +76,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        access.ensure_defaults(store)
+        access.ensure_credentials(store, settings.demo_password)  # also gives older users a username
         if settings.seed_on_start:
             seed_data.load_seed(store, settings)
             log.info("Seeded demo data; plan starts %s", settings.plan_start)
@@ -115,35 +117,32 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     def session_for(user: dict) -> dict:
         token, exp = auth.mint_token(settings, user)
-        return {"token": token, "exp": exp, "user_id": user["id"], "role": user["role"], "name": user["name"],
+        return {"token": token, "exp": exp, "user_id": user["id"], "username": user.get("username", ""),
+                "role": user["role"], "name": user["name"],
                 "role_label": (access.get_role(store, user["role"]) or {}).get("label", user["role"]),
                 "capabilities": sorted(access.capabilities_of(store, user["role"]))}
 
-    @app.get("/api/auth/people")
-    def people():
-        """The people on the demo sign-in page. Replace with a real identity check before real data."""
-        access.ensure_defaults(store)
+    @app.get("/api/auth/demo")
+    def demo_accounts():
+        """The built-in accounts that still use the demo password, for the sign-in page's demo buttons.
+        Empty when DEMO_PASSWORD is empty."""
+        if not settings.demo_password:
+            return {"password": "", "accounts": []}
+        access.ensure_credentials(store, settings.demo_password)
         order = list(access.DEFAULT_ROLES)
-        users = sorted((u for u in store.list("users") if u.get("active", True)),
+        users = sorted((u for u in store.list("users") if u.get("active", True) and u.get("demo_login")),
                        key=lambda u: (order.index(u["role"]) if u["role"] in order else len(order), u["name"].lower()))
-        return {"people": [{**access.public_user(store, u),
-                            "description": (access.get_role(store, u["role"]) or {}).get("description", "")}
-                           for u in users]}
+        return {"password": settings.demo_password,
+                "accounts": [{**access.public_user(store, u),
+                              "description": (access.get_role(store, u["role"]) or {}).get("description", "")}
+                             for u in users]}
 
     @app.post("/api/auth/login")
     def login(body: LoginIn):
-        access.ensure_defaults(store)
-        active = sorted((u for u in store.list("users") if u.get("active", True)), key=lambda u: u["id"])
-        if body.user_id:
-            user = next((u for u in active if u["id"] == body.user_id), None)
-            if not user:
-                raise HTTPException(400, "Unknown or turned-off user.")
-        elif body.role:
-            user = next((u for u in active if u["role"] == body.role), None)
-            if not user:
-                raise HTTPException(400, f"No active user has the role {body.role!r}.")
-        else:
-            raise HTTPException(400, "Say which user to sign in as.")
+        access.ensure_credentials(store, settings.demo_password)
+        user = access.authenticate(store, body.username, body.password)
+        if not user:
+            raise HTTPException(401, "Wrong username or password.")
         return session_for(user)
 
     @app.get("/api/auth/me")
@@ -157,7 +156,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.get("/api/users")
     def list_users(_: auth.Actor = users_admin):
-        access.ensure_defaults(store)
+        access.ensure_credentials(store, settings.demo_password)
         users = sorted(store.list("users"), key=lambda u: (u["role"] != "planner", u["name"].lower()))
         return {"users": [access.public_user(store, u) for u in users],
                 "roles": [{"id": r["id"], "label": r.get("label", r["id"]),
@@ -168,11 +167,12 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.post("/api/users")
     def create_user(body: UserIn, _: auth.Actor = users_admin):
-        return access.public_user(store, access.add_user(store, body.name, body.role))
+        return access.public_user(store, access.add_user(store, body.name, body.role, body.username, body.password))
 
     @app.put("/api/users/{user_id}")
     def edit_user(user_id: str, body: UserIn, _: auth.Actor = users_admin):
-        return access.public_user(store, access.update_user(store, user_id, body.name, body.role, body.active))
+        return access.public_user(store, access.update_user(store, user_id, body.name, body.role, body.active,
+                                                       body.username, body.password))
 
     @app.delete("/api/users/{user_id}")
     def remove_user(user_id: str, actor: auth.Actor = users_admin):

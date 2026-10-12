@@ -1,9 +1,10 @@
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Link, Navigate, NavLink, useLocation } from "react-router-dom";
-import { can, cfg, fmtT, getSession, PAGES, roleLabel } from "./lib.js";
+import { can, cfg, fmtT, getSession, PAGES } from "./lib.js";
+import AccountMenu from "./components/AccountMenu.jsx";
 import { useLive } from "./live.jsx";
-import { Avatar, Icon } from "./ui.jsx";
+import { Icon } from "./ui.jsx";
 
 // This week at a glance, under the page links: is calling on, is a week short, does anything
 // wait for a decision. Hidden on narrow screens, where the sidebar is a single row.
@@ -79,6 +80,8 @@ export default function Shell({ title, head, children }) {
       <aside className="side">
         <Link className="brand" to="/"><span className="mark"><Icon name="leaf" /></span>Harvest-Call</Link>
         <div className="workspace-card"><span>Workspace</span><b>{cfg.millName}</b></div>
+        {/* The middle scrolls on its own when it is taller than the window; the account stays below it. */}
+        <div className="side-scroll">
         <nav aria-label="Planner pages">
           {PAGES.filter((p) => !p.need || can(p.need)).map(({ key, to, label }) => (
             <NavLink key={key} to={to} end aria-label={key === "approvals" && waiting ? `Approvals, ${waiting} waiting` : undefined}>
@@ -89,14 +92,8 @@ export default function Shell({ title, head, children }) {
         </nav>
         <WeekCard state={state} />
         <DemoGuide state={state} />
-        <div className="spacer" />
-        <div className="planner">
-          <Avatar name={session.name} cls="ink" />
-          <div>
-            <b>{session.name}</b>
-            <span>{roleLabel(session)} · </span><Link to="/login">Switch user</Link>
-          </div>
         </div>
+        <div className="side-foot"><AccountMenu session={session} /></div>
       </aside>
       <div className="workspace">
         <div className="topbar">{head}</div>

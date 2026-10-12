@@ -49,6 +49,7 @@ class Settings:
     caption_translate_to: str | None  # e.g. "English"; None turns caption translation off
     auth_required: bool  # False leaves every planner action open (scripts, local experiments)
     jwt_secret: str  # signs sign-in tokens; set it in the cloud or each instance signs differently
+    demo_password: str  # password of the built-in demo accounts, shown on the sign-in page; empty turns them off
     jwt_ttl_seconds: int
     seed_on_start: bool
     static_dir: Path | None
@@ -121,6 +122,7 @@ def get_settings() -> Settings:
         caption_translate_to=os.environ.get("CAPTION_TRANSLATE_TO", "English") or None,
         auth_required=_bool("AUTH_REQUIRED", True),
         jwt_secret=os.environ.get("JWT_SECRET") or secrets.token_hex(32),
+        demo_password=os.environ.get("DEMO_PASSWORD", "harvest-demo"),
         jwt_ttl_seconds=int(os.environ.get("JWT_TTL_SECONDS", str(12 * 3600))),
         seed_on_start=_bool("SEED_ON_START", store_backend == "memory"),
         static_dir=static_dir,
