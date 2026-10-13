@@ -8,15 +8,17 @@ import { ActButton, Avatar, Dialog, DialogClose, Pill, SubmitButton } from "../u
 function UserForm({ user, roles, onClose, onSaved }) {
   const act = useAct();
   const editing = !!user?.id;
-  const [f, setF] = useState({ name: "", role: "viewer", active: true });
+  const blank = { name: "", username: "", password: "", role: "viewer", active: true };
+  const [f, setF] = useState(blank);
   useEffect(() => {
-    if (user) setF(editing ? { name: user.name, role: user.role, active: user.active } : { name: "", role: "viewer", active: true });
-  }, [user, editing]);
+    if (user) setF(editing ? { name: user.name, username: user.username || "", password: "", role: user.role, active: user.active } : blank);
+  }, [user, editing]); // eslint-disable-line react-hooks/exhaustive-deps
   const help = roles.find((r) => r.id === f.role)?.description || "";
   const [saving, setSaving] = useState(false);
   const save = async (e) => {
     e.preventDefault();
-    const body = { name: f.name, role: f.role, active: editing ? f.active : true };
+    // On an edit a blank password keeps the current one.
+    const body = { name: f.name, username: f.username, password: f.password, role: f.role, active: editing ? f.active : true };
     setSaving(true);
     await act(() => (editing ? api(`/api/users/${user.id}`, { method: "PUT", body }) : api("/api/users", { body })),
       () => { onClose(); return editing ? "User saved." : "User added."; });
@@ -28,6 +30,17 @@ function UserForm({ user, roles, onClose, onSaved }) {
       <form onSubmit={save}>
         <div style={{ display: "grid", gap: 10, margin: "12px 0" }}>
           <label className="field">Name <input type="text" required maxLength={60} autoComplete="off" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+          <label className="field">Username
+            <input type="text" required maxLength={32} autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="e.g. sari"
+              value={f.username} onChange={(e) => setF({ ...f, username: e.target.value.toLowerCase() })} />
+            <span className="hint">Lower-case letters, digits, dots or dashes. Used to sign in.</span>
+          </label>
+          <label className="field">{editing ? "New password" : "Password"}
+            <input type="password" minLength={8} required={!editing} autoComplete="new-password"
+              placeholder={editing ? "Leave blank to keep the current one" : "At least 8 characters"}
+              value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+            {editing && user.demo_login && <span className="hint">This account still uses the demo password. A new one takes it off the sign-in page's demo list.</span>}
+          </label>
           <label className="field">Role
             <select required value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>
               {roles.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
@@ -101,13 +114,14 @@ export default function Users() {
         </div>
         <div className="table-wrap">
           <table style={{ minWidth: 640 }}>
-            <thead><tr><th style={{ paddingLeft: 22 }}>Name</th><th>Role</th><th>Status</th><th style={{ paddingRight: 22 }}><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th style={{ paddingLeft: 22 }}>Name</th><th>Username</th><th>Role</th><th>Status</th><th style={{ paddingRight: 22 }}><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {data.users.map((u) => (
                 <tr key={u.id}>
-                  <td style={{ paddingLeft: 22 }}><div className="who-cell"><Avatar name={u.name} cls="sm" /><div><b>{u.name}</b>{u.id === me.user_id && <span>You</span>}</div></div></td>
+                  <td style={{ paddingLeft: 22 }}><div className="who-cell"><Avatar name={u.name} cls="sm" person /><div><b>{u.name}</b>{u.id === me.user_id && <span>You</span>}</div></div></td>
+                  <td className="num">{u.username || "–"}</td>
                   <td>{roleName(u.role)}{u.demo && <>{" "}<Pill cls="amber">Demo user</Pill></>}</td>
-                  <td>{u.active ? <Pill cls="mint">Can sign in</Pill> : <Pill>Turned off</Pill>}</td>
+                  <td>{!u.active ? <Pill>Turned off</Pill> : !u.has_password ? <Pill cls="amber">No password yet</Pill> : <Pill cls="mint">Can sign in</Pill>}</td>
                   <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
                     <button className="btn sm" type="button" onClick={() => setForm(u)}>Edit</button>{" "}
                     <ActButton className="btn sm" busy="Deleting…" disabled={u.id === me.user_id} run={() => remove(u)}>Delete</ActButton>

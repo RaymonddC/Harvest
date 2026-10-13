@@ -42,6 +42,7 @@ GOOGLE_CLOUD_LOCATION="${GOOGLE_CLOUD_LOCATION:-us-central1}"
 # Signs the sign-in tokens. Set it to keep people signed in across deploys; when empty a fresh
 # random one is made, so a redeploy only asks everyone to pick their role again.
 JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}"
+DEMO_PASSWORD="${DEMO_PASSWORD-harvest-demo}"  # empty is allowed: it turns the demo accounts off
 # VA-8 stretch goal: set all three to enable the real-phone channel. PUBLIC_BASE_URL
 # is set automatically below once the Cloud Run URL is known - no need to pass it.
 TWILIO_ACCOUNT_SID="${TWILIO_ACCOUNT_SID:-}"
@@ -65,7 +66,7 @@ fi
 # "^@^" switches gcloud's list delimiter to @, because the Firebase config JSON contains commas.
 ENV_VARS="^@^STORE_BACKEND=firestore@GOOGLE_CLOUD_PROJECT=$PROJECT@SEED_ON_START=false"
 ENV_VARS="$ENV_VARS@MILL_NAME=$MILL_NAME@DEMO_LANGUAGE=$DEMO_LANGUAGE"
-ENV_VARS="$ENV_VARS@JWT_SECRET=$JWT_SECRET"
+ENV_VARS="$ENV_VARS@JWT_SECRET=$JWT_SECRET@DEMO_PASSWORD=$DEMO_PASSWORD"
 if [[ -n "${FIREBASE_WEB_CONFIG:-}" ]]; then ENV_VARS="$ENV_VARS@FIREBASE_WEB_CONFIG=$FIREBASE_WEB_CONFIG"; fi
 
 case "$GEMINI_BACKEND" in
@@ -118,9 +119,10 @@ JS
 
 if [[ "$SEED_DEMO_DATA" == "true" ]]; then
   echo "Seeding demo data (this replaces everything in Firestore)..."
-  # Resetting is a planner action: sign in as the planner (no password in demo mode) to get a token.
+  # Resetting is a planner action: sign in as the built-in planner with the demo password.
   TOKEN="$(curl -fsS -X POST "$URL/api/auth/login" -H 'Content-Type: application/json' \
-    -d '{"role":"planner"}' | python3 -c 'import sys, json; print(json.load(sys.stdin)["token"])')"
+    -d "$(python3 -c 'import json, sys; print(json.dumps({"username": "dewi", "password": sys.argv[1]}))' "$DEMO_PASSWORD")" \
+    | python3 -c 'import sys, json; print(json.load(sys.stdin)["token"])')"
   curl -fsS -X POST "$URL/api/demo/reset" -H "Authorization: Bearer $TOKEN" >/dev/null
 else
   echo "Skipping demo data (SEED_DEMO_DATA=false)."

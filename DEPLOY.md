@@ -267,7 +267,8 @@ workflow's `env:` block, as `deploy.sh` already reads them.
 
 - **Logs:** `gcloud run services logs read harvest-gateway --region $REGION --limit 100`
 - **Reset the demo data:** sign in as Planner and press *Reset demo data* on the Setup page, or
-  `TOKEN=$(curl -s -X POST $URL/api/auth/login -H 'Content-Type: application/json' -d '{"role":"planner"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')`
+  `TOKEN=$(curl -s -X POST $URL/api/auth/login -H 'Content-Type: application/json' -d '{"username":"dewi","password":"harvest-demo"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')`
+  (use your `DEMO_PASSWORD`, or Dewi's own password if you set one)
   then `curl -X POST $URL/api/demo/reset -H "Authorization: Bearer $TOKEN"`. It wipes Firestore, then reloads the seed.
 - **Rotate the Gemini key (only with `GEMINI_BACKEND=api_key`):**
   `printf '%s' "$NEW_KEY" | gcloud secrets versions add gemini-api-key --data-file=-`, then

@@ -41,8 +41,8 @@ export function getSession() {
 export function clearSession() {
   try { localStorage.removeItem(SESSION_KEY); } catch { /* storage blocked */ }
 }
-export async function signIn(userId) {
-  const session = await api("/api/auth/login", { body: { user_id: userId }, auth: false });
+export async function signIn(username, password) {
+  const session = await api("/api/auth/login", { body: { username, password }, auth: false });
   try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch { /* checked below */ }
   if (!getSession()) throw new Error("This browser blocks storage, so the sign-in cannot be kept. Allow site data and try again.");
   return session;

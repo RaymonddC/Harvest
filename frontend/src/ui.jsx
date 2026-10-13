@@ -15,7 +15,12 @@ export function Icon({ name, size = 18 }) {
   );
 }
 
-export const Avatar = ({ name, cls = "" }) => <span className={`avatar ${cls}`.trim()} aria-hidden="true">{initials(name)}</span>;
+// person: a soft colour picked from the name, the same every time, so people are easy to tell apart.
+const TINTS = 6;
+const tintOf = (name = "") => [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % TINTS;
+export const Avatar = ({ name, cls = "", person = false }) => (
+  <span className={`avatar ${cls} ${person ? `person-tint t${tintOf(name)}` : ""}`.replace(/\s+/g, " ").trim()} aria-hidden="true">{initials(name)}</span>
+);
 
 export const Pill = ({ children, cls = "" }) => <span className={`pill ${cls}`.trim()}>{children}</span>;
 

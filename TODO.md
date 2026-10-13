@@ -38,6 +38,9 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
 ## Login (decided 10 Oct: keep the demo role picker for the hackathon)
 
 7. **Replace the demo role picker with Firebase Authentication** (plan task B-09, Phase 2).
+   *13 Oct: sign-in now takes a username and password (hashed); the built-in accounts share the
+   `DEMO_PASSWORD` shown on the sign-in page. Before real data, give users their own passwords and
+   empty `DEMO_PASSWORD`. Firebase Authentication below is still the Phase 2 option.*
    Google sign-in on the pages, the server verifies each request's ID token and checks an email
    allow list, and the Firestore read rule requires a signed-in user. Do it before any real data
    or real phone calls, and after the submission. Replace `/api/auth/login` in

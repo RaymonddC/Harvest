@@ -78,6 +78,7 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | `AUTH_REQUIRED` | `true` | No | Planner actions need the planner role. `false` leaves them open. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `JWT_SECRET` | a new random value each start | Yes | Signs sign-in tokens. Set a long random value (at least 32 characters) in the cloud. | GitHub secret `JWT_SECRET`, then redeploy (everyone signs in again) |
 | `JWT_TTL_SECONDS` | `43200` (12 hours) | No | How long a sign-in lasts. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `DEMO_PASSWORD` | `harvest-demo` | No (it is shown on the sign-in page) | Password of the built-in accounts `dewi`, `budi`, `guest` and `farmer`, which the sign-in page offers as demo accounts. Setting a user's own password on the Users page takes them off that list. Empty turns the demo accounts off. | `deploy.env` or the shell when running `deploy.sh`; not settable from GitHub yet, so the code default runs |
 | `HARVEST_NO_DOTENV` | unset | No | Set to `1` to ignore `.env` files entirely. The tests set it so a developer's own `.env` cannot change results. | Not used in production |
 | `STATIC_DIR` | the repo's `web/` folder | No | Pages the backend serves. Left unset in the cloud, where Firebase Hosting serves them. | Left unset in production (Firebase Hosting serves the pages) |
 | `CORS_ORIGINS` | `*` | No | Allowed browser origins, comma-separated. Set to your Hosting URL for anything real. | Not settable from GitHub yet: the code default runs. See the rule above |
@@ -112,6 +113,7 @@ options of that one script, not of the service, and need no entry elsewhere.
 | `MILL_NAME`, `DEMO_LANGUAGE` | as above | Passed to the service. |
 | `FIREBASE_WEB_CONFIG` | none | Passed to the service and written into `web/config.js`. |
 | `JWT_SECRET` | a new random value each deploy | Passed to the service. Fix it to keep people signed in across deploys. |
+| `DEMO_PASSWORD` | `harvest-demo` | Passed to the service; also used to sign in as `dewi` when seeding. |
 | `SEED_DEMO_DATA` | `true` | Replace everything in Firestore with the demo data after deploying. Use `true` on the first deploy only. |
 | `SKIP_API_ENABLE` | `false` | Skip enabling Google Cloud APIs. Automatic deploys set `true`. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | none | If all three are set, `deploy.sh` wires up the phone channel. The token's value is only checked here; the secret itself must exist in Secret Manager as `twilio-auth-token`. |
