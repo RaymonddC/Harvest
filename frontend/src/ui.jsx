@@ -65,6 +65,6 @@ export function ActButton({ run, busy: busyText, children, className = "btn", di
 export const Spinner = () => <span className="spinner" aria-hidden="true" />;
 
 // The submit button of a form whose save is running.
-export const SubmitButton = ({ busy, busyText, children, className = "btn solid" }) => (
-  <button type="submit" className={className} disabled={busy} aria-busy={busy || undefined}>{busy ? <><Spinner />{busyText}</> : children}</button>
+export const SubmitButton = ({ busy, busyText, children, className = "btn solid", disabled = false }) => (
+  <button type="submit" className={className} disabled={busy || disabled} aria-busy={busy || undefined}>{busy ? <><Spinner />{busyText}</> : children}</button>
 );

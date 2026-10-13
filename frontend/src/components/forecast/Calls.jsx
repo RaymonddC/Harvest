@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { callChip, KIND_WORD } from "../../lib.js";
 import { Avatar, Dialog, DialogClose, Pill } from "../../ui.jsx";
@@ -26,7 +27,7 @@ export function Calls({ calls, onShow }) {
     return () => clearInterval(t);
   }, [onCall.length]);
   if (!onCall.length && !finished.length && !queued.length) {
-    return <div className="rows" id="calls"><p className="muted">No calls yet. Start the campaign on the Setup page.</p></div>;
+    return <div className="rows" id="calls"><div className="empty"><p>No calls yet. Add farmers and a price range, then start the first round of calls.</p><Link className="btn solid" to="/setup">Go to Setup</Link></div></div>;
   }
   return (
     <div className="rows" id="calls">

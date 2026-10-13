@@ -1,6 +1,7 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useState } from "react";
 import { api, can, cropLabel, fmtKg, maskPhone } from "../../lib.js";
+import { useConfirm } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar } from "../../ui.jsx";
 
@@ -46,6 +47,7 @@ function SortHead({ col, sort, setSort, className, style }) {
 
 // Every farmer: search, sort, pages; Call now on each row, Edit and Delete in its "⋯" menu.
 export default function FarmerList({ farmers, onEdit }) {
+  const confirm = useConfirm();
   const act = useAct();
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
@@ -64,8 +66,8 @@ export default function FarmerList({ farmers, onEdit }) {
   const first = (current - 1) * PAGE;
   const go = (n) => { setPage(n); document.getElementById("farmer-list").scrollIntoView({ block: "start" }); };
   const sortBy = (s) => { setSort(s); setPage(1); };
-  const remove = (f) => {
-    if (confirm(`Delete ${f.name}? Their waiting calls are withdrawn. Past calls and offers stay.`)) {
+  const remove = async (f) => {
+    if (await confirm({ title: `Delete ${f.name}?`, body: "Their waiting calls are withdrawn. Past calls and offers stay.", confirm: "Delete farmer", danger: true })) {
       act(() => api(`/api/farmers/${f.id}`, { method: "DELETE" }), `${f.name} deleted.`);
     }
   };
