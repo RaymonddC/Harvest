@@ -1,6 +1,9 @@
 import { MotionConfig } from "motion/react";
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import Alerts from "./alerts.jsx";
+import { CropProvider } from "./campaigns.jsx";
+import { ConfirmProvider, UnsavedProvider } from "./dialogs.jsx";
 import { LiveProvider } from "./live.jsx";
 import { OLD_URLS } from "./lib.js";
 import { Toasts } from "./toast.jsx";
@@ -24,6 +27,10 @@ export default function App() {
       {/* Motion follows the device's "reduce motion" setting. */}
       <MotionConfig reducedMotion="user">
         <LiveProvider>
+          <CropProvider>
+          <ConfirmProvider>
+          <UnsavedProvider>
+          <Alerts />
           <Suspense fallback={null}>
             <Routes>
               <Route path="/" element={<Forecast />} />
@@ -35,6 +42,9 @@ export default function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
+          </UnsavedProvider>
+          </ConfirmProvider>
+          </CropProvider>
         </LiveProvider>
         <Toasts />
       </MotionConfig>

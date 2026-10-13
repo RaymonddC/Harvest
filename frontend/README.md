@@ -77,3 +77,23 @@ addresses load the app, while real files such as `call.html` are served first.
 To go back to the vanilla pages, set `"public": "web"` in `firebase.json` and drop the rewrite.
 
 The backend's own static serving (`STATIC_DIR`) has no single-page rewrite, so it only suits `web/`.
+
+## Multi-crop campaigns (task C-05): screens ready, backend to follow
+
+The sidebar's workspace card picks the crop; Setup shows one tile per campaign and a "New campaign"
+form; Live forecast and Approvals show the picked crop's weeks, offers and quotes
+(`src/campaigns.jsx`). With today's backend there is one campaign (`campaigns/current`) for one crop, so
+the other crops and "New campaign" show as coming soon.
+
+The backend switches the screens on by sending `settings.multi_crop: true`, and then provides:
+
+| What | Shape |
+|---|---|
+| `state.campaigns` | `[{ id, crop, kind, status, target_kg_per_week, weeks, started_at }]`, one per crop |
+| `state.forecast`, `state.offers`, `state.rival_quotes` | each record carries `crop` (records without one are treated as the single crop) |
+| `state.limits` | one per crop, `id` or `crop` is the crop id (`palm`, `rubber`, `coffee`) |
+| `POST /api/campaigns` | body `{ crop, target_kg_per_week, weeks }`, returns the new campaign |
+| `POST /api/campaigns/{id}/start` | body `{ kind: "collect" | "gap_fill" }` (the Setup page still calls `/api/campaign/start` today) |
+| `POST /api/campaigns/{id}/stop` | stops that campaign |
+
+The agent side (prompt and tools) needs to know which crop a call is about and use that crop's price range.

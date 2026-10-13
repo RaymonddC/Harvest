@@ -333,3 +333,195 @@ body.login-page { background: var(--surface); }
 .avatar.person-tint.t5 { background: #F8E3DA; color: #93401E; }
 .account .avatar { width: 36px; height: 36px; font-size: 13px; }
 .acc-head .avatar { width: 40px; height: 40px; font-size: 14px; }
+
+/* ---------- crop switcher (in the workspace card) ---------- */
+.crop-switch { display: flex; flex-direction: column; align-items: stretch; gap: 2px; width: 100%; text-align: left; font: inherit; color: var(--ink);
+  background: var(--surface); cursor: pointer; transition: border-color .15s, background-color .15s; }
+.crop-switch:hover, .crop-switch[data-state="open"] { border-color: var(--leaf); background: var(--fill); }
+.crop-switch:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--leaf-soft); }
+.crop-now { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line-2);
+  font-size: 13px !important; font-weight: 700; color: var(--leaf-deep) !important; }
+.crop-chev { margin-left: auto; font-size: 11px; color: var(--muted); }
+.crop-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--leaf); }
+.crop-dot.off { background: var(--line-strong); }
+.crop-menu { min-width: 220px; }
+.crop-menu-head { padding: 6px 12px 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.crop-item { gap: 10px; }
+.crop-item[data-disabled] { color: var(--muted); cursor: default; }
+.crop-tag { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--amber-text); background: var(--amber-soft); padding: 2px 8px; border-radius: 999px; }
+.crop-check { margin-left: auto; color: var(--leaf); font-weight: 800; }
+
+/* ---------- Setup: campaign tiles ---------- */
+.camp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.camp { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; text-align: left; font: inherit; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; cursor: pointer; box-shadow: var(--shadow);
+  transition: border-color .15s, box-shadow .15s; }
+.camp:hover { border-color: var(--leaf-mid); }
+.camp:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--leaf-soft); }
+.camp.picked { border-color: var(--leaf); box-shadow: 0 0 0 3px var(--leaf-soft); }
+.camp-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.camp-crop { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; }
+.camp-crop .icon { color: var(--leaf); }
+.camp-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.camp-status i { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); }
+.camp-status.on { color: var(--leaf-deep); }
+.camp-status.on i { background: var(--leaf); box-shadow: 0 0 0 3px var(--leaf-soft); }
+.camp-figs { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--muted); }
+.camp-figs b { color: var(--ink); }
+.camp.new { flex-direction: row; align-items: center; gap: 12px; border-style: dashed; border-color: var(--line-strong); box-shadow: none; background: transparent; }
+.camp.new:hover { border-color: var(--leaf); background: var(--leaf-soft); }
+.camp-plus { width: 36px; height: 36px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center; font-size: 22px; font-weight: 700;
+  color: var(--leaf-deep); background: var(--leaf-soft); }
+.camp.new > span:not(.camp-plus) { display: flex; flex-direction: column; gap: 2px; }
+.camp.new small { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.camp-soon { margin: 0 0 4px; padding: 10px 12px; border-radius: 10px; background: var(--amber-soft); color: var(--amber-text); font-size: 13.5px; font-weight: 600; }
+
+/* Price and percentage boxes: numbers set in the same width digits. */
+.num-input { font-variant-numeric: tabular-nums; }
+
+/* =====================================================================================
+   PLANTATION PRO: the sign-in page's dark green carried into the app.
+   Dark sidebar with the plantation dot pattern, a glass top bar that stays in view,
+   a slightly green canvas, and layered surfaces where only the gap banner is lifted.
+   ===================================================================================== */
+body.app {
+  --pp-forest: #0F3D2A; --pp-forest-2: #14492F; --pp-forest-3: #1C5A3B;
+  --pp-on: #EAF3EE; --pp-on-muted: #9FC0AE; --pp-mint: #7FE0B4;
+  --pp-line: rgba(255, 255, 255, .10);
+  --radius-lg: 18px;
+  --shadow-1: 0 1px 2px rgba(16, 24, 20, .04), 0 6px 20px -12px rgba(16, 24, 20, .14);
+  --shadow-2: 0 1px 2px rgba(16, 24, 20, .05), 0 18px 40px -20px rgba(16, 24, 20, .28);
+  background: #EEF2EF;
+}
+
+/* ---------- sidebar ---------- */
+body.app .side { background: var(--pp-forest); color: var(--pp-on); border-right: 0;
+  background-image: radial-gradient(circle, rgba(127, 224, 180, .09) 1.2px, transparent 1.4px); background-size: 22px 22px; }
+body.app .side .brand, body.app .side .brand:hover { color: #fff; }
+body.app .side .mark { background: #2FBF7F; color: #06130D; }
+body.app .side .crop-switch { background: rgba(255, 255, 255, .06); border-color: var(--pp-line); color: #fff; }
+body.app .side .crop-switch:hover, body.app .side .crop-switch[data-state="open"] { background: rgba(255, 255, 255, .10); border-color: rgba(127, 224, 180, .45); }
+body.app .side .crop-switch > span:first-child { color: var(--pp-on-muted); }
+body.app .side .crop-now { border-top-color: var(--pp-line); color: var(--pp-mint) !important; }
+body.app .side .crop-now .crop-dot { background: var(--pp-mint); box-shadow: 0 0 8px rgba(127, 224, 180, .7); }
+body.app .side .crop-chev { color: var(--pp-on-muted); }
+body.app .side nav a { color: #CFE3D8; border-radius: 12px; transition: background-color .15s, color .15s; }
+body.app .side nav a .icon { color: var(--pp-on-muted); }
+body.app .side nav a:hover { background: rgba(255, 255, 255, .07); color: #fff; }
+body.app .side nav a[aria-current="page"] { background: #EAF6EF; color: var(--pp-forest); font-weight: 800; box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .5); }
+body.app .side nav a[aria-current="page"] .icon { color: var(--leaf); }
+body.app .side .week-card { background: rgba(255, 255, 255, .06); border: 1px solid var(--pp-line); }
+body.app .side .week-card .wc-title { color: var(--pp-on-muted); }
+body.app .side .week-card .wc-row { color: #DCEBE2; }
+body.app .side .week-card .wc-dot.on { background: var(--pp-mint); }
+body.app .side .week-card .wc-link { color: #F5C766; }
+body.app .side .guide { background: rgba(255, 255, 255, .05); border-color: var(--pp-line); }
+body.app .side .guide-toggle { color: var(--pp-on-muted); }
+body.app .side .guide-steps li { color: #B8D0C3; }
+body.app .side .guide-steps li.done { color: #7E9C8C; }
+body.app .side .guide-steps li.next { color: #fff; }
+body.app .side .guide-steps li.next a { color: var(--pp-mint); }
+body.app .side .guide-steps .tick { background: rgba(255, 255, 255, .10); color: #DCEBE2; }
+body.app .side .guide-steps li.done .tick { background: #2FBF7F; color: #06130D; }
+body.app .side .side-scroll { scrollbar-color: rgba(255, 255, 255, .18) transparent; }
+body.app .side .side-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .18); }
+body.app .side .side-foot { background: var(--pp-forest); border-top-color: var(--pp-line); }
+body.app .side .account { background: rgba(255, 255, 255, .06); border-color: var(--pp-line); color: #fff; }
+body.app .side .account:hover, body.app .side .account[data-state="open"] { background: rgba(255, 255, 255, .11); border-color: rgba(127, 224, 180, .45); }
+body.app .side .account .acc-text span, body.app .side .acc-chev { color: var(--pp-on-muted); }
+@media (max-width: 860px) {
+  body.app .side .account { background: transparent; border-color: transparent; }
+}
+@media (max-width: 640px) {
+  /* Phone tab bar: the same forest green, the current page as a light pill. */
+  body.app .side nav { background: var(--pp-forest); border-top: 1px solid var(--pp-line); }
+}
+
+/* ---------- top bar: glass, stays in view, tightens once the page scrolls ---------- */
+body.app .topbar { position: sticky; top: 0; z-index: 20; background: rgba(238, 242, 239, .78);
+  -webkit-backdrop-filter: saturate(160%) blur(14px); backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid transparent; transition: padding .2s ease, border-color .2s ease, background-color .2s ease; }
+body.app .topbar.scrolled { padding-top: 12px; padding-bottom: 12px; border-bottom-color: rgba(16, 24, 20, .08); background: rgba(255, 255, 255, .82); }
+body.app .topbar h1 { transition: font-size .2s ease; letter-spacing: -0.025em; }
+body.app .topbar.scrolled h1 { font-size: 22px; }
+body.app .topbar.scrolled .page-head p { display: none; }
+@media (max-width: 640px) { body.app .topbar { position: static; } }
+
+/* ---------- surfaces ---------- */
+body.app .card, body.app .kpi { border-radius: var(--radius-lg); border-color: rgba(16, 24, 20, .06); box-shadow: var(--shadow-1); }
+body.app .card.dark { background: var(--pp-forest); border-color: var(--pp-forest);
+  background-image: radial-gradient(circle, rgba(127, 224, 180, .08) 1.2px, transparent 1.4px); background-size: 22px 22px; }
+body.app .hero { border-radius: 22px; box-shadow: var(--shadow-2); }
+body.app .hero.gap { background: linear-gradient(135deg, #FFF8E8 0%, #FDEFD2 100%); }
+body.app .hero.ok { background: linear-gradient(135deg, #EAF6EF 0%, #D9F0E3 100%); }
+body.app .kpi .value { font-size: 30px; letter-spacing: -0.03em; }
+body.app .kpi .bar { height: 7px; border-radius: 4px; }
+body.app .kpi .bar i { background: linear-gradient(90deg, #2FBF7F, var(--leaf)); border-radius: 4px; }
+body.app .camp, body.app .offers-card, body.app .week-summary { border-radius: var(--radius-lg); }
+body.app table th { background: #F7FAF8; }
+
+/* ---------- buttons ---------- */
+body.app .btn { border-radius: 12px; transition: transform .15s ease, background-color .15s, box-shadow .15s; }
+body.app .btn.solid { box-shadow: 0 6px 16px -8px rgba(16, 24, 20, .55); }
+body.app .btn.leaf { box-shadow: 0 6px 16px -8px rgba(22, 119, 78, .6); }
+body.app .btn.solid:hover:not(:disabled), body.app .btn.leaf:hover:not(:disabled) { transform: translateY(-1px); }
+
+/* ---------- chart: rounded, softly shaded bars; the week under the pointer stands out ---------- */
+body.app .chart .bar { border-radius: 10px 10px 4px 4px; background: linear-gradient(180deg, #25935F 0%, var(--leaf) 100%); }
+body.app .chart .bar.gap { background: linear-gradient(180deg, #F0BC4D 0%, var(--amber) 100%); }
+body.app .chart .col { transition: opacity .15s; }
+body.app .chart .bars:hover .col:not(:hover) { opacity: .55; }
+@media (prefers-reduced-motion: reduce) { body.app .btn:hover { transform: none; } }
+
+
+/* ============ UX: next step, confirm, validation, offer groups, shortcuts ============ */
+
+/* The top bar holds the page title and, on the right, the one next step. */
+/* Same width as the page content below (1240px), so the button lines up with the cards' right edge. */
+body.app .topbar-row { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; max-width: 1240px; }
+body.app .topbar-row > .page-head { flex: 1 1 420px; min-width: 0; max-width: none; }
+body.app .next-step { display: flex; align-items: center; gap: 10px; flex: none; margin-left: auto; }
+body.app .next-step .ns-label { font-size: 12px; color: var(--muted); }
+body.app .next-step .btn { box-shadow: 0 6px 18px -8px rgba(15, 61, 42, .55); }
+body.app .topbar.scrolled .next-step .ns-label { display: none; }
+@media (max-width: 640px) {
+  body.app .next-step { width: 100%; }
+  body.app .next-step .ns-label { display: none; }
+  body.app .next-step .btn { flex: 1; justify-content: center; }
+}
+
+/* The app's own confirm dialog. */
+.confirm-body { margin: 0 0 18px; color: var(--ink-2, #3b4a42); line-height: 1.55; }
+.confirm-acts { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn.danger-solid { background: #B3261E; border-color: #B3261E; color: #fff; }
+.btn.danger-solid:hover { background: #8F1D17; border-color: #8F1D17; }
+.btn.danger-solid:focus-visible { outline: 3px solid rgba(179, 38, 30, .35); outline-offset: 2px; }
+
+/* A price box with a problem says what is wrong right under it. */
+.field.invalid input { border-color: #B3261E; box-shadow: 0 0 0 3px rgba(179, 38, 30, .12); }
+.field-err { display: block; margin-top: 4px; font-size: 12px; font-weight: 500; color: #B3261E; }
+
+/* Skipped CSV lines in a toast. */
+ul.skipped { margin: 6px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.5; }
+
+/* Offers, grouped by what they need. */
+.offer-group { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 16px 22px 8px; }
+.offer-group:not(:first-child) { border-top: 1px solid var(--line-2); margin-top: 4px; }
+.offer-group h3 { margin: 0; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.offer-group .count { min-width: 22px; height: 22px; padding: 0 7px; border-radius: 11px; display: inline-grid; place-items: center;
+  background: var(--leaf-soft); color: var(--leaf-deep); font-size: 12px; font-variant-numeric: tabular-nums; }
+.offer .impact { display: inline-block; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.offer .impact.closes { color: var(--leaf-deep); font-weight: 600; }
+
+/* Empty states lead with what to do. */
+.empty p { margin: 0 auto; max-width: 56ch; color: var(--muted); line-height: 1.55; }
+
+/* Keyboard shortcuts dialog. */
+dl.shortcuts { margin: 0 0 18px; display: grid; gap: 10px; }
+dl.shortcuts > div { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+dl.shortcuts dt { white-space: nowrap; }
+dl.shortcuts dd { margin: 0; color: var(--muted); text-align: right; }
+dl.shortcuts small { color: var(--muted); }
+kbd { display: inline-block; min-width: 24px; padding: 2px 7px; border: 1px solid var(--line, #d9e1dc); border-bottom-width: 2px;
+  border-radius: 6px; background: #fff; font: 600 12px/1.4 inherit; text-align: center; }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { api } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar, Dialog, DialogClose, needs } from "../../ui.jsx";
@@ -18,7 +19,12 @@ export default function FarmersStep({ farmers, toCall, onAdd }) {
     setOpen(false);
     return r;
   }, (r) => {
-    if (r.skipped?.length) alert(`${r.added} added. ${r.skipped.length} lines skipped:\n\n${r.skipped.slice(0, 8).join("\n")}`);
+    // Lines that could not be read are listed in a toast that stays until it is closed, so they can be fixed.
+    if (r.skipped?.length) {
+      toast.warning(`${r.skipped.length} line${r.skipped.length > 1 ? "s" : ""} skipped`, {
+        description: <ul className="skipped">{r.skipped.slice(0, 8).map((x) => <li key={x}>{x}</li>)}</ul>,
+        duration: Infinity, closeButton: true });
+    }
     return `${r.added} farmers added.`;
   });
 

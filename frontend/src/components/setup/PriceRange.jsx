@@ -1,6 +1,7 @@
 import * as Slider from "@radix-ui/react-slider";
 import { useEffect, useState } from "react";
 import { api, can, cropLabel, plainPrice } from "../../lib.js";
+import { useUnsaved } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
 import { SubmitButton } from "../../ui.jsx";
 import StepTop from "./StepTop.jsx";
@@ -45,8 +46,27 @@ function PriceSlider({ form, l, onChange }) {
   );
 }
 
-const Field = ({ label, name, form, edit, step = "any" }) => (
-  <label className="field">{label}<input type="number" step={step} required value={form?.[name] ?? ""} onChange={edit(name)} /></label>
+// What is wrong with the typed range, in words, or nothing when it can be saved.
+function problems(f) {
+  if (!f) return {};
+  const v = (k) => Number(f[k]);
+  const out = {};
+  for (const k of FIELDS) if (f[k] === "" || f[k] === null) out[k] = "Fill this in.";
+  if (!out.floor_price && !(v("floor_price") > 0)) out.floor_price = "Must be more than 0.";
+  if (!out.reference_price && !out.floor_price && v("reference_price") < v("floor_price")) out.reference_price = "Can't be below the lowest price.";
+  if (!out.ceiling_price && !out.reference_price && v("ceiling_price") < v("reference_price")) out.ceiling_price = "Can't be below the market price.";
+  if (!out.step_pct && !(v("step_pct") > 0)) out.step_pct = "Must be more than 0.";
+  return out;
+}
+
+// A plain text box that takes numbers only: no up and down arrows (and no change on a stray
+// mouse-wheel scroll), and a number keypad on phones. decimal allows one point, for percentages.
+const Field = ({ label, name, form, edit, error, decimal = false }) => (
+  <label className={`field ${error ? "invalid" : ""}`}>{label}
+    <input type="text" inputMode={decimal ? "decimal" : "numeric"} autoComplete="off" required className="num-input"
+      value={form?.[name] ?? ""} onChange={edit(name, decimal)} aria-invalid={!!error} aria-describedby={error ? `${name}-err` : undefined} />
+    {error && <span className="field-err" id={`${name}-err`}>{error}</span>}
+  </label>
 );
 
 // Step 2: the floor, market and ceiling prices, and the offer ladder they make.
@@ -54,12 +74,22 @@ export default function PriceRange({ l }) {
   const act = useAct();
   const [form, setForm] = useState(null);
   const [dirty, setDirty] = useState(false);
+  const { setUnsaved } = useUnsaved();
+  // Leaving the page with unsaved edits asks first; the flag is cleared when this form goes away.
+  useEffect(() => { setUnsaved(dirty); }, [dirty, setUnsaved]);
+  useEffect(() => () => setUnsaved(false), [setUnsaved]);
   // Until the planner edits it, the form follows the saved limits.
   useEffect(() => {
     if (l && !dirty) setForm(Object.fromEntries(FIELDS.map((k) => [k, l[k]])));
   }, [l, dirty]);
 
-  const edit = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); setDirty(true); };
+  const edit = (k, decimal) => (e) => {
+    // Keep digits (and one decimal point where allowed); anything else typed is ignored.
+    let v = e.target.value.replace(decimal ? /[^0-9.]/g : /[^0-9]/g, "");
+    if (decimal) v = v.replace(/(\..*)\./g, "$1");
+    setForm({ ...form, [k]: v });
+    setDirty(true);
+  };
   const slide = (values) => { setForm({ ...form, ...values }); setDirty(true); };
   const [saving, setSaving] = useState(false);
   const save = async (e) => {
@@ -70,6 +100,8 @@ export default function PriceRange({ l }) {
     setSaving(false);
   };
   const rungs = form && l ? ladder(form, l) : null;
+  const errs = dirty ? problems(form) : {};
+  const invalid = Object.keys(errs).length > 0;
   const priced = !!l && !dirty;
 
   return (
@@ -78,17 +110,17 @@ export default function PriceRange({ l }) {
       <div className="step-head"><h2 id="limits-title">Fair price range</h2>
         <span className="sub">{l ? `${cropLabel(l.crop)}, ${l.currency} per ${l.unit}. The agent can only offer inside this range, and farmers are never offered less than the lowest price.` : "The agent can only offer inside this range."}</span></div>
       <div className="grid3">
-        <Field label="Lowest" name="floor_price" form={form} edit={edit} />
-        <Field label="Market today" name="reference_price" form={form} edit={edit} />
-        <Field label="Highest" name="ceiling_price" form={form} edit={edit} />
+        <Field label="Lowest" name="floor_price" form={form} edit={edit} error={errs.floor_price} />
+        <Field label="Market today" name="reference_price" form={form} edit={edit} error={errs.reference_price} />
+        <Field label="Highest" name="ceiling_price" form={form} edit={edit} error={errs.ceiling_price} />
       </div>
       {form && l && <PriceSlider form={form} l={l} onChange={slide} />}
       <span className="sub">{l && l.reference_source ? `Market price source: ${l.reference_source}` : ""}</span>
       <details>
         <summary>How the agent climbs the offer</summary>
         <div className="grid2" style={{ marginTop: 10 }}>
-          <Field label="First offer, % over market" name="first_premium_pct" form={form} edit={edit} step="0.5" />
-          <Field label="Each step, % of market" name="step_pct" form={form} edit={edit} step="0.5" />
+          <Field label="First offer, % over market" name="first_premium_pct" form={form} edit={edit} error={errs.first_premium_pct} decimal />
+          <Field label="Each step, % of market" name="step_pct" form={form} edit={edit} error={errs.step_pct} decimal />
         </div>
         <p className="sub" style={{ margin: "10px 0 6px" }}>The agent offers these in order when asked for a better price:</p>
         <div className="ladder">
@@ -96,9 +128,11 @@ export default function PriceRange({ l }) {
         </div>
       </details>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: "auto" }}>
-        {can("limits.edit") ? <SubmitButton busy={saving || !l} busyText={l ? "Saving…" : "Save price range"}>Save price range</SubmitButton>
+        {can("limits.edit") ? <SubmitButton busy={saving || !l} disabled={invalid} busyText={l ? "Saving…" : "Save price range"}>Save price range</SubmitButton>
           : <button type="button" className="btn solid" disabled title="Your role cannot change the price range.">Save price range</button>}
-        <span className="small muted">Illustrative prices for the demo.</span>
+        {invalid ? <span className="small field-err">Fix the marked boxes to save.</span>
+          : dirty ? <button type="button" className="btn ghost" onClick={() => setDirty(false)}>Discard changes</button>
+          : <span className="small muted">Illustrative prices for the demo.</span>}
       </div>
     </form>
   );

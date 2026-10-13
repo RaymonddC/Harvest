@@ -19,7 +19,17 @@ function detail(o) {
   return parts.join(" · ");
 }
 
-export default function Offer({ o, l }) {
+// What approving this offer does to the week it delivers in, from that week's shortfall today.
+function impact(o, row) {
+  if (!row || !o.deliver_week) return null;
+  const t = (kg) => `${(kg / 1000).toFixed(kg >= 10000 ? 0 : 1)} t`;
+  if (!row.gap_kg) return { cls: "", text: `Week ${o.deliver_week} already meets its target` };
+  const left = row.gap_kg - o.kg;
+  return left <= 0 ? { cls: "closes", text: `Closes the week ${o.deliver_week} gap` }
+    : { cls: "", text: `+${t(o.kg)} to week ${o.deliver_week}, still ${t(left)} short` };
+}
+
+export default function Offer({ o, l, row }) {
   const act = useAct();
   // An escalated offer is approved at the farmer's requested price, so that is what must fit.
   const price = o.status === "escalated" && o.requested_price != null ? o.requested_price : o.price_per_kg;
@@ -27,10 +37,11 @@ export default function Offer({ o, l }) {
   const cur = o.currency || "IDR";
   const open = o.status === "pending" || o.status === "escalated";
   const confirmed = o.status === "approved" && o.confirmed_by_voice;
+  const effect = open ? impact(o, row) : null;
   return (
     // layout: when a decision re-sorts the list, the row slides to its new place.
     <motion.div layout transition={{ duration: 0.3, ease: "easeOut" }} className={`offer is-${o.status}`}>
-      <div className="who"><Avatar name={o.farmer_name} cls={o.kind === "supplier" ? "ink" : ""} /><div><b>{o.farmer_name}</b><span>{detail(o)}</span></div></div>
+      <div className="who"><Avatar name={o.farmer_name} cls={o.kind === "supplier" ? "ink" : ""} /><div><b>{o.farmer_name}</b><span>{detail(o)}</span>{effect && <span className={`impact ${effect.cls}`}>{effect.text}</span>}</div></div>
       <div className="fig"><span>Volume</span><b className="num">{(o.kg / 1000).toFixed(1)} t</b></div>
       <div className="fig"><span>Price, {cur}/kg</span><b className="num">{plainPrice(o.price_per_kg, cur)}</b>{l && <PriceSpot price={price} l={l} cur={cur} />}</div>
       <div className="acts">

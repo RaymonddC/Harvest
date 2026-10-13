@@ -6,7 +6,8 @@ import Chart from "../components/forecast/Chart.jsx";
 import { FillList, Hero } from "../components/forecast/GapCard.jsx";
 import GapNote from "../components/forecast/GapNote.jsx";
 import Kpis from "../components/forecast/Kpis.jsx";
-import { apiUrl, cropLabel, fmtT } from "../lib.js";
+import { apiUrl, fmtT } from "../lib.js";
+import { cropName, forCrop, useCrop } from "../campaigns.jsx";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 
@@ -14,11 +15,11 @@ export default function Forecast() {
   const { state } = useLive();
   const [shown, setShown] = useState(null); // call in the detail dialog
   const [logOpen, setLogOpen] = useState(false);
-  const rows = state ? [...state.forecast].sort((a, b) => a.week - b.week) : [];
+  const { crop } = useCrop();
+  const rows = state ? forCrop(state.forecast, crop).sort((a, b) => a.week - b.week) : []; // the picked crop's weeks
   const gap = rows.find((r) => r.is_gap);
   const campaign = state ? state.campaigns.find((x) => x.id === "current") || {} : {};
   const running = campaign.status === "running";
-  const crop = state && state.limits[0] ? state.limits[0].crop : "palm";
   const campaignCalls = state ? state.calls.filter((c) => c.kind !== "confirm" && (c.attempt || 1) === 1) : [];
   const target = rows.length ? rows[0].target_kg : 0;
 
@@ -26,7 +27,7 @@ export default function Forecast() {
     <div className="page-head">
       <div>
         <h1>Live supply forecast</h1>
-        <p>Expected {cropLabel(crop)} per week against the mill's target, updated as each call is saved.</p>
+        <p>Expected {cropName(crop)} per week against the mill's target, updated as each call is saved.</p>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
         <span className={`pill lg dot ${running ? "mint running" : ""}`}>{running ? (campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Campaign running") : "No campaign running"}</span>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, can, getSession } from "../lib.js";
 import Shell from "../Shell.jsx";
+import { useConfirm } from "../dialogs.jsx";
 import { useAct } from "../toast.jsx";
 import { ActButton, Avatar, Dialog, DialogClose, Pill, SubmitButton } from "../ui.jsx";
 
@@ -81,9 +82,10 @@ export default function Users() {
   }, [act]);
   useEffect(() => { if (allowed) load(); }, [allowed, load]);
 
+  const confirm = useConfirm();
   const roleName = (id) => data.roles.find((r) => r.id === id)?.label || id;
   const remove = async (u) => {
-    if (confirm(`Delete ${u.name}? They can no longer sign in. Offers they approved keep their name.`)) {
+    if (await confirm({ title: `Delete ${u.name}?`, body: "They can no longer sign in. Offers they approved keep their name.", confirm: "Delete user", danger: true })) {
       await act(() => api(`/api/users/${u.id}`, { method: "DELETE" }), `${u.name} deleted.`);
       await load();
     }
