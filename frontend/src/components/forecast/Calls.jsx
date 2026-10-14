@@ -40,28 +40,6 @@ export function Calls({ calls, onShow }) {
   );
 }
 
-// One finished call: status, summary, and the transcript when the farmer consented.
-export function CallDialog({ call, onClose }) {
-  const chip = call ? callChip(call) : null;
-  return (
-    <Dialog open={!!call} onClose={onClose} title={call ? `${call.farmer_name} · ${KIND_WORD[call.kind]}` : "Call"}>
-      {call && <>
-        <p style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}><Pill cls={chip.cls}>{chip.text}</Pill>{call.summary || ""}</p>
-        {call.consent && call.transcript && call.transcript.length ? (
-          <div className="transcript">
-            {call.transcript.map((l, i) => (
-              <div key={i} className={`bubble ${l.who}`}><span className="who">{l.who === "agent" ? "Agent" : call.farmer_name}</span><span>{l.text}</span>{l.translation && <span className="tr">{l.translation}</span>}</div>
-            ))}
-          </div>
-        ) : (
-          <p className="muted" style={{ margin: "12px 0" }}>{call.status === "dropped" ? "The call dropped before it finished. Answers saved during the call are kept." : "No transcript: the farmer did not consent to one being kept."}</p>
-        )}
-      </>}
-      <DialogClose />
-    </Dialog>
-  );
-}
-
 // Every call, newest first, with a way into the details of finished ones.
 export function CallLog({ open, calls, onClose, onShow }) {
   const all = [...calls].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));

@@ -30,7 +30,29 @@ function impact(o, row) {
 }
 
 // confirming: the confirmation call to this farmer is in progress, so the decision is locked.
-export default function Offer({ o, l, row, confirming = false }) {
+// The price next to what a planner would check it against: the market price the agent started
+// from, a supplier's quote for the same week, and the room left under the ceiling.
+function proof(o, l, quote, price) {
+  const cur = o.currency || "IDR";
+  const out = [];
+  const ref = o.reference_price || l?.reference_price;
+  if (ref) {
+    const pct = (price / ref - 1) * 100;
+    out.push({ k: "market", text: `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(1)}% vs market ${plainPrice(ref, cur)}` });
+  }
+  if (quote) {
+    const d = price - quote.price_per_kg;
+    out.push({ k: "rival", text: Math.abs(d) < 0.5 ? `Same as ${quote.supplier_name}'s quote`
+      : `${plainPrice(Math.abs(d), cur)} ${d > 0 ? "more" : "less"} than ${quote.supplier_name}'s quote` });
+  }
+  if (l) {
+    const room = l.ceiling_price - price;
+    out.push({ k: room < 0 ? "over" : "room", text: room < 0 ? `${plainPrice(-room, cur)} over the ceiling` : `${plainPrice(room, cur)} under the ceiling` });
+  }
+  return out;
+}
+
+export default function Offer({ o, l, row, quote, confirming = false }) {
   const act = useAct();
   // An escalated offer is approved at the farmer's requested price, so that is what must fit.
   const price = o.status === "escalated" && o.requested_price != null ? o.requested_price : o.price_per_kg;
@@ -39,12 +61,13 @@ export default function Offer({ o, l, row, confirming = false }) {
   const open = o.status === "pending" || o.status === "escalated";
   const confirmed = o.status === "approved" && o.confirmed_by_voice;
   const effect = open ? impact(o, row) : null;
+  const checks = open ? proof(o, l, quote, price) : [];
   return (
     // layout: when a decision re-sorts the list, the row slides to its new place.
     <motion.div layout transition={{ duration: 0.3, ease: "easeOut" }} className={`offer is-${o.status}`}>
       <div className="who"><Avatar name={o.farmer_name} cls={o.kind === "supplier" ? "ink" : ""} /><div><b>{o.farmer_name}</b><span>{detail(o)}</span>{effect && <span className={`impact ${effect.cls}`}>{effect.text}</span>}</div></div>
       <div className="fig"><span>Volume</span><b className="num">{(o.kg / 1000).toFixed(1)} t</b></div>
-      <div className="fig"><span>Price, {cur}/kg</span><b className="num">{plainPrice(o.price_per_kg, cur)}</b>{l && <PriceSpot price={price} l={l} cur={cur} />}</div>
+      <div className="fig"><span>Price, {cur}/kg</span><b className="num">{plainPrice(o.price_per_kg, cur)}</b>{l && <PriceSpot price={price} l={l} cur={cur} market={o.reference_price || l.reference_price} rival={quote?.price_per_kg} />}</div>
       <div className="acts">
         {open ? (
           <>
@@ -61,6 +84,11 @@ export default function Offer({ o, l, row, confirming = false }) {
           </>
         )}
       </div>
+      {checks.length > 0 && (
+        <ul className="proof" aria-label="Price check">
+          {checks.map((x) => <li key={x.k} className={x.k}><i aria-hidden="true" />{x.text}</li>)}
+        </ul>
+      )}
       {o.status === "escalated" && !inLimits && (
         <p className="warn">Above the ceiling of {plainPrice(l ? l.ceiling_price : 0, cur)}. Raise the ceiling on the Setup page to approve, or reject.</p>
       )}

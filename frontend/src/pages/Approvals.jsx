@@ -50,6 +50,9 @@ export default function Approvals() {
   const confirming = new Set(state.calls.filter((c) => c.kind === "confirm" && c.status === "on_call").map((c) => c.offer_id));
   const anyOut = offers.some((o) => o.status === "escalated");
   const rowOf = Object.fromEntries(view.forecast.map((r) => [r.week, r]));
+  // The cheapest supplier quote for the offer's week, to compare its price with (not for offers made from a quote).
+  const quoteFor = (o) => (o.source || "").startsWith("rival_quote") ? null
+    : view.rival_quotes.filter((q) => q.deliver_week === o.deliver_week).sort((a, b) => a.price_per_kg - b.price_per_kg)[0] || null;
   const toDecide = offers.filter((o) => o.status === "pending" || o.status === "escalated");
   const decided = offers.filter((o) => o.status === "approved" || o.status === "rejected");
   // Pending offers whose price sits inside the floor and ceiling: safe to approve in one go.
@@ -87,7 +90,7 @@ export default function Approvals() {
             </ActButton>
           ))}
           <AnimatePresence initial={false}>
-          {toDecide.map((o) => <Offer key={o.id} o={o} l={limits[o.crop]} row={rowOf[o.deliver_week]} />)}
+          {toDecide.map((o) => <Offer key={o.id} o={o} l={limits[o.crop]} row={rowOf[o.deliver_week]} quote={quoteFor(o)} />)}
           </AnimatePresence>
           {quotes.length > 0 && group("Rival quotes not used yet", quotes.length)}
           <AnimatePresence initial={false}>

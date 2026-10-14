@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CallDialog, CallLog, Calls } from "../components/forecast/Calls.jsx";
+import CallRecap from "../components/forecast/CallRecap.jsx";
+import { CallLog, Calls } from "../components/forecast/Calls.jsx";
 import Chart from "../components/forecast/Chart.jsx";
 import { FillList, Hero } from "../components/forecast/GapCard.jsx";
 import GapNote from "../components/forecast/GapNote.jsx";
@@ -59,8 +60,10 @@ export default function Forecast() {
             <div className="card-head">
               <h2 id="chart-title">Expected supply vs target, tonnes per week</h2>
               <div className="legend" aria-hidden="true">
-                <span><i className="l-leaf" />On track</span>
-                <span><i className="l-amber" />Gap</span>
+                <span><i className="l-leaf" />Firm</span>
+                <span><i className="l-unsure" />Unsure, counted half</span>
+                <span><i className="l-approved" />Approved deals</span>
+                <span><i className="l-amber" />Gap week</span>
                 <span><i className="l-pend" />Pending approval</span>
                 <span><i className="l-target" /><span>{target ? `Target ${fmtT(target)} t` : "Target"}</span></span>
               </div>
@@ -85,7 +88,7 @@ export default function Forecast() {
           </section>
         </div>
       </div>
-      <CallDialog call={shown} onClose={() => setShown(null)} />
+      <CallRecap call={shown} onClose={() => setShown(null)} />
       <CallLog open={logOpen} calls={view ? view.calls : []} onClose={() => setLogOpen(false)} onShow={setShown} />
     </Shell>
   );
