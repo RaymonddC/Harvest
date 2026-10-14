@@ -116,5 +116,14 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
       English; it often repeats the consent question; it does not always call `end_call` (the last farmer line, "Tidak ada,
       terima kasih", exists to let it finish).
 
+13. **Multi-crop campaigns, backend (done 14 Oct; C-05).** One campaign per crop: `POST /api/campaigns`,
+    `/api/campaigns/{id}/start|stop`, per-crop forecast rows (`W1` for the default crop, `rubber-W1` for others),
+    `settings.multi_crop` (env `MULTI_CROP`, kill switch). The old `/api/campaign/start|stop` still work (optional `crop`).
+    Still to do, in `frontend/` (Wilbert): five screens (`Forecast.jsx`, `StartCalling.jsx`, `GapCard.jsx`, `NextStep.jsx`,
+    `Shell.jsx`) look up the campaign with id `current` and call `/api/campaign/start` with no crop, so they always act on the
+    default crop. Make them use the picked crop: `state.campaigns.find((c) => c.crop === crop)` and send `crop` in the body
+    (or call `/api/campaigns/{id}/start`). A new crop also needs farmers (CSV with a `crop` column) and price limits on the
+    Setup page before a gap-fill call can start; the demo data stays palm only.
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

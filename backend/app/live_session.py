@@ -229,6 +229,8 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
 
     offer = store.get("offers", call["offer_id"]) if call.get("offer_id") else None
     harvest = store.get("harvests", f"h-{farmer['id']}-{farmer.get('crop', '')}")
+    # The weeks and weekly target of the crop this call is about (each campaign has its own).
+    settings = services.settings_for_crop(store, settings, farmer.get("crop"))
     session = CallSession(call_id=call_id, farmer=farmer, kind=call["kind"],
                           gap_week=call.get("gap_week"), offer=offer)
     handlers = ToolHandlers(store, settings, session)

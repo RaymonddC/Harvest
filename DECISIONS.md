@@ -73,3 +73,10 @@ Known, accepted gap: Twilio doesn't sign the Media Streams WebSocket handshake i
 `/twilio/voice` webhook that sets it up) — `/twilio/stream/{call_id}`'s only protection is the
 unguessable `call_id` and `run_call`'s own queued/channel checks. Fine for a hackathon demo; not
 something to rely on for real traffic.
+
+## Multi-crop campaigns (14 Oct)
+One campaign per crop, keyed by crop. The default crop (`DEMO_CROP`, palm) keeps the ids it always had (campaign `current`,
+forecast rows `W1`..`W5`), so existing data, tests and screens need no migration; other crops use their crop id (`rubber`,
+`rubber-W1`). Each campaign has its own weekly target and weeks; a call runs with its crop's values (`services.settings_for_crop`).
+`MULTI_CROP=false` turns creation off. Demo data stays palm only; a new crop needs farmers and price limits added by the planner,
+and a gap-fill start refuses with a clear message while limits are missing.

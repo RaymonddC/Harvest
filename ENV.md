@@ -68,6 +68,7 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | `MILL_NAME` | `Koperasi Sawit Maju` | No | The buying mill, spoken by the agent and shown in the header. | GitHub variable `MILL_NAME`, then redeploy |
 | `DEMO_LANGUAGE` | `Bahasa Indonesia` | No | Language the agent speaks. | GitHub variable `DEMO_LANGUAGE`, then redeploy |
 | `DEMO_CROP` | `palm` | No | Default crop. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `MULTI_CROP` | `true` | No | Lets planners create a campaign for another crop (rubber, coffee) next to the default one, each with its own weekly target, weeks and price limits. `false` is the kill switch: the dashboard goes back to one campaign and "New campaign" says coming soon. | Not settable from GitHub yet: the code default runs; set it in `deploy.env` to turn it off |
 | `CAPTION_TRANSLATE_TO` | `English` | No | Second caption line on the call screen. Empty turns it off. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `PLAN_START` | next Monday | No | First Monday of the forecast horizon (`YYYY-MM-DD`). | Not settable from GitHub yet: the code default runs. See the rule above |
 | `FORECAST_WEEKS` | `5` | No | Weeks in the forecast. | Not settable from GitHub yet: the code default runs. See the rule above |

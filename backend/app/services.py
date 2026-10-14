@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import dataclasses
 import hashlib
 import datetime as dt
 import io
@@ -16,7 +17,9 @@ CALL_STATUSES = ("queued", "on_call", "done", "dropped", "declined")
 
 
 class ServiceError(ValueError):
-    pass
+    def __init__(self, message: str, status: int = 400) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 def now_iso() -> str:
@@ -49,23 +52,116 @@ def set_limits(store: Store, crop: str, floor: float, ceiling: float, reference:
     return limits.to_doc()
 
 
+# ---------- campaigns (one per crop) ----------
+# The default crop (DEMO_CROP, palm) keeps the ids it always had: campaign "current" and forecast rows "W1".."W5".
+# Every other crop uses its own id: campaign "rubber" and forecast rows "rubber-W1".. (see campaign_id, forecast_row_id).
+
+MAX_WEEKS = 12
+MAX_TARGET_KG = 10_000_000
+
+
+def default_crop(settings: Settings) -> str:
+    return normalize_crop(settings.demo_crop)
+
+
+def campaign_id(settings: Settings, crop: str) -> str:
+    return "current" if normalize_crop(crop) == default_crop(settings) else normalize_crop(crop)
+
+
+def crop_of_campaign_id(settings: Settings, cid: str) -> str:
+    return default_crop(settings) if cid == "current" else normalize_crop(cid)
+
+
+def forecast_row_id(settings: Settings, crop: str, label: str) -> str:
+    return label if normalize_crop(crop) == default_crop(settings) else f"{normalize_crop(crop)}-{label}"
+
+
+def farmer_crop(settings: Settings, doc: dict) -> str:
+    return normalize_crop(doc.get("crop") or settings.demo_crop)
+
+
+def ensure_default_campaign(store: Store, settings: Settings) -> None:
+    """Older data has one campaign ("current") with no crop, target or weeks: fill them in, once."""
+    doc = store.get("campaigns", "current") or {}
+    fill = {k: v for k, v in (("crop", default_crop(settings)),
+                              ("target_kg_per_week", settings.target_kg_per_week),
+                              ("weeks", settings.weeks)) if doc.get(k) in (None, "")}
+    if fill or not doc:
+        store.set("campaigns", "current", {"status": "idle", "kind": None, **fill}, merge=True)
+
+
+def list_campaigns(store: Store, settings: Settings) -> list[dict]:
+    ensure_default_campaign(store, settings)
+    return store.list("campaigns")
+
+
+def get_campaign(store: Store, settings: Settings, crop: str | None = None) -> dict | None:
+    crop = normalize_crop(crop) if crop else default_crop(settings)
+    return next((c for c in list_campaigns(store, settings) if normalize_crop(c.get("crop") or "") == crop), None)
+
+
+def weeks_for(store: Store, settings: Settings, crop: str | None = None) -> int:
+    return int((get_campaign(store, settings, crop) or {}).get("weeks") or settings.weeks)
+
+
+def settings_for_crop(store: Store, settings: Settings, crop: str | None) -> Settings:
+    """The settings a call about this crop runs with: that campaign's weeks and weekly target."""
+    c = get_campaign(store, settings, crop) or {}
+    return dataclasses.replace(settings, weeks=int(c.get("weeks") or settings.weeks),
+                               target_kg_per_week=int(c.get("target_kg_per_week") or settings.target_kg_per_week))
+
+
+def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_week: float, weeks: int) -> dict:
+    if not settings.multi_crop:
+        raise ServiceError("Running more than one crop at a time is turned off (MULTI_CROP).")
+    key = normalize_crop(crop)
+    if key not in CROP_LABELS:
+        raise ServiceError(f"Unknown crop {crop!r}. Use one of: {', '.join(CROP_LABELS)}.")
+    if get_campaign(store, settings, key):
+        raise ServiceError(f"{CROP_LABELS[key]} already has a campaign.", status=409)
+    if not 0 < target_kg_per_week <= MAX_TARGET_KG:
+        raise ServiceError(f"The weekly target must be between 1 and {MAX_TARGET_KG:,} kg.")
+    if not 1 <= weeks <= MAX_WEEKS:
+        raise ServiceError(f"Weeks to plan must be between 1 and {MAX_WEEKS}.")
+    cid = campaign_id(settings, key)
+    doc = {"crop": key, "kind": None, "status": "idle", "target_kg_per_week": round(target_kg_per_week),
+           "weeks": int(weeks), "created_at": now_iso()}
+    store.set("campaigns", cid, doc)
+    recompute_forecast(store, settings)
+    return {"id": cid, **doc}
+
+
 # ---------- forecast ----------
 
 def recompute_forecast(store: Store, settings: Settings) -> list[dict]:
-    harvests = store.list("harvests")
-    offers = store.list("offers")
+    """One set of weekly rows per campaign, each from that crop's harvests and offers only."""
+    all_harvests = store.list("harvests")
+    all_offers = store.list("offers")
     farmers = store.list("farmers")
-    rows = fc.compute_forecast(harvests, offers, settings.plan_start, settings.weeks,
-                               settings.target_kg_per_week, settings.gap_tolerance)
-    for row in rows:
-        row["shortlist"] = (fc.shortlist(row["week"], farmers, harvests, offers,
-                                         settings.plan_start, settings.weeks)
-                            if row["is_gap"] else [])
-        row["reasons"] = (fc.gap_reasons(row["week"], harvests, settings.plan_start, settings.weeks)
-                          if row["is_gap"] else None)
-        row["note"] = gap_note_text(row) if row["is_gap"] else None
-        row["updated_at"] = now_iso()
-        store.set("forecast", row["id"], row)
+    rows: list[dict] = []
+    keep: set[str] = set()
+    for camp in list_campaigns(store, settings):
+        crop = normalize_crop(camp.get("crop") or settings.demo_crop)
+        weeks = int(camp.get("weeks") or settings.weeks)
+        target = int(camp.get("target_kg_per_week") or settings.target_kg_per_week)
+        harvests = [h for h in all_harvests if farmer_crop(settings, h) == crop]
+        offers = [o for o in all_offers if farmer_crop(settings, o) == crop]
+        crop_farmers = [f for f in farmers if farmer_crop(settings, f) == crop]
+        for row in fc.compute_forecast(harvests, offers, settings.plan_start, weeks, target, settings.gap_tolerance):
+            row["crop"] = crop
+            row["shortlist"] = (fc.shortlist(row["week"], crop_farmers, harvests, offers,
+                                             settings.plan_start, weeks) if row["is_gap"] else [])
+            row["reasons"] = (fc.gap_reasons(row["week"], harvests, settings.plan_start, weeks)
+                              if row["is_gap"] else None)
+            row["note"] = gap_note_text(row) if row["is_gap"] else None
+            row["updated_at"] = now_iso()
+            row["id"] = forecast_row_id(settings, crop, row["label"])
+            store.set("forecast", row["id"], row)
+            keep.add(row["id"])
+            rows.append(row)
+    for old in store.list("forecast"):  # weeks cut from a shorter plan, or rows of a removed campaign
+        if old["id"] not in keep:
+            store.delete("forecast", old["id"])
     return rows
 
 
@@ -85,32 +181,44 @@ def gap_note_text(row: dict) -> str:
     return text[0].upper() + text[1:] + "."
 
 
-def first_gap_week(store: Store) -> dict | None:
+def first_gap_week(store: Store, crop: str | None = None) -> dict | None:
+    """The earliest short week; for one crop when given (rows from before crops existed count as the default crop)."""
     rows = sorted(store.list("forecast"), key=lambda r: r.get("week", 0))
+    if crop:
+        rows = [r for r in rows if normalize_crop(r.get("crop") or crop) == normalize_crop(crop)]
     return next((r for r in rows if r.get("is_gap")), None)
 
 
-def forecast_csv(store: Store) -> str:
-    rows = sorted(store.list("forecast"), key=lambda r: r.get("week", 0))
+def _forecast_rows(store: Store, crop: str | None) -> list[dict]:
+    rows = sorted(store.list("forecast"), key=lambda r: (r.get("crop") or "", r.get("week", 0)))
+    return [r for r in rows if not crop or normalize_crop(r.get("crop") or crop) == normalize_crop(crop)]
+
+
+def forecast_csv(store: Store, crop: str | None = None) -> str:
+    rows = _forecast_rows(store, crop)
     out = io.StringIO()
     writer = csv.writer(out)
-    writer.writerow(["week", "week_start", "expected_kg", "pending_kg", "target_kg", "gap_kg", "is_gap"])
+    with_crop = len({r.get("crop") for r in rows}) > 1  # a crop column only when the rows mix crops
+    writer.writerow(["week", "week_start", "expected_kg", "pending_kg", "target_kg", "gap_kg", "is_gap"]
+                    + (["crop"] if with_crop else []))
     for r in rows:
         writer.writerow([r["label"], r["week_start"], r["expected_kg"], r["pending_kg"],
-                         r["target_kg"], r["gap_kg"], "yes" if r["is_gap"] else "no"])
+                         r["target_kg"], r["gap_kg"], "yes" if r["is_gap"] else "no"]
+                        + ([r.get("crop", "")] if with_crop else []))
     return out.getvalue()
 
 
-def forecast_summary_text(store: Store, settings: Settings) -> str:
+def forecast_summary_text(store: Store, settings: Settings, crop: str | None = None) -> str:
     """Plain template summary. The API may ask Gemini to rewrite it."""
-    rows = sorted(store.list("forecast"), key=lambda r: r.get("week", 0))
+    rows = _forecast_rows(store, crop)
     if not rows:
         return "No forecast yet. Start a call campaign to collect harvest answers."
     gaps = [r for r in rows if r["is_gap"]]
-    pending = sum(o["kg"] for o in store.list("offers") if o.get("status") == "pending")
+    pending = sum(o["kg"] for o in store.list("offers") if o.get("status") == "pending"
+                  and (not crop or normalize_crop(o.get("crop") or crop) == normalize_crop(crop)))
     parts = [f"Expected supply over {len(rows)} weeks totals "
              f"{sum(r['expected_kg'] for r in rows) / 1000:.0f} t against a target of "
-             f"{settings.target_kg_per_week / 1000:.0f} t per week."]
+             f"{rows[0]['target_kg'] / 1000:.0f} t per week."]
     for g in gaps:
         parts.append(f"{g['label']} (from {g['week_start']}) is short by {g['gap_kg'] / 1000:.0f} t; "
                      f"{len(g['shortlist'])} farmers could pull harvest forward.")
@@ -141,7 +249,7 @@ def record_harvest(store: Store, settings: Settings, farmer_id: str, crop: str, 
     if call_id:
         store.set("calls", call_id, {"harvest_confidence": confidence}, merge=True)
     recompute_forecast(store, settings)
-    week = fc.week_index(date, settings.plan_start, settings.weeks)
+    week = fc.week_index(date, settings.plan_start, weeks_for(store, settings, crop))
     return {"harvest_id": harvest_id, "week": week,
             "week_label": fc.week_label(week) if week else "outside the forecast horizon"}
 
@@ -160,7 +268,7 @@ def create_offer(store: Store, settings: Settings, *, farmer: dict, crop: str, k
     from_week = None
     harvest_id = None
     if harvest and farmer.get("type") != "supplier":
-        hw = fc.week_index(harvest["ready_date"], settings.plan_start, settings.weeks)
+        hw = fc.week_index(harvest["ready_date"], settings.plan_start, weeks_for(store, settings, crop))
         if hw and deliver_week and hw > deliver_week:
             from_week, harvest_id = hw, harvest["id"]
             kg = min(kg, float(harvest["kg"]))
@@ -270,16 +378,23 @@ def _open_call_for(store: Store, farmer_id: str, kind: str) -> bool:
                for c in store.list("calls"))
 
 
-def start_campaign(store: Store, settings: Settings, kind: str = "collect") -> dict:
-    farmers = store.list("farmers")
-    queued = 0
-    gap = first_gap_week(store)
+def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop: str | None = None) -> dict:
+    """Queue the calls of one crop's campaign (the default crop when none is named)."""
+    crop = normalize_crop(crop) if crop else default_crop(settings)
+    camp = get_campaign(store, settings, crop)
+    if not camp:
+        raise ServiceError(f"{CROP_LABELS.get(crop, crop)} has no campaign yet. Create one first.")
+    label = CROP_LABELS.get(crop, crop)
+    farmers = [f for f in store.list("farmers") if farmer_crop(settings, f) == crop]
+    recompute_forecast(store, settings)  # rows written before crops existed pick up their crop now
+    gap = first_gap_week(store, crop)
     if kind == "collect":
         targets = [f for f in farmers if f.get("to_call")]
         gap_week = gap["week"] if gap else None
     elif kind == "gap_fill":
         if not gap:
-            raise ServiceError("No week has a gap right now.")
+            raise ServiceError(f"No {label} week has a gap right now.")
+        get_limits(store, crop)  # the agent reads the reference price: stop here, not in the middle of a call
         ids = [s["farmer_id"] for s in gap.get("shortlist", [])]
         ids += [f["id"] for f in farmers if f.get("type") == "supplier"]
         targets = [f for f in farmers if f["id"] in ids]
@@ -287,27 +402,33 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect") -> d
     else:
         raise ServiceError("Campaign kind must be collect or gap_fill.")
     targets = [f for f in targets if not f.get("do_not_call")]
+    if not targets:
+        raise ServiceError(f"No {label} farmers are ready to call. Add or mark farmers on the Setup page.")
+    queued = 0
     for farmer in sorted(targets, key=lambda f: f["id"]):
         if not _open_call_for(store, farmer["id"], kind):
             queue_call(store, farmer, kind, gap_week=gap_week)
             queued += 1
-    store.set("campaigns", "current", {"status": "running", "kind": kind, "started_at": now_iso(),
-                                       "gap_week": gap_week}, merge=True)
-    return {"queued": queued, "kind": kind, "gap_week": gap_week}
+    store.set("campaigns", campaign_id(settings, crop), {"status": "running", "kind": kind, "started_at": now_iso(),
+                                                         "gap_week": gap_week, "crop": crop}, merge=True)
+    return {"queued": queued, "kind": kind, "gap_week": gap_week, "crop": crop}
 
 
-def stop_campaign(store: Store) -> dict:
-    store.set("campaigns", "current", {"status": "stopped", "stopped_at": now_iso()}, merge=True)
-    return {"status": "stopped"}
+def stop_campaign(store: Store, settings: Settings, crop: str | None = None) -> dict:
+    crop = normalize_crop(crop) if crop else default_crop(settings)
+    if not get_campaign(store, settings, crop):
+        raise ServiceError(f"{CROP_LABELS.get(crop, crop)} has no campaign.")
+    store.set("campaigns", campaign_id(settings, crop), {"status": "stopped", "stopped_at": now_iso()}, merge=True)
+    return {"status": "stopped", "crop": crop}
 
 
-def call_now(store: Store, farmer_id: str, kind: str | None = None) -> str:
+def call_now(store: Store, farmer_id: str, kind: str | None = None, settings: Settings | None = None) -> str:
     farmer = store.get("farmers", farmer_id)
     if not farmer:
         raise ServiceError("Farmer not found.")
     if farmer.get("do_not_call"):
         raise ServiceError("This farmer asked not to be called again.")
-    gap = first_gap_week(store)
+    gap = first_gap_week(store, normalize_crop(farmer.get("crop") or (settings.demo_crop if settings else "palm")))
     kind = kind or "collect"
     return queue_call(store, farmer, kind, gap_week=gap["week"] if gap else None)
 
@@ -340,7 +461,7 @@ def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None 
         raise ServiceError(f"{to_number} is not on the real-call allowlist (REAL_CALL_ALLOWLIST). "
                            "This is a safety gate, not a bug - add the number there, or set it to "
                            "\"*\" to allow any number (production).")
-    gap = first_gap_week(store)
+    gap = first_gap_week(store, farmer_crop(settings, farmer))
     call_id = queue_call(store, farmer, kind or "collect", gap_week=gap["week"] if gap else None,
                          channel="twilio")
     from twilio.rest import Client  # imported lazily: only needed once Twilio is actually configured

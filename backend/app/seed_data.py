@@ -132,7 +132,7 @@ def build_seed(plan_start: dt.date, language: str, crop: str = "palm",
         "harvests": harvests,
         "limits": {crop: limits_doc},
         "rival_quotes": rival_quotes,
-        "campaigns": {"current": {"status": "idle", "kind": None, "target_kg_per_week": target_kg}},
+        "campaigns": {"current": {"status": "idle", "kind": None, "crop": crop, "target_kg_per_week": target_kg}},
     }
 
 

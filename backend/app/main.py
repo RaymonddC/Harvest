@@ -47,6 +47,13 @@ class CsvIn(BaseModel):
 
 class CampaignIn(BaseModel):
     kind: str = "collect"
+    crop: str = ""  # empty: the default crop
+
+
+class NewCampaignIn(BaseModel):
+    crop: str
+    target_kg_per_week: float
+    weeks: int
 
 
 class LoginIn(BaseModel):
@@ -95,7 +102,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.exception_handler(services.ServiceError)
     async def service_error(_: Request, exc: services.ServiceError):
-        return JSONResponse({"detail": str(exc)}, status_code=400)
+        return JSONResponse({"detail": str(exc)}, status_code=exc.status)
 
     @app.exception_handler(access.AccessError)
     async def access_error(_: Request, exc: access.AccessError):
@@ -188,7 +195,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "max_call_attempts": settings.max_call_attempts,
                             "plan_start": settings.plan_start.isoformat(),
                             "weeks": settings.weeks, "target_kg_per_week": settings.target_kg_per_week,
-                            "gap_tolerance": settings.gap_tolerance}
+                            "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop}
         return data
 
     @app.get("/api/state")
@@ -222,15 +229,15 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     @app.get("/api/forecast.csv")
-    def forecast_csv():
-        return PlainTextResponse(services.forecast_csv(store), media_type="text/csv",
+    def forecast_csv(crop: str = ""):
+        return PlainTextResponse(services.forecast_csv(store, crop or None), media_type="text/csv",
                                  headers={"Content-Disposition": "attachment; filename=forecast.csv"})
 
     @app.get("/api/forecast/summary")
-    async def forecast_summary():
+    async def forecast_summary(crop: str = ""):
         """Plain summary plus the gap note; Gemini rewrites the note when a key is configured."""
-        text = services.forecast_summary_text(store, settings)
-        gap = services.first_gap_week(store)
+        text = services.forecast_summary_text(store, settings, crop or None)
+        gap = services.first_gap_week(store, crop or services.default_crop(settings))
         note, by = (None, None)
         if gap and gap.get("note"):
             polished = await asyncio.to_thread(
@@ -269,17 +276,31 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def upload(body: CsvIn):
         return services.upload_farmers(store, settings, body.csv)
 
+    # The first two stay for older screens: they act on the crop in the body, or the default crop.
     @app.post("/api/campaign/start", dependencies=[Depends(need("campaign.run"))])
     def campaign_start(body: CampaignIn):
-        return services.start_campaign(store, settings, body.kind)
+        return services.start_campaign(store, settings, body.kind, body.crop or None)
 
     @app.post("/api/campaign/stop", dependencies=[Depends(need("campaign.run"))])
-    def campaign_stop():
-        return services.stop_campaign(store)
+    def campaign_stop(body: CampaignIn | None = None):
+        return services.stop_campaign(store, settings, body.crop if body and body.crop else None)
+
+    @app.post("/api/campaigns", dependencies=[Depends(need("campaign.run"))])
+    def campaign_create(body: NewCampaignIn):
+        return services.create_campaign(store, settings, body.crop, body.target_kg_per_week, body.weeks)
+
+    @app.post("/api/campaigns/{campaign_id}/start", dependencies=[Depends(need("campaign.run"))])
+    def campaign_start_one(campaign_id: str, body: CampaignIn | None = None):
+        crop = services.crop_of_campaign_id(settings, campaign_id)
+        return services.start_campaign(store, settings, body.kind if body else "collect", crop)
+
+    @app.post("/api/campaigns/{campaign_id}/stop", dependencies=[Depends(need("campaign.run"))])
+    def campaign_stop_one(campaign_id: str):
+        return services.stop_campaign(store, settings, services.crop_of_campaign_id(settings, campaign_id))
 
     @app.post("/api/farmers/{farmer_id}/call", dependencies=[Depends(need("campaign.run"))])
     def farmer_call(farmer_id: str, body: CallNowIn | None = None):
-        return {"call_id": services.call_now(store, farmer_id, body.kind if body else None)}
+        return {"call_id": services.call_now(store, farmer_id, body.kind if body else None, settings)}
 
     @app.post("/api/farmers/{farmer_id}/dial", dependencies=[Depends(need("campaign.run"))])
     def farmer_dial(farmer_id: str, body: DialIn | None = None):
