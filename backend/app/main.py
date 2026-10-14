@@ -189,6 +189,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     # ----- read model -----
 
     def snapshot() -> dict:
+        services.refresh_campaign_status(store, settings)  # a campaign left "running" by an older version heals here
         data = {c: store.list(c) for c in COLLECTIONS}
         data["settings"] = {"mill_name": settings.mill_name,
                             "language": settings.demo_language, "max_call_seconds": settings.max_call_seconds,

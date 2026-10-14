@@ -4,7 +4,7 @@ import { api, fmtT } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { Dialog, DialogClose, Icon, SubmitButton } from "../../ui.jsx";
 
-const STATUS = { running: "Calling", stopped: "Stopped", idle: "Not started" };
+const STATUS = { running: "Calling", stopped: "Stopped", done: "Finished", idle: "Not started" };
 
 function statusOf(c) {
   if (c.status !== "running") return { word: STATUS[c.status] || "Not started", cls: "" };

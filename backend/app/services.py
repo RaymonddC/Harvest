@@ -90,6 +90,20 @@ def ensure_default_campaign(store: Store, settings: Settings) -> None:
         store.set("campaigns", "current", {"status": "idle", "kind": None, **fill}, merge=True)
 
 
+def refresh_campaign_status(store: Store, settings: Settings) -> None:
+    """A campaign that is "running" with no call of its crop still waiting or on the phone has finished:
+    mark it "done" (Start calling is offered again). Confirmation calls belong to approvals, not to the campaign."""
+    running = [c for c in store.list("campaigns") if c.get("status") == "running"]
+    if not running:
+        return
+    farmers = {f["id"]: farmer_crop(settings, f) for f in store.list("farmers")}
+    open_crops = {farmers.get(c["farmer_id"]) for c in store.list("calls")
+                  if c.get("kind") in ("collect", "gap_fill") and c.get("status") in ("queued", "on_call")}
+    for camp in running:
+        if normalize_crop(camp.get("crop") or settings.demo_crop) not in open_crops:
+            store.set("campaigns", camp["id"], {"status": "done", "finished_at": now_iso()}, merge=True)
+
+
 def list_campaigns(store: Store, settings: Settings) -> list[dict]:
     ensure_default_campaign(store, settings)
     return store.list("campaigns")
@@ -135,6 +149,7 @@ def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_w
 
 def recompute_forecast(store: Store, settings: Settings) -> list[dict]:
     """One set of weekly rows per campaign, each from that crop's harvests and offers only."""
+    refresh_campaign_status(store, settings)  # also heals a campaign left "running" after its last call
     all_harvests = store.list("harvests")
     all_offers = store.list("offers")
     farmers = store.list("farmers")
@@ -506,6 +521,7 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
             queue_call(store, farmer, call["kind"], gap_week=call.get("gap_week"),
                        offer_id=call.get("offer_id"), attempt=call.get("attempt", 1) + 1,
                        channel=call.get("channel", "browser"))
+    refresh_campaign_status(store, settings)  # after any retry was queued: the last call ending ends the campaign
 
 
 # The languages a farmer can be called in. The agent speaks whatever the name says, so a typo here

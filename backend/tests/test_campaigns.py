@@ -143,3 +143,51 @@ def test_multi_crop_is_on_by_default_and_can_be_switched_off(monkeypatch):
         assert get_settings().multi_crop is False
     finally:
         get_settings.cache_clear()
+
+
+def finish(store, settings, call_id, **kw):
+    services.finish_call(store, settings, call_id, ended_cleanly=kw.pop("ended_cleanly", True), outcome=kw.pop("outcome", "completed"),
+                         summary="ok", consent=True, transcript=[])
+
+
+def test_a_campaign_is_finished_when_its_last_call_ends(client, store, settings):
+    make_rubber(client)
+    a = rubber_farmer(store, "Pak A", "+62 812 0000 6001")
+    b = rubber_farmer(store, "Pak B", "+62 812 0000 6002")
+    assert client.post("/api/campaigns/rubber/start", json={"kind": "collect"}).json()["queued"] == 2
+    calls = {c["farmer_id"]: c["id"] for c in store.list("calls") if c["status"] == "queued"}
+    finish(store, settings, calls[a])
+    assert store.get("campaigns", "rubber")["status"] == "running"  # one call is still waiting
+    finish(store, settings, calls[b])
+    done = store.get("campaigns", "rubber")
+    assert done["status"] == "done" and done["finished_at"]
+    assert store.get("campaigns", "current")["status"] != "done"  # palm is a different campaign
+
+
+def test_a_dropped_call_that_is_retried_keeps_the_campaign_running(client, store, settings):
+    make_rubber(client)
+    a = rubber_farmer(store)
+    client.post("/api/campaigns/rubber/start", json={"kind": "collect"})
+    call_id = next(c["id"] for c in store.list("calls") if c["farmer_id"] == a)
+    finish(store, settings, call_id, ended_cleanly=False, outcome="dropped")  # a retry is queued
+    assert store.get("campaigns", "rubber")["status"] == "running"
+    retry = next(c["id"] for c in store.list("calls") if c["status"] == "queued")
+    finish(store, settings, retry)
+    assert store.get("campaigns", "rubber")["status"] == "done"
+
+
+def test_confirmation_calls_do_not_keep_a_campaign_running(client, store, settings):
+    make_rubber(client)
+    a = rubber_farmer(store)
+    client.post("/api/campaigns/rubber/start", json={"kind": "collect"})
+    services.queue_call(store, store.get("farmers", a) | {"id": a}, "confirm", offer_id="x")
+    finish(store, settings, next(c["id"] for c in store.list("calls") if c["kind"] == "collect"))
+    assert store.get("campaigns", "rubber")["status"] == "done"
+
+
+def test_a_campaign_left_running_by_older_data_is_healed_on_read(client, store):
+    store.set("campaigns", "current", {"status": "running", "kind": "collect"}, merge=True)  # no open calls at all
+    state = client.get("/api/state").json()
+    assert next(c for c in state["campaigns"] if c["id"] == "current")["status"] == "done"
+    r = client.post("/api/campaign/start", json={"kind": "collect"})  # a new round can start again
+    assert r.status_code == 200 and store.get("campaigns", "current")["status"] == "running"

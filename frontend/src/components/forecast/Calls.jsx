@@ -6,6 +6,22 @@ import { Avatar, Dialog, DialogClose, Pill } from "../../ui.jsx";
 const ENDED = ["done", "declined", "dropped"];
 const newestFirst = (a, b) => (b.started_at || b.created_at || "").localeCompare(a.started_at || a.created_at || "");
 
+// When a call happened, in the viewer's own time: "14 Oct, 22:05". A finished call shows when it ended,
+// a running one when it started, a waiting one when it was queued.
+const stamp = (c) => (ENDED.includes(c.status) ? c.ended_at || c.started_at : c.status === "on_call" ? c.started_at : null) || c.created_at;
+export function fmtWhen(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+const lasted = (c) => {  // "2 min 13 s" from start to end, when both are known
+  const s = Date.parse(c.started_at), e = Date.parse(c.ended_at);
+  if (!s || !e || e < s) return "";
+  const sec = Math.round((e - s) / 1000);
+  return sec >= 60 ? `${Math.floor(sec / 60)} min ${sec % 60} s` : `${sec} s`;
+};
+
 function Row({ c, onShow }) {
   const chip = callChip(c);
   const label = c.kind === "collect" ? c.farmer_name : `${c.farmer_name} · ${KIND_WORD[c.kind].replace(" call", "")}`;
@@ -46,6 +62,7 @@ export function CallDialog({ call, onClose }) {
   return (
     <Dialog open={!!call} onClose={onClose} title={call ? `${call.farmer_name} · ${KIND_WORD[call.kind]}` : "Call"}>
       {call && <>
+        <p className="muted" style={{ marginTop: 8, marginBottom: 0 }}>{[fmtWhen(stamp(call)), lasted(call)].filter(Boolean).join(" · ")}</p>
         <p style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}><Pill cls={chip.cls}>{chip.text}</Pill>{call.summary || ""}</p>
         {call.consent && call.transcript && call.transcript.length ? (
           <div className="transcript">
@@ -70,12 +87,13 @@ export function CallLog({ open, calls, onClose, onShow }) {
       <div className="table-wrap" style={{ maxHeight: "60vh", overflow: "auto" }}>
         {all.length ? (
           <table>
-            <thead><tr>{["Farmer", "Call", "Status", "Summary", ""].map((h) => <th key={h}>{h}</th>)}</tr></thead>
+            <thead><tr>{["When", "Farmer", "Call", "Status", "Summary", ""].map((h) => <th key={h}>{h}</th>)}</tr></thead>
             <tbody>
               {all.map((c) => {
                 const chip = callChip(c);
                 return (
                   <tr key={c.id}>
+                    <td style={{ whiteSpace: "nowrap" }} title={stamp(c) || undefined}>{fmtWhen(stamp(c)) || <span className="muted">–</span>}</td>
                     <td>{c.farmer_name}</td><td>{KIND_WORD[c.kind]}</td><td><Pill cls={chip.cls}>{chip.text}</Pill></td>
                     <td>{c.summary || <span className="muted">–</span>}</td>
                     <td>{ENDED.includes(c.status) && <button className="btn" style={{ minHeight: 36 }} onClick={() => { onClose(); onShow(c); }}>Details</button>}</td>
