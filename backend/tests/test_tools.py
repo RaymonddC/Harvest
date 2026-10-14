@@ -40,6 +40,36 @@ def test_record_harvest_refuses_to_save_without_a_matching_read_back(store, sett
     assert h.dispatch("record_harvest", args)["saved"] is True
 
 
+def save_harvest(h, kg=1600):
+    args = {"crop": "palm", "kg": kg, "ready_date": "2026-11-02", "confirmed_by_farmer": False}
+    h.dispatch("record_harvest", args)
+    return h.dispatch("record_harvest", {**args, "confirmed_by_farmer": True})
+
+
+def test_a_price_is_not_saved_as_a_second_harvest_volume(store, settings):
+    """In two recorded calls the farmer's "naik jadi 3300" (a price) was saved as 3,300 kg."""
+    h, session = make(store, settings)
+    assert save_harvest(h)["saved"] is True
+    r = h.dispatch("record_harvest", {"crop": "palm", "kg": 3300, "ready_date": "2026-11-02",
+                                      "confirmed_by_farmer": False})
+    assert r["status"] == "looks_like_a_price" and r["saved"] is False and "farmer_counter_price" in r["error"]
+    assert store.get("harvests", "h-f01-palm")["kg"] == 1600
+    # a real correction is not blocked for good: the same number again goes through the normal read-back
+    again = h.dispatch("record_harvest", {"crop": "palm", "kg": 3300, "ready_date": "2026-11-02",
+                                          "confirmed_by_farmer": False})
+    assert again["status"] == "waiting_for_read_back"
+
+
+def test_ordinary_volume_corrections_are_not_mistaken_for_prices(store, settings):
+    h, _ = make(store, settings)
+    assert save_harvest(h, 1600)["saved"] is True
+    assert h.dispatch("record_harvest", {"crop": "palm", "kg": 1800, "ready_date": "2026-11-02",
+                                         "confirmed_by_farmer": False})["status"] == "waiting_for_read_back"
+    h2, _ = make(store, settings, farmer_id="b003")  # nothing saved yet on this call: any first volume is fine
+    assert h2.dispatch("record_harvest", {"crop": "palm", "kg": 3300, "ready_date": "2026-11-02",
+                                          "confirmed_by_farmer": False})["status"] == "waiting_for_read_back"
+
+
 def test_record_harvest_updates_forecast_and_replaces_corrections(store, settings):
     h, _ = make(store, settings)
     before = store.get("forecast", "W4")["expected_kg"]
@@ -168,6 +198,11 @@ def test_prompt_has_disclosure_two_step_read_back_and_no_limits(store, settings)
     assert "AI assistant calling for Koperasi Sawit Maju" in text
     assert "Bahasa Indonesia" in text and "Palm FFB" in text
     assert "confirmed_by_farmer false" in text and "W3" in text
+    # the voice rules found missing in the recorded calls
+    assert "Speak only Bahasa Indonesia" in text and "Never slip into English" in text
+    assert "Ask the consent question once" in text
+    assert "A number the farmer says with" in text and "PRICE per kilogram" in text
+    assert "call end_call at once" in text
     for secret in ("3350", "3,350", "2900", "2,900", "ceiling", "floor"):
         assert secret not in text
     confirm = build_system_instruction(settings, farmer, "confirm", None,

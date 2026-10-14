@@ -1,6 +1,6 @@
 """Record a real gap-fill call and build the sample call from it (TODO item 12).
 
-  python scripts/sample_call.py clips    # farmer lines -> speech (Gemini TTS), web/samples/clips/farmer-N.wav (16 kHz); --all redoes every line
+  python scripts/sample_call.py clips    # farmer lines -> speech (Gemini TTS), web/samples/clips/*.wav (16 kHz); --all redoes every line
   python scripts/sample_call.py record   # run_call against the live model with a scripted farmer; writes OUT/recording.json
   python scripts/sample_call.py build    # recording -> web/samples/gap-fill.json + audio clips (one translation request)
 
@@ -35,6 +35,13 @@ from app.store import MemoryStore  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 SAMPLES = ROOT / "web" / "samples"
 LINES = SAMPLES / "farmer-lines.json"
+# The order a scripted recording plays the farmer's lines in (the page picks lines from what the agent says instead).
+RECORD_ORDER = ["identity", "volume", "readback", "counter", "agree", "closing"]
+
+
+def record_lines() -> list[dict]:
+    by_id = {line["id"]: line for line in json.loads(LINES.read_text())}
+    return [by_id[i] for i in RECORD_ORDER]
 WORK = Path(os.environ.get("SAMPLE_WORK_DIR", "sample_work"))
 TTS_MODEL = os.environ.get("TTS_MODEL", "gemini-2.5-flash-tts")
 FARMER_VOICE = os.environ.get("FARMER_VOICE", "Charon")
@@ -71,10 +78,13 @@ def read_wav(path: Path) -> bytes:
 def make_clips() -> None:
     lines = json.loads(LINES.read_text())
     client = live_session.genai_client()
-    WORK.mkdir(parents=True, exist_ok=True)
-    for i, line in enumerate(lines, start=1):
-        if line.get("audio") and (ROOT / "web" / line["audio"]).exists() and "--all" not in sys.argv:
+    (SAMPLES / "clips").mkdir(exist_ok=True)
+    done: set[str] = set()
+    for line in lines:
+        path = ROOT / "web" / line["audio"]
+        if line["audio"] in done or (path.exists() and "--all" not in sys.argv):
             continue  # keep clips a recording already used; pass --all to regenerate every line
+        done.add(line["audio"])
         resp = client.models.generate_content(
             model=TTS_MODEL, contents=f"Say in Indonesian, in a calm, friendly voice: {line['text']}",
             config=types.GenerateContentConfig(
@@ -83,11 +93,8 @@ def make_clips() -> None:
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=FARMER_VOICE)))))
         pcm24 = resp.candidates[0].content.parts[0].inline_data.data
         pcm16 = pcm_peak_trim(resample_pcm16(pcm24, OUT_RATE, IN_RATE), IN_RATE)
-        (SAMPLES / "clips").mkdir(exist_ok=True)
-        write_wav(SAMPLES / "clips" / f"farmer-{i}.wav", pcm16, IN_RATE)
-        line["audio"] = f"samples/clips/farmer-{i}.wav"
-        print(f"farmer-{i}: {len(pcm16) / 2 / IN_RATE:.1f}s  {line['text']}")
-    LINES.write_text(json.dumps(lines, ensure_ascii=False, indent=2) + "\n")
+        write_wav(path, pcm16, IN_RATE)
+        print(f"{line['audio']}: {len(pcm16) / 2 / IN_RATE:.1f}s  {line['text']}")
 
 
 # ---------- recording ----------
@@ -187,8 +194,8 @@ async def record() -> None:
     seed_data.load_seed(store, settings)
     farmer = store.get("farmers", FARMER_ID)
     call_id = services.queue_call(store, {**farmer, "id": FARMER_ID}, "gap_fill", gap_week=GAP_WEEK)
-    lines = json.loads(LINES.read_text())
-    clips = [read_wav(SAMPLES / "clips" / f"farmer-{i}.wav") for i in range(1, len(lines) + 1)]
+    lines = record_lines()
+    clips = [read_wav(ROOT / "web" / line["audio"]) for line in lines]
     ch = ScriptedChannel(clips)
     client = live_session.genai_client()
 
@@ -309,7 +316,7 @@ def build(work: Path) -> None:
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(wav), "-ac", "1", "-b:a", "56k",
                         str(clips / f"agent-{n}.mp3")], check=True)
         out.append({"t": a0, "who": "agent", "audio": f"samples/clips/agent-{n}.mp3", "ms": round(sum(dur(b) for _, b in g) * 1000)})
-    flines = json.loads(LINES.read_text())
+    flines = record_lines()
     for tr in turns:
         out.append({"t": tr["start"], "who": "farmer", "audio": flines[tr["index"]]["audio"],
                     "ms": round((tr["end"] - tr["start"]) * 1000)})

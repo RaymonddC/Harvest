@@ -1,26 +1,9 @@
 [
-  {
-    "text": "Ya, betul. Boleh, tidak apa-apa.",
-    "audio": "samples/clips/farmer-1.wav"
-  },
-  {
-    "text": "Bisa, Pak. Kira-kira seribu enam ratus kilo.",
-    "audio": "samples/clips/farmer-2.wav"
-  },
-  {
-    "text": "Ya, benar.",
-    "audio": "samples/clips/farmer-3.wav"
-  },
-  {
-    "text": "Harganya bisa naik jadi tiga ribu tiga ratus rupiah per kilo?",
-    "audio": "samples/clips/farmer-4.wav"
-  },
-  {
-    "text": "Ya, setuju.",
-    "audio": "samples/clips/farmer-5.wav"
-  },
-  {
-    "text": "Tidak ada, terima kasih. Sampai jumpa.",
-    "audio": "samples/clips/farmer-6.wav"
-  }
+  {"id": "closing", "text": "Tidak ada, terima kasih. Sampai jumpa.", "audio": "samples/clips/farmer-6.wav", "after": "agree", "ends": true, "when": "pertanyaan|ada lagi|ada yang (lain|ingin)|anything else|any other"},
+  {"id": "counter", "text": "Harganya bisa naik jadi tiga ribu tiga ratus rupiah per kilo?", "audio": "samples/clips/farmer-4.wav", "after": "volume", "when": "harga|rp\\s?\\d|rupiah|per kilo|per kg|price"},
+  {"id": "agree", "text": "Ya, setuju.", "audio": "samples/clips/farmer-5.wav", "after": "counter", "max": 2, "when": "setuju|sepakat|bersedia|agree"},
+  {"id": "readback", "text": "Ya, benar.", "audio": "samples/clips/farmer-3.wav", "after": "volume", "max": 3, "when": "apakah (itu |sudah )?(benar|betul)|sudah benar|is that (right|correct)"},
+  {"id": "volume", "text": "Bisa, Pak. Kira-kira seribu enam ratus kilo.", "audio": "samples/clips/farmer-2.wav", "after": "identity", "max": 2, "when": "kilo|kg|berapa|bisa (kirim|mengirim|antar)|how many|minggu|week"},
+  {"id": "identity", "text": "Ya, betul. Boleh, tidak apa-apa.", "audio": "samples/clips/farmer-1.wav", "when": "izin|transkrip|berbicara dengan|speaking with|permission|transcript|all right"},
+  {"id": "yes", "text": "Ya, benar.", "audio": "samples/clips/farmer-3.wav", "fallback": true, "max": 3}
 ]

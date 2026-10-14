@@ -123,6 +123,8 @@ class CallSession:
     consent: bool | None = None
     saved_offer_ids: list[str] = field(default_factory=list)
     read_back: dict[str, tuple[float, str]] = field(default_factory=dict)  # per crop: (kg, date) last read back
+    saved_kg: dict[str, float] = field(default_factory=dict)  # per crop: the volume saved on this call
+    price_warned: set[tuple[str, float]] = field(default_factory=set)  # (crop, number) already refused as a price
 
 
 def _weekday_label(date: dt.date, settings: Settings) -> str:
@@ -188,6 +190,15 @@ class ToolHandlers:
         except ValueError:
             return {"error": "ready_date must be a date in YYYY-MM-DD form."}
         confidence = "unsure" if confidence == "unsure" else "firm"
+        looks_like_price = self._looks_like_price(crop_id, kg)
+        if looks_like_price:
+            self.session.price_warned.add((crop_id, kg))
+            return {"saved": False, "status": "looks_like_a_price",
+                    "error": f"Not saved. {round(kg):,} looks like a price per kilogram, not a harvest volume: the "
+                             f"volume already recorded on this call is {round(self.session.saved_kg[crop_id]):,} kg. "
+                             "Do not change the harvest. If the farmer named a price, use it as farmer_counter_price "
+                             "in check_offer. Only if they clearly said a NEW volume in kilograms, ask them to "
+                             "confirm it and call this again."}
         self.last_ui = {"captured": {"crop": crop_label(crop_id), "kg": round(kg),
                                      "ready": _weekday_label(date, self.settings),
                                      "confidence": confidence.title(),
@@ -206,7 +217,21 @@ class ToolHandlers:
                              "these exact numbers back to the farmer first; save only after they say yes."}
         result = services.record_harvest(self.store, self.settings, self.session.farmer["id"], crop_id,
                                          kg, date.isoformat(), self.session.call_id, confidence)
+        self.session.saved_kg[crop_id] = kg
         return {"saved": True, **result}
+
+    def _looks_like_price(self, crop_id: str, kg: float) -> bool:
+        """A second, different 'volume' that falls inside this crop's price range is almost surely a price the
+        farmer said ("naik jadi 3300"), not a harvest. Refused once; the same number again is let through,
+        so a real correction is never blocked for good."""
+        if crop_id not in self.session.saved_kg or kg == self.session.saved_kg[crop_id]:
+            return False
+        if (crop_id, kg) in self.session.price_warned:
+            return False
+        doc = self.store.get("limits", crop_id)
+        if not doc:
+            return False
+        return float(doc["floor_price"]) * 0.9 <= kg <= float(doc["ceiling_price"]) * 1.1
 
     def _tool_get_reference_price(self, crop: str) -> dict:
         limits = services.get_limits(self.store, crop)

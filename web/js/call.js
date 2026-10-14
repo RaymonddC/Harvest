@@ -1,3 +1,4 @@
+import { pickLine } from "./stand-in.js";
 import { cfg, cropLabel, el, fmtKg, KIND_WORD, pill, plainPrice, subscribe, toast, wsUrl } from "./data.js";
 
 const $ = (id) => document.getElementById(id);
@@ -114,7 +115,13 @@ async function answer(call) {
 function handleMessage(msg) {
   if (!active) return;
   if (msg.type === "connected") { Object.assign(active, { village: msg.village, language: msg.language, gapWeek: msg.gap_week }); active.connected = true; meta(); }
-  else if (msg.type === "caption") caption(msg);
+  else if (msg.type === "caption") {
+    if (msg.who === "agent") {  // the agent's latest turn, for the stand-in farmer to answer
+      if (active.agentIndex !== msg.index) { active.agentIndex = msg.index; active.agentText = ""; }
+      active.agentText += msg.text;
+    }
+    caption(msg);
+  }
   else if (msg.type === "translation") translation(msg);
   else if (msg.type === "interrupted") flush();
   else if (msg.type === "tool") { active.lastTool = performance.now(); toolEvent(msg); }
@@ -212,8 +219,8 @@ function stopReplay() {
 
 // ---------- stand-in farmer: scripted farmer audio sent into a live call ----------
 // "Play the farmer for me" replaces the microphone with the farmer's lines from samples/farmer-lines.json (spoken
-// by Gemini, the same clips the sample call uses). Each line goes in once the agent has finished talking and has
-// answered the previous line, so the demo and the video need no teammate.
+// by Gemini, the same clips the sample call uses). Each time the agent has finished talking, the line that answers
+// what it just said is chosen (stand-in.js: pickLine), so the call keeps its sense when the agent varies its order.
 
 const FARMER_LINES_URL = "samples/farmer-lines.json";
 const STAND_IN_LABEL = "Play the farmer for me";
@@ -229,8 +236,10 @@ function parseWav(buf) {  // 16 kHz mono PCM16 WAV -> Int16Array
 }
 
 async function loadFarmerLines() {
-  const lines = await (await fetch(FARMER_LINES_URL)).json();
-  return Promise.all(lines.map(async (l) => parseWav(await (await fetch(l.audio)).arrayBuffer())));
+  const meta = await (await fetch(FARMER_LINES_URL)).json();
+  const clips = new Map();  // several lines may share one clip
+  await Promise.all([...new Set(meta.map((l) => l.audio))].map(async (u) => clips.set(u, parseWav(await (await fetch(u)).arrayBuffer()))));
+  return { meta, clips };
 }
 
 function setStandIn(on) {
@@ -252,7 +261,19 @@ function agentDone(s) {
 
 function standInChunk(s, samples) {
   const out = new Int16Array(samples);
-  if (!s.clip && s.next < s.lines.length && agentDone(s)) { s.clip = s.lines[s.next++]; s.pos = 0; }
+  if (!s.clip && agentDone(s)) {
+    const i = pickLine(s.lines.meta, active.agentText, s.used);
+    if (i < 0) {
+      setStandIn(false);
+      toast("The scripted farmer has no answer for that. Your microphone is back on.");
+    } else {
+      const line = s.lines.meta[i];
+      s.used[line.id] = (s.used[line.id] || 0) + 1;
+      s.clip = s.lines.clips.get(line.audio);
+      s.pos = 0;
+      s.ends = !!line.ends;
+    }
+  }
   if (s.clip) {
     out.set(s.clip.subarray(s.pos, s.pos + samples));
     s.pos += samples;
@@ -262,7 +283,7 @@ function standInChunk(s, samples) {
       s.clip = null;
       s.endedAt = performance.now();
       active.micLevel = 0;
-      if (s.next >= s.lines.length) { setStandIn(false); toast("The scripted farmer has said all its lines. Your microphone is back on."); }
+      if (s.ends) { setStandIn(false); toast("The scripted farmer has said goodbye. Your microphone is back on."); }
     }
   } else {
     active.micLevel = 0;
@@ -272,12 +293,12 @@ function standInChunk(s, samples) {
 
 $("stand-in").onclick = async () => {
   if (!active || active.replay) return;
-  const s = active.standIn ||= { lines: null, next: 0, clip: null, pos: 0, endedAt: 0, on: false };
+  const s = active.standIn ||= { lines: null, used: {}, clip: null, pos: 0, endedAt: 0, on: false, ends: false };
   if (s.on) return setStandIn(false);
   if (!s.lines) {
     try { s.lines = await loadFarmerLines(); } catch { toast("The scripted farmer's lines could not be loaded.", true); return; }
   }
-  if (s.next >= s.lines.length) { toast("The scripted farmer has said all its lines already.", true); return; }
+  if (s.used.closing) { toast("The scripted farmer has already said goodbye.", true); return; }
   setStandIn(true);
 };
 

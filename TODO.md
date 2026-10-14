@@ -111,10 +111,16 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
       `VAD_SILENCE_MS=400`), 6 scripted calls, per farmer turn: 1.5 to 1.8 s (name and consent), 1.3 to 1.4 s (volume),
       1.8 to 2.0 s (read-back, sometimes a `record_harvest` first), 1.4 to 2.4 s (counter-offer, `check_offer`), 1.8 to 3.0 s (final
       yes, `save_offer` and `end_call`); about 0.4 s less without the VAD wait. Connect to first agent audio: 1.35 to 2.7 s. A browser adds network and buffering.
-    - Prompt problems seen in the recordings (not fixed): in 2 of 6 calls the farmer's "naik jadi 3300" was taken
-      as a harvest weight and `record_harvest` was called with 3,300 kg; the agent sometimes says the reference price in
-      English; it often repeats the consent question; it does not always call `end_call` (the last farmer line, "Tidak ada,
-      terima kasih", exists to let it finish).
+    - Prompt problems seen in the recordings, **fixed in code 14 Oct, not yet checked on a real call**: (1) a counter price
+      ("naik jadi 3300") was saved as a 3,300 kg harvest in 2 of 6 calls: the prompt now separates prices from weights, and
+      `record_harvest` refuses a second, different volume that falls in the crop's price range (once; the same number again
+      goes through); (2) English in the middle of Indonesian: "Speak only {language}" rule, numbers included; (3) the consent
+      question repeated: asked once; (4) `end_call` not always called: an "Ending the call" section. To check: run
+      `scripts/sample_call.py record` a few times and read the transcripts and tool lists.
+    - The stand-in farmer now picks its line from what the agent just said (`web/js/stand-in.js`, rules in
+      `web/samples/farmer-lines.json`: `when`, `after`, `max`, `ends`, `fallback`), so it keeps its sense when the agent varies
+      its order; it says goodbye and switches itself off. It reuses "Ya, benar." as the short fallback; a dedicated
+      "Ya, silakan, Pak." clip would sound better (add it to the json and run `sample_call.py clips`).
 
 13. **Multi-crop campaigns (done 14 Oct; C-05).** One campaign per crop: `POST /api/campaigns`, `/api/campaigns/{id}/start|stop`,
     per-crop forecast rows (`W1` for the default crop, `rubber-W1` for others), `settings.multi_crop` (env / GitHub variable

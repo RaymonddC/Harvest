@@ -38,4 +38,4 @@ Hackathon project (Google Cloud AI Builder Cup 2026, Manufacturing). Read `READM
   (`web/samples/clips/`), the replay plays the clips, and the call page has "Play the farmer for me". Rebuild with
   `backend/scripts/sample_call.py` (clips, record, build). Reply delay measured: about 1.3 to 2.4 s with the 400 ms VAD wait.
 - Multi-crop campaigns are built and on by default (TODO item 13; `MULTI_CROP=false` turns them off).
-- Open: prompt problems found in the recordings (TODO item 12), and check the new voice path on the deployed site.
+- Voice prompt fixes and the adaptive stand-in farmer are in the code (TODO item 12) but not yet checked with real calls; check the voice path on the deployed site too.
