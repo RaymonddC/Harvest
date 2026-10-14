@@ -56,6 +56,11 @@ function NewCampaign({ open, onClose, state, soon, taken, onMade }) {
   const [f, setF] = useState({ crop: "", target: "", weeks: String(state.settings?.weeks || 5) });
   const [saving, setSaving] = useState(false);
   const cropId = f.crop || free[0]?.id || "";
+  // Whole numbers only, typed into plain text boxes (no up and down arrows, a number keypad on phones).
+  const digits = (k) => (e) => setF({ ...f, [k]: e.target.value.replace(/[^0-9]/g, "") });
+  const weeksBad = f.weeks !== "" && (Number(f.weeks) < 1 || Number(f.weeks) > 12);
+  const targetBad = f.target !== "" && Number(f.target) < 1;
+  const ready = Number(f.target) >= 1 && !weeksBad && f.weeks !== "";
   const save = async (e) => {
     e.preventDefault();
     if (soon) return;
@@ -80,11 +85,15 @@ function NewCampaign({ open, onClose, state, soon, taken, onMade }) {
             </select>
           </label>
           <div className="grid2">
-            <label className="field">Weekly target, tonnes
-              <input type="number" min="1" step="1" required placeholder="e.g. 40" value={f.target} onChange={(e) => setF({ ...f, target: e.target.value })} />
+            <label className={`field ${targetBad ? "invalid" : ""}`}>Weekly target, tonnes
+              <input type="text" inputMode="numeric" autoComplete="off" required placeholder="e.g. 40" className="num-input"
+                value={f.target} onChange={digits("target")} aria-invalid={targetBad} />
+              {targetBad && <span className="field-err">Must be at least 1 t.</span>}
             </label>
-            <label className="field">Weeks to plan
-              <input type="number" min="1" max="12" step="1" required value={f.weeks} onChange={(e) => setF({ ...f, weeks: e.target.value })} />
+            <label className={`field ${weeksBad ? "invalid" : ""}`}>Weeks to plan
+              <input type="text" inputMode="numeric" autoComplete="off" required className="num-input"
+                value={f.weeks} onChange={digits("weeks")} aria-invalid={weeksBad} />
+              {weeksBad && <span className="field-err">Between 1 and 12 weeks.</span>}
             </label>
           </div>
           <p className="sub" style={{ margin: 0 }}>
@@ -94,7 +103,7 @@ function NewCampaign({ open, onClose, state, soon, taken, onMade }) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           {soon || !free.length
             ? <button className="btn solid" type="submit" disabled title={soon ? "Coming with the next backend update" : undefined}>Create campaign</button>
-            : <SubmitButton busy={saving} busyText="Creating…">Create campaign</SubmitButton>}
+            : <SubmitButton busy={saving} disabled={!ready} busyText="Creating…">Create campaign</SubmitButton>}
           <DialogClose>{soon ? "Close" : "Cancel"}</DialogClose>
         </div>
       </form>
