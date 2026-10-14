@@ -46,6 +46,8 @@ export default function Approvals() {
   const limits = Object.fromEntries(state.limits.map((l) => [l.id, l]));
   const quotes = view.rival_quotes.filter((q) => !view.offers.some((o) => o.source === `rival_quote:${q.id}` && ["pending", "approved"].includes(o.status)));
   const l = state.limits.find((x) => (x.crop || x.id) === crop) || null; // a crop without a price range shows none, not another crop's
+  // Offers whose confirmation call is happening now: their Undo is locked until the call ends.
+  const confirming = new Set(state.calls.filter((c) => c.kind === "confirm" && c.status === "on_call").map((c) => c.offer_id));
   const anyOut = offers.some((o) => o.status === "escalated");
   const rowOf = Object.fromEntries(view.forecast.map((r) => [r.week, r]));
   const toDecide = offers.filter((o) => o.status === "pending" || o.status === "escalated");
@@ -62,7 +64,12 @@ export default function Approvals() {
     const ids = easy.map((o) => o.id);
     await act(async () => { for (const id of ids) await api(`/api/offers/${id}/approve`); },
       `${ids.length} offers approved. Confirmation calls are queued.`,
-      { fn: async () => { for (const id of ids) await api(`/api/offers/${id}/undo`); }, ok: "Back to pending." });
+      { fn: async () => {
+        // An offer whose confirmation call already started cannot be undone; undo the rest and say how many stayed.
+        let locked = 0;
+        for (const id of ids) { try { await api(`/api/offers/${id}/undo`); } catch { locked += 1; } }
+        if (locked) throw new Error(`${locked} of ${ids.length} could not be undone: the confirmation call has started or finished.`);
+      }, ok: "Back to pending." });
   };
   const gap = [...view.forecast].sort((a, b) => a.week - b.week).find((r) => r.is_gap);
   const group = (title, n, extra) => <div className="offer-group"><h3>{title}<span className="count">{n}</span></h3>{extra}</div>;
@@ -95,7 +102,7 @@ export default function Approvals() {
           </AnimatePresence>
           {decided.length > 0 && group("Decided", decided.length)}
           <AnimatePresence initial={false}>
-          {decided.map((o) => <Offer key={o.id} o={o} l={limits[o.crop]} row={rowOf[o.deliver_week]} />)}
+          {decided.map((o) => <Offer key={o.id} o={o} l={limits[o.crop]} row={rowOf[o.deliver_week]} confirming={confirming.has(o.id)} />)}
           </AnimatePresence>
           {!offers.length && !quotes.length && (
             <div className="empty">

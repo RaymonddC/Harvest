@@ -78,6 +78,20 @@ def test_undo_refused_after_voice_confirmation(client, store):
     assert client.post(f"/api/offers/{offer_id}/undo").status_code == 400
 
 
+def test_undo_is_locked_while_the_confirmation_call_is_running(client, store):
+    offer_id = client.post("/api/rival-quotes/rq01/offer").json()["id"]
+    client.post(f"/api/offers/{offer_id}/approve")
+    call = next(c for c in store.list("calls") if c["kind"] == "confirm" and c["offer_id"] == offer_id)
+    store.set("calls", call["id"], {"status": "on_call"}, merge=True)  # the farmer picked up
+    r = client.post(f"/api/offers/{offer_id}/undo")
+    assert r.status_code == 400 and "in progress" in r.json()["detail"]
+    assert store.get("offers", offer_id)["status"] == "approved"
+    assert store.get("calls", call["id"]) is not None  # the running call is not withdrawn
+    # the call ended without the farmer confirming (dropped): the decision can be undone again
+    store.set("calls", call["id"], {"status": "dropped"}, merge=True)
+    assert client.post(f"/api/offers/{offer_id}/undo").json()["status"] == "pending"
+
+
 def test_upload_farmers(client, store):
     csv = "name,phone,crop,language,village\nPak Test,+62 812 0000 7777,Kelapa Sawit,Bahasa Indonesia,Lirik\n"
     assert client.post("/api/farmers/upload", json={"csv": csv}).json()["added"] == 1

@@ -29,7 +29,8 @@ function impact(o, row) {
     : { cls: "", text: `+${t(o.kg)} to week ${o.deliver_week}, still ${t(left)} short` };
 }
 
-export default function Offer({ o, l, row }) {
+// confirming: the confirmation call to this farmer is in progress, so the decision is locked.
+export default function Offer({ o, l, row, confirming = false }) {
   const act = useAct();
   // An escalated offer is approved at the farmer's requested price, so that is what must fit.
   const price = o.status === "escalated" && o.requested_price != null ? o.requested_price : o.price_per_kg;
@@ -54,8 +55,9 @@ export default function Offer({ o, l, row }) {
           </>
         ) : (
           <>
-            <Pill cls={o.status === "approved" ? "mint" : ""}>{confirmed ? "Approved · confirmed by voice" : o.status === "approved" ? "Approved" : "Rejected"}</Pill>
-            {!confirmed && <ActButton need="offers.decide" className="btn ghost" busy="Undoing…" run={() => act(() => api(`/api/offers/${o.id}/undo`), "Back to pending.")}>Undo</ActButton>}
+            <Pill cls={o.status === "approved" ? "mint" : ""}>{confirmed ? "Approved · confirmed by voice" : confirming ? "Approved · calling now" : o.status === "approved" ? "Approved" : "Rejected"}</Pill>
+            {!confirmed && <ActButton need="offers.decide" className="btn ghost" busy="Undoing…" disabled={confirming} title={confirming ? "The confirmation call is in progress. Undo is available again if it ends without a confirmation." : undefined}
+              run={() => act(() => api(`/api/offers/${o.id}/undo`), "Back to pending.")}>Undo</ActButton>}
           </>
         )}
       </div>
