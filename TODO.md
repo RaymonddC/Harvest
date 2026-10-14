@@ -111,12 +111,17 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
       `VAD_SILENCE_MS=400`), 6 scripted calls, per farmer turn: 1.5 to 1.8 s (name and consent), 1.3 to 1.4 s (volume),
       1.8 to 2.0 s (read-back, sometimes a `record_harvest` first), 1.4 to 2.4 s (counter-offer, `check_offer`), 1.8 to 3.0 s (final
       yes, `save_offer` and `end_call`); about 0.4 s less without the VAD wait. Connect to first agent audio: 1.35 to 2.7 s. A browser adds network and buffering.
-    - Prompt problems seen in the recordings, **fixed in code 14 Oct, not yet checked on a real call**: (1) a counter price
-      ("naik jadi 3300") was saved as a 3,300 kg harvest in 2 of 6 calls: the prompt now separates prices from weights, and
-      `record_harvest` refuses a second, different volume that falls in the crop's price range (once; the same number again
-      goes through); (2) English in the middle of Indonesian: "Speak only {language}" rule, numbers included; (3) the consent
-      question repeated: asked once; (4) `end_call` not always called: an "Ending the call" section. To check: run
-      `scripts/sample_call.py record` a few times and read the transcripts and tool lists.
+    - Prompt problems seen in the recordings, **fixed 14 Oct and checked on 12 real scripted calls**: (1) a counter price
+      ("naik jadi 3300") saved as a 3,300 kg harvest (2 of 6 calls before, 0 of 12 after): the prompt separates prices from
+      weights, and `record_harvest` refuses a second, different volume that falls in the crop's price range (once; the same
+      number again goes through); (2) English in the middle of Indonesian: 0 of 12 after ("Speak only {language}"; one stray
+      "permission" came from the English opening sentence in the prompt, once); (3) the consent question repeated: once
+      per call in 12 of 12; (4) `end_call` not always called: called in 12 of 12 ("Ending the call" rules).
+      Found on the way: the agent often sent `record_harvest` with `confirmed_by_farmer: true` first, so the volume was
+      never saved (0 of 4 calls). The tool now turns that call into the read-back step (no error) and the prompt says "two
+      calls, false then true"; the volume is now saved in about half the calls (the agent often stops after the
+      read-back). In gap-fill calls the volume is already on record and the offer is unaffected; in collect calls it
+      matters, so test a collect call (the script records gap-fill only) before relying on it.
     - The stand-in farmer now picks its line from what the agent just said (`web/js/stand-in.js`, rules in
       `web/samples/farmer-lines.json`: `when`, `after`, `max`, `ends`, `fallback`), so it keeps its sense when the agent varies
       its order; it says goodbye and switches itself off. It reuses "Ya, benar." as the short fallback; a dedicated

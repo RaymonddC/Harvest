@@ -210,11 +210,16 @@ class ToolHandlers:
                     "say": "Read this back in the farmer's language and ask if it is right. If they "
                            "say yes, call record_harvest again with confirmed_by_farmer true."}
         if self.session.read_back.get(crop_id) != (kg, date.isoformat()):
-            # Enforced here, not only in the prompt: the exact numbers must have been read back first.
+            # Enforced here, not only in the prompt: nothing is saved until these exact numbers were read back.
+            # The call that skipped the read-back becomes the read-back step, so there is nothing to retry.
+            self.session.read_back[crop_id] = (kg, date.isoformat())
             self.last_ui = {"captured": {**self.last_ui["captured"], "status": "waiting"}}
             return {"saved": False, "status": "read_back_required",
-                    "error": "Not saved. Call record_harvest with confirmed_by_farmer false and read "
-                             "these exact numbers back to the farmer first; save only after they say yes."}
+                    "read_back": f"{round(kg):,} kg of {crop_label(crop_id)}, ready on {date:%A %d %B}.",
+                    "say": "Not saved yet: the farmer has not heard these numbers back. Read this sentence to the "
+                           "farmer in their language and ask if it is right. If they say yes, call record_harvest "
+                           "again with the same numbers and confirmed_by_farmer true. This is the normal next "
+                           "step, not an error; do not apologise."}
         result = services.record_harvest(self.store, self.settings, self.session.farmer["id"], crop_id,
                                          kg, date.isoformat(), self.session.call_id, confidence)
         self.session.saved_kg[crop_id] = kg

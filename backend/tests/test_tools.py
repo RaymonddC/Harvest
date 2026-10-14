@@ -33,11 +33,14 @@ def test_record_harvest_reads_back_before_saving(store, settings):
 def test_record_harvest_refuses_to_save_without_a_matching_read_back(store, settings):
     h, _ = make(store, settings)
     args = {"crop": "palm", "kg": 1600, "ready_date": "2026-11-02", "confirmed_by_farmer": True}
-    assert h.dispatch("record_harvest", args)["saved"] is False  # never read back
-    h.dispatch("record_harvest", {**args, "confirmed_by_farmer": False})
-    assert h.dispatch("record_harvest", {**args, "kg": 2000})["saved"] is False  # numbers changed
+    first = h.dispatch("record_harvest", args)  # confirmed straight away, never read back
+    assert first["saved"] is False and first["status"] == "read_back_required" and "error" not in first
+    assert "1,600 kg of Palm FFB" in first["read_back"] and "not an error" in first["say"]
     assert store.get("harvests", "h-f01-palm") is None
-    assert h.dispatch("record_harvest", args)["saved"] is True
+    assert h.dispatch("record_harvest", args)["saved"] is True  # the read-back it just returned counts
+    h.dispatch("record_harvest", {**args, "confirmed_by_farmer": False})
+    assert h.dispatch("record_harvest", {**args, "kg": 2000})["saved"] is False  # numbers changed after read-back
+    assert store.get("harvests", "h-f01-palm")["kg"] == 1600
 
 
 def save_harvest(h, kg=1600):
@@ -203,6 +206,7 @@ def test_prompt_has_disclosure_two_step_read_back_and_no_limits(store, settings)
     assert "Ask the consent question once" in text
     assert "A number the farmer says with" in text and "PRICE per kilogram" in text
     assert "call end_call at once" in text
+    assert "Never send true first" in text and "read_back_required" in text
     for secret in ("3350", "3,350", "2900", "2,900", "ceiling", "floor"):
         assert secret not in text
     confirm = build_system_instruction(settings, farmer, "confirm", None,

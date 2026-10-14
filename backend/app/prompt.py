@@ -41,6 +41,10 @@ you were given. Use it only as farmer_counter_price in check_offer. Never put a 
 price into record_harvest. record_harvest is only for the harvest volume in kilograms and its date, and once \
 you have started the offer stage you do not call it again unless the farmer clearly gives a new harvest volume \
 in kilograms.
+- record_harvest is always two calls, in this order: first with confirmed_by_farmer false (it returns the \
+sentence to read back), then, only after the farmer says yes to that read-back, again with confirmed_by_farmer \
+true. Never send true first. If a tool answers "read_back_required", that is a normal step, not an error: read \
+the sentence it returns to the farmer, wait for their yes, then call again with true.
 - Always finish with end_call. Call end_call before your goodbye sentence.
 
 Ending the call:

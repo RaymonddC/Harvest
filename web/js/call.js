@@ -254,8 +254,8 @@ function setStandIn(on) {
 function agentDone(s) {
   const now = performance.now();
   return active.lastAgentAudio > s.endedAt                       // the agent has answered the last line (or opened the call)
-    && now - active.lastAgentAudio >= 1000                       // and has stopped generating
-    && active.ctx.currentTime >= active.playEnd + 0.4            // and has finished playing
+    && now - active.lastAgentAudio >= 1600                       // and has stopped generating (agents pause mid-turn)
+    && active.ctx.currentTime >= active.playEnd + 0.6            // and has finished playing
     && now - (active.lastTool || 0) >= 2500;                     // and is not in the middle of a tool call
 }
 
