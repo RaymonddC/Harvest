@@ -118,7 +118,7 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
 
 13. **Multi-crop campaigns, backend (done 14 Oct; C-05).** One campaign per crop: `POST /api/campaigns`,
     `/api/campaigns/{id}/start|stop`, per-crop forecast rows (`W1` for the default crop, `rubber-W1` for others),
-    `settings.multi_crop` (env `MULTI_CROP`, kill switch). The old `/api/campaign/start|stop` still work (optional `crop`).
+    `settings.multi_crop` (env / GitHub variable `MULTI_CROP`, OFF by default; set it to `true` once the frontend below is done). The old `/api/campaign/start|stop` still work (optional `crop`).
     Still to do, in `frontend/` (Wilbert): five screens (`Forecast.jsx`, `StartCalling.jsx`, `GapCard.jsx`, `NextStep.jsx`,
     `Shell.jsx`) look up the campaign with id `current` and call `/api/campaign/start` with no crop, so they always act on the
     default crop. Make them use the picked crop: `state.campaigns.find((c) => c.crop === crop)` and send `crop` in the body

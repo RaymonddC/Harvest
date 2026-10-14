@@ -130,3 +130,16 @@ def test_call_now_uses_the_farmers_crop_gap(client, store):
     fid = rubber_farmer(store)
     cid = services.call_now(store, fid, "collect")
     assert store.get("calls", cid)["gap_week"] is not None  # rubber has a gap in every empty week
+
+
+def test_multi_crop_is_off_until_it_is_switched_on(monkeypatch):
+    from app.config import get_settings
+    get_settings.cache_clear()
+    try:
+        monkeypatch.delenv("MULTI_CROP", raising=False)
+        assert get_settings().multi_crop is False
+        get_settings.cache_clear()
+        monkeypatch.setenv("MULTI_CROP", "true")
+        assert get_settings().multi_crop is True
+    finally:
+        get_settings.cache_clear()

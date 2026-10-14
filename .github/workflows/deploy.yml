@@ -66,6 +66,7 @@ jobs:
           GEMINI_BACKEND: ${{ vars.GEMINI_BACKEND }}
           GOOGLE_CLOUD_LOCATION: ${{ vars.GOOGLE_CLOUD_LOCATION }}
           LIVE_MODEL: ${{ vars.LIVE_MODEL }}
+          MULTI_CROP: ${{ vars.MULTI_CROP }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           # Redeploys must not wipe live data, and the deployer account has no right to enable APIs.
           SEED_DEMO_DATA: "false"
