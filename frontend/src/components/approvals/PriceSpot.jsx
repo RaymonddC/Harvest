@@ -1,8 +1,9 @@
 import { plainPrice } from "../../lib.js";
 
 // Where the price sits between the floor and the ceiling. A request above the ceiling
-// lands in the red stretch past the ceiling mark.
-export default function PriceSpot({ price, l, cur }) {
+// lands in the red stretch past the ceiling mark. market and rival add small ticks for
+// today's market price and a supplier's quote for the same week.
+export default function PriceSpot({ price, l, cur, market, rival }) {
   const span = l.ceiling_price - l.floor_price || 1;
   const top = Math.max(l.ceiling_price, price) + span * 0.25;
   const at = (p) => `${Math.min(Math.max((p - l.floor_price) / (top - l.floor_price), 0), 1) * 100}%`;
@@ -15,6 +16,8 @@ export default function PriceSpot({ price, l, cur }) {
       title={`Floor ${plainPrice(l.floor_price, cur)} · ceiling ${plainPrice(l.ceiling_price, cur)}`}>
       <i className="ok" style={{ width: at(l.ceiling_price) }} />
       <i className="cap" style={{ left: at(l.ceiling_price) }} />
+      {market != null && <i className="mk market" style={{ left: at(market) }} />}
+      {rival != null && <i className="mk rival" style={{ left: at(rival) }} />}
       <i className="dot" style={{ left: at(price) }} />
     </div>
   );
