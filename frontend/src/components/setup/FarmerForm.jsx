@@ -46,7 +46,8 @@ export default function FarmerForm({ farmer, onClose }) {
             <select required value={f.language} onChange={set("language")}>{languages.map((l) => <option key={l}>{l}</option>)}</select>
           </label>
           <label className="field">Village <input type="text" autoComplete="off" value={f.village} onChange={set("village")} /></label>
-          <label className="field">Usual kg per week <input type="number" min="0" step="1" placeholder="optional" value={f.usual_kg_week} onChange={set("usual_kg_week")} /></label>
+          <label className="field">Usual kg per week <input type="text" inputMode="numeric" autoComplete="off" placeholder="optional" className="num-input" value={f.usual_kg_week ?? ""}
+            onChange={(e) => setF({ ...f, usual_kg_week: e.target.value.replace(/[^0-9]/g, "") })} /></label>
           <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
             <input type="checkbox" checked={f.can_pull_forward} onChange={set("can_pull_forward")} /> Can bring the harvest forward
           </label>

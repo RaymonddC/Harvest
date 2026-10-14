@@ -21,7 +21,7 @@ export default function StartCalling({ state, toCall }) {
   };
   return (
     <section className="card dark" aria-labelledby="campaign-title">
-      <StepTop n={3} done={false} word={running ? "Calling" : "Ready"} cls={running ? "leaf" : ""} />
+      <StepTop n={3} done={false} word={running ? "Calling" : toCall ? "Ready" : "Waiting"} cls={running ? "leaf" : ""} />
       <div className="step-head"><h2 id="campaign-title">Start calling</h2>
         <span className="sub">The agent asks every farmer about weeks 1 to {s.weeks || 5}, in {s.language || cfg.language || "the configured language"}.</span></div>
       <div className="stats" id="campaign-lines">
