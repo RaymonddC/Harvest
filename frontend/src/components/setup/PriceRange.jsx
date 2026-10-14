@@ -104,8 +104,9 @@ export default function PriceRange({ l, crop }) {
     setSaving(false);
   };
   const rungs = form && l ? ladder(form, l) : null;
-  const errs = dirty ? problems(form) : {};
-  const invalid = Object.keys(errs).length > 0;
+  const all = problems(form);
+  const errs = dirty ? all : {};
+  const invalid = Object.keys(all).length > 0;
   const priced = !!l && !dirty;
 
   return (
@@ -115,7 +116,7 @@ export default function PriceRange({ l, crop }) {
         <span className="sub">{l ? `${cropLabel(l.crop)}, ${l.currency} per ${l.unit}. The agent can only offer inside this range, and farmers are never offered less than the lowest price.` : `No price range for ${cropLabel(crop)} yet. Set it before any gap-fill call: the agent can only offer inside this range.`}</span></div>
       <div className="grid3">
         <Field label="Lowest" name="floor_price" form={form} edit={edit} error={errs.floor_price} />
-        <Field label="Market today" name="reference_price" form={form} edit={edit} error={errs.reference_price} />
+        <Field label="Market" name="reference_price" form={form} edit={edit} error={errs.reference_price} />
         <Field label="Highest" name="ceiling_price" form={form} edit={edit} error={errs.ceiling_price} />
       </div>
       {form && l && <PriceSlider form={form} l={l} onChange={slide} />}
@@ -134,7 +135,8 @@ export default function PriceRange({ l, crop }) {
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: "auto" }}>
         {can("limits.edit") ? <SubmitButton busy={saving} disabled={invalid} busyText="Saving…">Save price range</SubmitButton>
           : <button type="button" className="btn solid" disabled title="Your role cannot change the price range.">Save price range</button>}
-        {invalid ? <span className="small field-err">Fix the marked boxes to save.</span>
+        {invalid && !dirty ? <span className="small muted">Enter the three prices to save.</span>
+          : invalid ? <span className="small field-err">Fix the marked boxes to save.</span>
           : dirty ? <button type="button" className="btn ghost" onClick={() => setDirty(false)}>Discard changes</button>
           : <span className="small muted">Illustrative prices for the demo.</span>}
       </div>

@@ -110,10 +110,12 @@ export default function Shell({ title, head, children }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // The top bar tightens once the page has scrolled a little.
+  // The top bar tightens once the page has scrolled. Two thresholds, far apart: tightening makes the
+  // bar about 60px shorter, which moves the scroll position, and one threshold would then flip it
+  // back and forth (the bar shook near the top of the page).
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => setScrolled((was) => (was ? window.scrollY > 8 : window.scrollY > 96));
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);

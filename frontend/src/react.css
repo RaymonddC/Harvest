@@ -525,3 +525,74 @@ dl.shortcuts dd { margin: 0; color: var(--muted); text-align: right; }
 dl.shortcuts small { color: var(--muted); }
 kbd { display: inline-block; min-width: 24px; padding: 2px 7px; border: 1px solid var(--line, #d9e1dc); border-bottom-width: 2px;
   border-radius: 6px; background: #fff; font: 600 12px/1.4 inherit; text-align: center; }
+
+
+/* ============ Stacked forecast bars, call recap drawer, price check ============ */
+
+/* A bar is a stack: firm at the bottom, unsure answers hatched, approved deals on top. */
+body.app .chart .bar { display: flex; flex-direction: column-reverse; overflow: hidden; }
+body.app .chart .bar .seg { display: block; flex-basis: 0; min-height: 0; }
+body.app .chart .bar .seg.unsure { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .5) 0 4px, rgba(255, 255, 255, .12) 4px 8px); }
+body.app .chart .bar .seg.approved { background: rgba(15, 61, 42, .42); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55); }
+body.app .chart .bar.gap .seg.approved { background: rgba(110, 66, 0, .35); }
+.legend .l-unsure { background: repeating-linear-gradient(135deg, var(--leaf) 0 2px, #9CCFB5 2px 4px); }
+.legend .l-approved { background: #0F3D2A; }
+
+/* Call recap: a panel that slides in from the right. */
+.hc-sheet { position: fixed; z-index: 61; top: 0; right: 0; bottom: 0; width: min(520px, 100vw); display: flex; flex-direction: column;
+  background: var(--surface); box-shadow: -24px 0 60px -20px rgba(16, 24, 20, .35); border-radius: 22px 0 0 22px;
+  animation: hc-sheet-in .28s cubic-bezier(.2, .8, .2, 1); }
+.hc-sheet:focus { outline: none; }
+@keyframes hc-sheet-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .hc-sheet { animation: none; } }
+.sheet-head { display: flex; align-items: center; gap: 12px; padding: 20px 22px 16px; border-bottom: 1px solid var(--line-2); }
+.sheet-head > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sheet-title { margin: 0; font-size: 19px; font-weight: 800; letter-spacing: -0.01em; }
+.sheet-head .sub { font-size: 13px; color: var(--muted); }
+.sheet-x { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-size: 22px; line-height: 1;
+  color: var(--muted); cursor: pointer; flex: none; }
+.sheet-x:hover { background: var(--fill); color: var(--ink); }
+.sheet-body { flex: 1; overflow: auto; padding: 18px 22px 28px; display: flex; flex-direction: column; gap: 22px; }
+.sheet-body h3 { margin: 0 0 10px; font-size: 14px; font-weight: 700; }
+.recap-status { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.recap-status p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--ink-2); }
+
+ul.facts { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }
+ul.facts li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: var(--fill); }
+ul.facts li.ok { background: var(--leaf-soft); }
+ul.facts .mark { width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+  background: var(--surface); color: var(--faint); }
+ul.facts li.ok .mark { background: var(--leaf); color: #fff; }
+ul.facts li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+ul.facts .label { font-size: 12px; color: var(--muted); }
+ul.facts b { font-size: 14px; font-weight: 600; line-height: 1.45; }
+.deal-state { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: var(--surface); color: var(--muted); vertical-align: 1px; }
+.deal-state.pending, .deal-state.escalated { background: var(--amber-soft); color: var(--amber-text); }
+.deal-state.approved { background: var(--leaf); color: #fff; }
+
+.talk-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.talk-head h3 { margin: 0; }
+label.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+label.switch input { accent-color: var(--leaf); width: 16px; height: 16px; }
+.transcript.recap { max-height: none; overflow: visible; margin: 0; }
+.transcript.recap .bubble { font-size: 14px; line-height: 1.45; }
+
+@media (max-width: 640px) {
+  .hc-sheet { top: auto; width: 100vw; height: 88vh; border-radius: 22px 22px 0 0; animation-name: hc-sheet-up; }
+  @keyframes hc-sheet-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+}
+
+/* Price check under an offer: market, supplier quote, ceiling. */
+.offer .spot .mk { position: absolute; top: -4px; width: 2px; height: 14px; margin-left: -1px; border-radius: 1px; }
+.offer .spot .mk.market { background: var(--leaf-deep); }
+.offer .spot .mk.rival { background: #6B5BD6; }
+ul.proof { flex-basis: 100%; list-style: none; margin: -2px 0 0; padding: 0 0 0 56px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+ul.proof li { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+ul.proof li i { width: 8px; height: 8px; border-radius: 2px; background: var(--faint); }
+ul.proof li.market i { background: var(--leaf-deep); }
+ul.proof li.rival i { background: #6B5BD6; }
+ul.proof li.room i { background: var(--leaf-mid); }
+ul.proof li.over { color: var(--danger); font-weight: 600; }
+ul.proof li.over i { background: var(--danger); }
+@media (max-width: 640px) { ul.proof { padding-left: 0; } }
