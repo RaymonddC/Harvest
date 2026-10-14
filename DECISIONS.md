@@ -78,5 +78,5 @@ something to rely on for real traffic.
 One campaign per crop, keyed by crop. The default crop (`DEMO_CROP`, palm) keeps the ids it always had (campaign `current`,
 forecast rows `W1`..`W5`), so existing data, tests and screens need no migration; other crops use their crop id (`rubber`,
 `rubber-W1`). Each campaign has its own weekly target and weeks; a call runs with its crop's values (`services.settings_for_crop`).
-`MULTI_CROP` is off by default (GitHub variable `MULTI_CROP=true` turns it on) until the dashboard's campaign screens use the picked crop; with it off the dashboard behaves exactly as before. Demo data stays palm only; a new crop needs farmers and price limits added by the planner,
+`MULTI_CROP` is on by default (GitHub variable `MULTI_CROP=false` turns it off). The dashboard's campaign screens (Setup, Forecast, Approvals, week card, next step) use the picked crop; a crop with no price range shows a blank form, never another crop's. Demo data stays palm only; a new crop needs farmers and price limits added by the planner,
 and a gap-fill start refuses with a clear message while limits are missing.

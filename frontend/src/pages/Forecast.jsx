@@ -7,7 +7,7 @@ import { FillList, Hero } from "../components/forecast/GapCard.jsx";
 import GapNote from "../components/forecast/GapNote.jsx";
 import Kpis from "../components/forecast/Kpis.jsx";
 import { apiUrl, fmtT } from "../lib.js";
-import { cropName, forCrop, useCrop } from "../campaigns.jsx";
+import { campaignFor, cropName, forCrop, useCrop } from "../campaigns.jsx";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 
@@ -18,9 +18,13 @@ export default function Forecast() {
   const { crop } = useCrop();
   const rows = state ? forCrop(state.forecast, crop).sort((a, b) => a.week - b.week) : []; // the picked crop's weeks
   const gap = rows.find((r) => r.is_gap);
-  const campaign = state ? state.campaigns.find((x) => x.id === "current") || {} : {};
+  // Everything below shows the picked crop only: its farmers, their calls, its offers and quotes, and its campaign.
+  const farmerIds = new Set(state ? forCrop(state.farmers, crop).map((f) => f.id) : []);
+  const view = state ? { ...state, farmers: forCrop(state.farmers, crop), offers: forCrop(state.offers, crop),
+    rival_quotes: forCrop(state.rival_quotes, crop), calls: state.calls.filter((c) => farmerIds.has(c.farmer_id)) } : null;
+  const campaign = state ? campaignFor(state, crop) : {};
   const running = campaign.status === "running";
-  const campaignCalls = state ? state.calls.filter((c) => c.kind !== "confirm" && (c.attempt || 1) === 1) : [];
+  const campaignCalls = view ? view.calls.filter((c) => c.kind !== "confirm" && (c.attempt || 1) === 1) : [];
   const target = rows.length ? rows[0].target_kg : 0;
 
   const head = (
@@ -44,11 +48,11 @@ export default function Forecast() {
         {state && rows.length > 0 && (
           <motion.div key={gap ? "gap" : "ok"} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.25, ease: "easeOut" }}>
-            <Hero gap={gap} rows={rows} state={state} />
+            <Hero gap={gap} rows={rows} state={view} />
           </motion.div>
         )}
       </AnimatePresence>
-      <Kpis rows={rows} calls={campaignCalls} toCall={state ? state.farmers.filter((f) => f.to_call).length : 0} />
+      <Kpis rows={rows} calls={campaignCalls} toCall={view ? view.farmers.filter((f) => f.to_call).length : 0} />
       <div className="cols">
         <div className="col-main">
           <section className="card" aria-labelledby="chart-title">
@@ -70,19 +74,19 @@ export default function Forecast() {
           </section>
         </div>
         <div className="col-side">
-          {state && gap && <FillList gap={gap} state={state} />}
+          {state && gap && <FillList gap={gap} state={view} />}
           <section className="card" aria-labelledby="calls-title">
             <div className="card-head">
               <h2 id="calls-title">Live calls</h2>
               <a href="/call.html" target="_blank" rel="noopener">Open call client</a>
             </div>
-            {state ? <Calls calls={state.calls} onShow={setShown} /> : <div className="rows" id="calls" />}
+            {state ? <Calls calls={view.calls} onShow={setShown} /> : <div className="rows" id="calls" />}
             <button className="btn" onClick={() => setLogOpen(true)}>Call log</button>
           </section>
         </div>
       </div>
       <CallDialog call={shown} onClose={() => setShown(null)} />
-      <CallLog open={logOpen} calls={state ? state.calls : []} onClose={() => setLogOpen(false)} onShow={setShown} />
+      <CallLog open={logOpen} calls={view ? view.calls : []} onClose={() => setLogOpen(false)} onShow={setShown} />
     </Shell>
   );
 }

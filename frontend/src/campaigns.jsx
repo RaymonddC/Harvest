@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useLive } from "./live.jsx";
 
 // Crops a mill can run a campaign for. The label is what planners read; the id matches
@@ -35,6 +35,9 @@ export function campaignsOf(state) {
   }));
 }
 
+// The campaign of one crop (the legacy "current" campaign is the default crop's), or an empty object.
+export const campaignFor = (state, crop) => campaignsOf(state).find((c) => c.crop === crop) || {};
+
 // Rows for one crop. Records without a crop belong to the single crop of today's backend.
 export const forCrop = (list, crop) => list.filter((x) => !x.crop || x.crop === crop);
 
@@ -46,11 +49,14 @@ export function CropProvider({ children }) {
   const { state } = useLive();
   const [crop, setCropState] = useState(() => { try { return localStorage.getItem(KEY) || ""; } catch { return ""; } });
   const crops = useMemo(() => [...new Set(campaignsOf(state).map((c) => c.crop))], [state]);
+  // A crop picked a moment ago (a campaign just created) may not have reached the live data yet.
+  const pickedAt = useRef(0);
   // Fall back to the first crop that has a campaign when the remembered one has none.
   useEffect(() => {
-    if (crops.length && !crops.includes(crop)) setCropState(crops[0]);
+    if (crops.length && !crops.includes(crop) && Date.now() - pickedAt.current > 5000) setCropState(crops[0]);
   }, [crops, crop]);
   const setCrop = (id) => {
+    pickedAt.current = Date.now();
     setCropState(id);
     try { localStorage.setItem(KEY, id); } catch { /* storage blocked: the choice lasts this visit */ }
   };

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { campaignFor, useCrop } from "../../campaigns.jsx";
 import { api, fmtPrice, fmtT } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar, Icon, Pill } from "../../ui.jsx";
@@ -17,6 +18,7 @@ function supply(gap, state) {
 // news that every week is on track (and which approved offers closed the gap).
 export function Hero({ gap, rows, state }) {
   const act = useAct();
+  const { crop } = useCrop();
   const target = rows[0].target_kg;
   const waiting = state.offers.filter((o) => ["pending", "escalated"].includes(o.status)).length;
   if (!gap) {
@@ -37,7 +39,7 @@ export function Hero({ gap, rows, state }) {
   }
   const { list, farmersKg, quotes, quoteKg } = supply(gap, state);
   const canFill = list.length > 0 || state.farmers.some((f) => f.type === "supplier");
-  const campaign = state.campaigns.find((x) => x.id === "current") || {};
+  const campaign = campaignFor(state, crop);
   const calling = campaign.status === "running" && campaign.kind === "gap_fill";
   let text = list.length
     ? `${list.length} farmer${list.length > 1 ? "s" : ""} can bring about ${fmtT(farmersKg)} t forward`
@@ -54,7 +56,7 @@ export function Hero({ gap, rows, state }) {
         {/* While gap-fill calls run, the next step is answering them, not starting more. */}
         {calling ? <a className="btn solid big" href="/call.html" target="_blank" rel="noopener"><Icon name="phone" size={16} />Open call client</a> : (
         <ActButton need="campaign.run" className="btn solid big" busy="Queuing calls…" disabled={!canFill}
-          run={() => act(() => api("/api/campaign/start", { body: { kind: "gap_fill" } }), (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`)}>
+          run={() => act(() => api("/api/campaign/start", { body: { kind: "gap_fill", crop } }), (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`)}>
           <Icon name="phone" size={16} />Start gap-fill calls
         </ActButton>)}
         {waiting > 0 && <Link className="btn" to="/approvals">Review {waiting} waiting</Link>}

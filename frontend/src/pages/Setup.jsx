@@ -21,7 +21,7 @@ export default function Setup() {
   const farmers = state ? forCrop(state.farmers, crop).filter((f) => f.type !== "supplier")
     .sort((a, b) => Number(!!b.to_call) - Number(!!a.to_call) || a.id.localeCompare(b.id)) : [];
   const toCall = state ? forCrop(state.farmers, crop).filter((f) => f.to_call).length : 0;
-  const l = state ? state.limits.find((x) => (x.crop || x.id) === crop) || state.limits[0] : null;
+  const l = state ? state.limits.find((x) => (x.crop || x.id) === crop) || null : null; // none yet for a new crop: the form starts blank
 
   const head = (
     <div className="page-head">
@@ -38,7 +38,7 @@ export default function Setup() {
       {/* "linked": on a wide screen a line joins each step to the next, green once the step is done. */}
       <div className="steps linked">
         <FarmersStep farmers={farmers} toCall={toCall} onAdd={() => setFarmerForm({})} />
-        <PriceRange l={l} />
+        <PriceRange key={crop} l={l} crop={crop} />
         {state ? <StartCalling state={state} toCall={toCall} /> : <section className="card dark"><div className="stats" id="campaign-lines" /></section>}
       </div>
       {state && <FarmerList farmers={farmers} onEdit={setFarmerForm} />}

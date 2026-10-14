@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { campaignFor, cropName, useCrop } from "../../campaigns.jsx";
 import { api, cfg } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Icon } from "../../ui.jsx";
@@ -8,13 +9,14 @@ import StepTop from "./StepTop.jsx";
 export default function StartCalling({ state, toCall }) {
   const act = useAct();
   const navigate = useNavigate();
-  const campaign = state.campaigns.find((x) => x.id === "current") || {};
+  const { crop } = useCrop();
+  const campaign = campaignFor(state, crop);
   const running = campaign.status === "running";
   const s = state.settings || {};
   const minutes = Math.round((s.max_call_seconds || 360) / 60);
   const retries = Math.max((s.max_call_attempts || 2) - 1, 0);
   const start = async () => {
-    const r = await act(() => api("/api/campaign/start", { body: { kind: "collect" } }));
+    const r = await act(() => api("/api/campaign/start", { body: { kind: "collect", crop } }));
     if (r) navigate("/");
   };
   return (
@@ -32,10 +34,10 @@ export default function StartCalling({ state, toCall }) {
         {running ? <>
           <span className="pill lg dot running" style={{ alignSelf: "flex-start", background: "var(--ink-2)", color: "var(--on-ink)" }}>{campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Calling farmers now"}</span>
           <a className="btn mint big block" href="/call.html" target="_blank" rel="noopener">Open call client</a>
-          <ActButton need="campaign.run" className="btn on-ink block" busy="Stopping…" run={() => act(() => api("/api/campaign/stop"), "Calling stopped.")}>Stop calling</ActButton>
+          <ActButton need="campaign.run" className="btn on-ink block" busy="Stopping…" run={() => act(() => api("/api/campaign/stop", { body: { crop } }), "Calling stopped.")}>Stop calling</ActButton>
         </> : (
           <ActButton need="campaign.run" className="btn mint big block" busy="Starting…" disabled={!toCall} run={start}>
-            <Icon name="phone" />{toCall ? `Start calling ${toCall} farmers` : "Add farmers to start"}
+            <Icon name="phone" />{toCall ? `Start calling ${toCall} ${cropName(crop)} ${toCall === 1 ? "farmer" : "farmers"}` : "Add farmers to start"}
           </ActButton>
         )}
       </div>

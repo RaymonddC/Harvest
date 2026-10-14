@@ -126,7 +126,7 @@ def get_settings() -> Settings:
         demo_password=os.environ.get("DEMO_PASSWORD", "harvest-demo"),
         jwt_ttl_seconds=int(os.environ.get("JWT_TTL_SECONDS", str(12 * 3600))),
         seed_on_start=_bool("SEED_ON_START", store_backend == "memory"),
-        multi_crop=_bool("MULTI_CROP", False),
+        multi_crop=_bool("MULTI_CROP", True),
         static_dir=static_dir,
         cors_origins=tuple(
             o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()

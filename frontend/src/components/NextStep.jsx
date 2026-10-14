@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { forCrop, useCrop } from "../campaigns.jsx";
+import { campaignFor, forCrop, useCrop } from "../campaigns.jsx";
 import { api } from "../lib.js";
 import { useLive } from "../live.jsx";
 import { useAct } from "../toast.jsx";
@@ -15,10 +15,10 @@ export default function NextStep({ page }) {
   const { crop } = useCrop();
   const act = useAct();
   if (!state) return null;
-  const campaign = state.campaigns.find((x) => x.id === "current") || {};
+  const campaign = campaignFor(state, crop);
   const waiting = forCrop(state.offers, crop).filter((o) => WAITING.includes(o.status)).length;
   const gap = forCrop(state.forecast, crop).sort((a, b) => a.week - b.week).find((r) => r.is_gap);
-  const canFill = gap && ((gap.shortlist || []).length || state.farmers.some((f) => f.type === "supplier"));
+  const canFill = gap && ((gap.shortlist || []).length || forCrop(state.farmers, crop).some((f) => f.type === "supplier"));
   const toCall = forCrop(state.farmers, crop).filter((f) => f.to_call).length;
 
   let step = null;
@@ -29,7 +29,7 @@ export default function NextStep({ page }) {
   } else if (canFill && page !== "forecast") { // the forecast page leads with this in its banner
     step = (
       <ActButton className="btn solid" need="campaign.run" busy="Queuing calls…"
-        run={() => act(() => api("/api/campaign/start", { body: { kind: "gap_fill" } }), (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`)}>
+        run={() => act(() => api("/api/campaign/start", { body: { kind: "gap_fill", crop } }), (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`)}>
         <Icon name="phone" size={16} />Fill week {gap.week}
       </ActButton>
     );

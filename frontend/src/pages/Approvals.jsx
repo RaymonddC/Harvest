@@ -45,7 +45,7 @@ export default function Approvals() {
   const offers = [...view.offers].sort((a, b) => ORDER[a.status] - ORDER[b.status] || (a.created_at || "").localeCompare(b.created_at || ""));
   const limits = Object.fromEntries(state.limits.map((l) => [l.id, l]));
   const quotes = view.rival_quotes.filter((q) => !view.offers.some((o) => o.source === `rival_quote:${q.id}` && ["pending", "approved"].includes(o.status)));
-  const l = state.limits.find((x) => (x.crop || x.id) === crop) || state.limits[0];
+  const l = state.limits.find((x) => (x.crop || x.id) === crop) || null; // a crop without a price range shows none, not another crop's
   const anyOut = offers.some((o) => o.status === "escalated");
   const rowOf = Object.fromEntries(view.forecast.map((r) => [r.week, r]));
   const toDecide = offers.filter((o) => o.status === "pending" || o.status === "escalated");
@@ -103,7 +103,7 @@ export default function Approvals() {
                 <>
                   <p>No offers yet. Week {gap.week} is {(gap.gap_kg / 1000).toFixed(0)} t short: gap-fill calls ask farmers to move harvest into it, and every deal they agree lands here.</p>
                   <ActButton need="campaign.run" className="btn solid" busy="Queuing calls…"
-                    run={() => act(() => api("/api/campaign/start", { body: { kind: "gap_fill" } }), (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`)}>
+                    run={() => act(() => api("/api/campaign/start", { body: { kind: "gap_fill", crop } }), (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`)}>
                     <Icon name="phone" size={16} />Start gap-fill calls
                   </ActButton>
                 </>

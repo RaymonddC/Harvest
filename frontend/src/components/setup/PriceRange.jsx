@@ -70,7 +70,7 @@ const Field = ({ label, name, form, edit, error, decimal = false }) => (
 );
 
 // Step 2: the floor, market and ceiling prices, and the offer ladder they make.
-export default function PriceRange({ l }) {
+export default function PriceRange({ l, crop }) {
   const act = useAct();
   const [form, setForm] = useState(null);
   const [dirty, setDirty] = useState(false);
@@ -82,6 +82,10 @@ export default function PriceRange({ l }) {
   useEffect(() => {
     if (l && !dirty) setForm(Object.fromEntries(FIELDS.map((k) => [k, l[k]])));
   }, [l, dirty]);
+  // A crop with no price range yet (a new campaign) starts a blank form, with the agent's usual ladder settings.
+  useEffect(() => {
+    if (!l && !form) setForm({ floor_price: "", reference_price: "", ceiling_price: "", first_premium_pct: "4", step_pct: "2" });
+  }, [l, form]);
 
   const edit = (k, decimal) => (e) => {
     // Keep digits (and one decimal point where allowed); anything else typed is ignored.
@@ -96,7 +100,7 @@ export default function PriceRange({ l }) {
     e.preventDefault();
     const body = Object.fromEntries(FIELDS.map((k) => [k, Number(form[k])]));
     setSaving(true);
-    await act(() => api(`/api/limits/${l.id}`, { method: "PUT", body }), () => { setDirty(false); return "Price range saved. The agent uses it from the next offer."; });
+    await act(() => api(`/api/limits/${l ? l.id : crop}`, { method: "PUT", body }), () => { setDirty(false); return "Price range saved. The agent uses it from the next offer."; });
     setSaving(false);
   };
   const rungs = form && l ? ladder(form, l) : null;
@@ -108,7 +112,7 @@ export default function PriceRange({ l }) {
     <form className={`card ${priced ? "done" : ""}`} aria-labelledby="limits-title" onSubmit={save}>
       <StepTop n={2} done={priced} word={dirty ? "Unsaved" : priced ? "Done" : "To do"} />
       <div className="step-head"><h2 id="limits-title">Fair price range</h2>
-        <span className="sub">{l ? `${cropLabel(l.crop)}, ${l.currency} per ${l.unit}. The agent can only offer inside this range, and farmers are never offered less than the lowest price.` : "The agent can only offer inside this range."}</span></div>
+        <span className="sub">{l ? `${cropLabel(l.crop)}, ${l.currency} per ${l.unit}. The agent can only offer inside this range, and farmers are never offered less than the lowest price.` : `No price range for ${cropLabel(crop)} yet. Set it before any gap-fill call: the agent can only offer inside this range.`}</span></div>
       <div className="grid3">
         <Field label="Lowest" name="floor_price" form={form} edit={edit} error={errs.floor_price} />
         <Field label="Market today" name="reference_price" form={form} edit={edit} error={errs.reference_price} />
@@ -128,7 +132,7 @@ export default function PriceRange({ l }) {
         </div>
       </details>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: "auto" }}>
-        {can("limits.edit") ? <SubmitButton busy={saving || !l} disabled={invalid} busyText={l ? "Saving…" : "Save price range"}>Save price range</SubmitButton>
+        {can("limits.edit") ? <SubmitButton busy={saving} disabled={invalid} busyText="Saving…">Save price range</SubmitButton>
           : <button type="button" className="btn solid" disabled title="Your role cannot change the price range.">Save price range</button>}
         {invalid ? <span className="small field-err">Fix the marked boxes to save.</span>
           : dirty ? <button type="button" className="btn ghost" onClick={() => setDirty(false)}>Discard changes</button>

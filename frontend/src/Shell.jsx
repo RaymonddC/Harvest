@@ -4,6 +4,7 @@ import { Link, Navigate, NavLink, useLocation, useNavigate } from "react-router-
 import { can, fmtT, getSession, PAGES } from "./lib.js";
 import AccountMenu from "./components/AccountMenu.jsx";
 import CropSwitcher from "./components/CropSwitcher.jsx";
+import { campaignFor, forCrop, useCrop } from "./campaigns.jsx";
 import NextStep from "./components/NextStep.jsx";
 import { useUnsaved } from "./dialogs.jsx";
 import { useLive } from "./live.jsx";
@@ -12,11 +13,12 @@ import { Dialog, DialogClose, Icon } from "./ui.jsx";
 // This week at a glance, under the page links: is calling on, is a week short, does anything
 // wait for a decision. Hidden on narrow screens, where the sidebar is a single row.
 function WeekCard({ state }) {
+  const { crop } = useCrop();
   if (!state) return null;
-  const campaign = state.campaigns.find((x) => x.id === "current") || {};
+  const campaign = campaignFor(state, crop);
   const running = campaign.status === "running";
-  const gap = [...state.forecast].sort((a, b) => a.week - b.week).find((r) => r.is_gap);
-  const waiting = state.offers.filter((o) => ["pending", "escalated"].includes(o.status)).length;
+  const gap = forCrop(state.forecast, crop).sort((a, b) => a.week - b.week).find((r) => r.is_gap);
+  const waiting = forCrop(state.offers, crop).filter((o) => ["pending", "escalated"].includes(o.status)).length;
   return (
     <div className="week-card" aria-label="This week">
       <span className="wc-title">This week</span>
@@ -37,10 +39,10 @@ function DemoGuide({ state }) {
   });
   if (!state) return null;
   const { calls, offers } = state;
-  const campaign = state.campaigns.find((x) => x.id === "current") || {};
+  const anyRunning = state.campaigns.some((c) => c.status === "running"); // the guide follows the whole mill, not one crop
   const steps = [
     ["Check the farmers and the price range", "/setup", state.farmers.length > 0 && state.limits.length > 0],
-    ["Start calling", "/setup", campaign.status === "running" || calls.some((c) => c.status !== "queued")],
+    ["Start calling", "/setup", anyRunning || calls.some((c) => c.status !== "queued")],
     ["Answer a call as the farmer", "/call.html", calls.some((c) => ["done", "on_call"].includes(c.status))],
     ["Fill the gap: gap-fill calls or the rival quote", "/", offers.length > 0],
     ["Approve the offers", "/approvals", offers.some((o) => o.status === "approved")],
