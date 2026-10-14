@@ -33,6 +33,18 @@ log = logging.getLogger(__name__)
 
 INPUT_MIME = "audio/pcm;rate=16000"
 GOODBYE_GRACE_SECONDS = 10
+GOODBYE_MAX_AUDIO_SECONDS = 5.0  # after end_call only a short goodbye is let through; the rest is cut
+OUTPUT_RATE = 24000
+
+# Speech-to-text hint. Without it the Live API detects the language itself, and short Indonesian answers
+# came back as German or Turkish in the transcript ("Das ist ja nicht") although the agent understood them.
+LANGUAGE_CODES = {"bahasa indonesia": "id-ID", "indonesian": "id-ID", "bahasa malaysia": "ms-MY", "malay": "ms-MY",
+                  "english": "en-US", "javanese": "jv-ID", "sundanese": "su-ID"}
+
+
+def stt_language_codes(language: str | None) -> list[str] | None:
+    code = LANGUAGE_CODES.get((language or "").strip().lower())
+    return [code] if code else None
 WRAP_UP_NUDGE = ("(The call is close to its time limit. Summarise what was agreed, call end_call, "
                  "then say goodbye.)")
 
@@ -127,12 +139,14 @@ class Transcript:
         return out
 
 
-def build_live_config(settings: Settings, system_instruction: str) -> types.LiveConnectConfig:
+def build_live_config(settings: Settings, system_instruction: str,
+                      language: str | None = None, hint_language: bool = True) -> types.LiveConnectConfig:
+    codes = stt_language_codes(language) if hint_language else None
     return types.LiveConnectConfig(
         response_modalities=["AUDIO"],
         system_instruction=system_instruction,
         tools=[types.Tool(function_declarations=TOOL_DECLARATIONS)],
-        input_audio_transcription=types.AudioTranscriptionConfig(),
+        input_audio_transcription=types.AudioTranscriptionConfig(language_codes=codes) if codes else types.AudioTranscriptionConfig(),
         # Answer as soon as the farmer has stopped talking: a short silence ends their turn.
         realtime_input_config=types.RealtimeInputConfig(
             automatic_activity_detection=types.AutomaticActivityDetection(
@@ -159,6 +173,19 @@ def genai_client():
                             project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
                             location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"))
     return genai.Client()
+
+
+async def open_live(stack: contextlib.AsyncExitStack, connect, model: str, config: types.LiveConnectConfig,
+                    plain_config: types.LiveConnectConfig | None):
+    """Open the Live session. If the service rejects the setup with the language hint, open it again without,
+    so a hint can never stop a call from connecting."""
+    try:
+        return await stack.enter_async_context(connect(model, config))
+    except Exception:  # noqa: BLE001
+        if plain_config is None:
+            raise
+        log.warning("Live setup with a speech-to-text language hint failed; retrying without it", exc_info=True)
+        return await stack.enter_async_context(connect(model, plain_config))
 
 
 def default_connect(model: str, config: types.LiveConnectConfig):
@@ -274,7 +301,10 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
     mic = {"chunks": 0, "bytes": 0, "peak": 0}  # what the browser's microphone actually delivered
 
     try:
-        async with connect(settings.live_model, build_live_config(settings, instruction)) as live:
+        async with contextlib.AsyncExitStack() as stack:
+            hinted = build_live_config(settings, instruction, language)
+            plain = build_live_config(settings, instruction, language, hint_language=False) if stt_language_codes(language) else None
+            live = await open_live(stack, connect, settings.live_model, hinted, plain)
             await send({"type": "connected", "farmer": farmer.get("name"), "village": farmer.get("village"),
                         "language": farmer.get("language"), "kind": call["kind"],
                         "mill": settings.mill_name, "gap_week": call.get("gap_week")})
@@ -298,6 +328,7 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
 
             async def downstream() -> None:
                 spoke_after_end = False
+                post_end_seconds = 0.0
                 while True:
                     async for msg in live.receive():
                         if msg.tool_call:
@@ -318,6 +349,12 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                                 if part.inline_data and part.inline_data.data:
                                     if session.ended:
                                         spoke_after_end = True
+                                        # After end_call only a short goodbye is let through: the agent's audio
+                                        # arrives faster than it plays, so a long speech here would keep playing in
+                                        # the browser long after the call was closed.
+                                        post_end_seconds += len(part.inline_data.data) / 2 / OUTPUT_RATE
+                                        if post_end_seconds > GOODBYE_MAX_AUDIO_SECONDS:
+                                            return
                                     await channel.send_audio(part.inline_data.data)
                         if sc.input_transcription and sc.input_transcription.text:
                             await caption("farmer", sc.input_transcription.text)

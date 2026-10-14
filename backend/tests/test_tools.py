@@ -205,7 +205,7 @@ def test_prompt_has_disclosure_two_step_read_back_and_no_limits(store, settings)
     assert "Speak only Bahasa Indonesia" in text and "Never slip into English" in text
     assert "Ask the consent question once" in text
     assert "A number the farmer says with" in text and "PRICE per kilogram" in text
-    assert "call end_call at once" in text
+    assert "call end_call at once" in text and "BEFORE end_call" in text and "one short goodbye sentence" in text
     assert "Never send true first" in text and "read_back_required" in text
     for secret in ("3350", "3,350", "2900", "2,900", "ceiling", "floor"):
         assert secret not in text

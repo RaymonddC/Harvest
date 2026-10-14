@@ -263,6 +263,57 @@ def fake_voice(monkeypatch):
     return fake
 
 
+def long_audio(seconds):
+    return content(model_turn=types.Content(parts=[types.Part(inline_data=types.Blob(
+        data=b"\0\0" * int(24000 * seconds), mime_type="audio/pcm"))]))
+
+
+def test_speech_to_text_gets_the_farmers_language_as_a_hint(settings):
+    from app.live_session import build_live_config
+    assert build_live_config(settings, "x", "Bahasa Indonesia").input_audio_transcription.language_codes == ["id-ID"]
+    assert build_live_config(settings, "x", "Javanese").input_audio_transcription.language_codes == ["jv-ID"]
+    assert build_live_config(settings, "x", "Klingon").input_audio_transcription.language_codes is None  # unknown: detect
+    assert build_live_config(settings, "x", "Bahasa Indonesia", hint_language=False).input_audio_transcription.language_codes is None
+
+
+def test_the_call_connects_without_the_hint_if_the_service_rejects_it(client, store, monkeypatch):
+    seen = []
+
+    @contextlib.asynccontextmanager
+    async def picky_connect(model, config):
+        seen.append(config.input_audio_transcription.language_codes)
+        if config.input_audio_transcription.language_codes:
+            raise RuntimeError("1007 invalid argument: languageCodes")
+        yield FakeLive()
+
+    async def no_translate(text, target):
+        return None
+
+    monkeypatch.setattr(live_session, "default_connect", picky_connect)
+    monkeypatch.setattr(live_session, "make_translator", lambda settings: no_translate)
+    call_id = client.post("/api/farmers/b001/call", json={"kind": "gap_fill"}).json()["call_id"]
+    with client.websocket_connect(f"/ws/call/{call_id}") as ws:
+        ws.send_bytes(b"\1\0" * 160)
+        events, _ = drain(ws)
+    assert seen == [["id-ID"], None]  # tried with the hint, then without
+    assert events[0]["type"] == "connected" and events[-1]["type"] == "ended"
+    assert not [e for e in events if e["type"] == "error"]
+
+
+def test_a_long_speech_after_end_call_is_cut_to_a_short_goodbye(client, store, fake_voice):
+    """Seen on a real call: end_call, then the whole deal repeated (13 s of speech) before the goodbye."""
+    fake_voice.turns[-1] = [long_audio(2.0), long_audio(2.0), long_audio(2.0), long_audio(2.0), long_audio(2.0),
+                            content(output_transcription=types.Transcription(text=" SECOND SENTENCE THAT MUST NOT ARRIVE")),
+                            content(turn_complete=True)]
+    call_id = client.post("/api/farmers/b001/call", json={"kind": "gap_fill"}).json()["call_id"]
+    with client.websocket_connect(f"/ws/call/{call_id}") as ws:
+        ws.send_bytes(b"\1\0" * 160)
+        events, frames = drain(ws)
+    assert events[-1]["type"] == "ended" and store.get("calls", call_id)["status"] == "done"
+    assert frames <= 1 + 2 + 1  # the first greeting chunk, two 2 s goodbye chunks, nothing after the 5 s cap
+    assert "MUST NOT ARRIVE" not in json.dumps(events)
+
+
 def test_voice_call_end_to_end(client, store, fake_voice):
     call_id = client.post("/api/farmers/b001/call", json={"kind": "gap_fill"}).json()["call_id"]
     with client.websocket_connect(f"/ws/call/{call_id}") as ws:

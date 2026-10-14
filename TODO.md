@@ -122,6 +122,15 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
       calls, false then true"; the volume is now saved in about half the calls (the agent often stops after the
       read-back). In gap-fill calls the volume is already on record and the offer is unaffected; in collect calls it
       matters, so test a collect call (the script records gap-fill only) before relying on it.
+    - **Transcript and goodbye (14 Oct, found by a planner on the live site; fixed in code, not yet checked on a real
+      call).** (1) The speech-to-text had no language hint, so the Live API detected the language itself and short
+      Indonesian answers came back as German or Turkish ("Das ist ja nicht") although the agent understood them. The farmer's
+      language is now sent as `language_codes` (`live_session.LANGUAGE_CODES`); if the service rejects the setup the call
+      reconnects without the hint (`open_live`). To check: a real call, read the farmer lines in the transcript; if the hint is
+      accepted but ignored, try `adaptation_phrases` / `custom_vocabulary` on the same config. (2) After `end_call` the
+      agent sometimes repeated the whole deal (13.6 s of speech in 1 of 12 recorded calls; normally a 2 s goodbye): the
+      prompt now says everything before `end_call` and one short goodbye after, and the server lets at most 5 s of speech
+      through after `end_call` (`GOODBYE_MAX_AUDIO_SECONDS`), because audio arrives faster than it plays.
     - The stand-in farmer now picks its line from what the agent just said (`web/js/stand-in.js`, rules in
       `web/samples/farmer-lines.json`: `when`, `after`, `max`, `ends`, `fallback`), so it keeps its sense when the agent varies
       its order; it says goodbye and switches itself off. It reuses "Ya, benar." as the short fallback; a dedicated

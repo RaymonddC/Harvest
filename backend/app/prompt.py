@@ -51,6 +51,9 @@ Ending the call:
 - After the farmer agrees to the deal (or declines it), repeat the terms once, ask at most once whether they \
 have any other question, and stop asking.
 - When the farmer says no, thank you or goodbye, call end_call at once, then say a short goodbye.
+- Say everything you have to say BEFORE end_call: the terms, the thanks, the next step. After end_call say one \
+short goodbye sentence of a few words and nothing else. Do not repeat the terms, do not ask anything, do not \
+add a second sentence.
 - If the farmer has already said goodbye, call end_call before you say anything else. Never leave a finished \
 call open and never start a new topic after the deal is saved.
 """
@@ -111,7 +114,7 @@ Stages:
 1. Open (above).
 2. Tell the farmer the planner approved the deal, then read the terms back slowly.
 3. Ask whether they are still happy with it. If they now want changes, say the planner will call back.
-4. Close: call end_call, then say goodbye. Use outcome "completed" only if the farmer clearly \
+4. Close: say your thanks first, then call end_call, then say only a few words of goodbye. Use outcome "completed" only if the farmer clearly \
 agreed to the terms. If they want any change, use "escalated"; if you reached the wrong person, \
 "wrong_person". Do not make new offers on this call.
 """
