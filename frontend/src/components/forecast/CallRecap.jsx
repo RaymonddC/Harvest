@@ -78,6 +78,9 @@ export default function CallRecap({ call, onClose }) {
                         <span className={`deal-state ${offer.status}`}>{{ pending: "waiting for you", escalated: "above the ceiling", approved: "approved", rejected: "rejected" }[offer.status] || offer.status}</span></> : "No deal agreed"}
                     </Fact>
                   )}
+                  {Object.values(c.answers || {}).map((a) => (
+                    <Fact key={a.question} ok={a.answer !== "skipped"} label={a.question}>{a.answer === "skipped" ? "Farmer did not answer" : a.answer}</Fact>
+                  ))}
                   {c.kind === "confirm" && <Fact ok={c.status === "done"} label="Confirmation">{c.status === "done" ? "Farmer heard the approved deal" : "Not confirmed yet"}</Fact>}
                 </ul>
                 {offer && ["pending", "escalated"].includes(offer.status) && (

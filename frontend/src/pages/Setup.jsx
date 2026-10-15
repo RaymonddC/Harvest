@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cropName, forCrop, useCrop } from "../campaigns.jsx";
+import AgentCard from "../components/setup/AgentCard.jsx";
 import Campaigns from "../components/setup/Campaigns.jsx";
 import FarmerForm from "../components/setup/FarmerForm.jsx";
 import FarmerList from "../components/setup/FarmerList.jsx";
@@ -41,6 +42,7 @@ export default function Setup() {
         <PriceRange key={crop} l={l} crop={crop} />
         {state ? <StartCalling state={state} toCall={toCall} /> : <section className="card dark"><div className="stats" id="campaign-lines" /></section>}
       </div>
+      {state && <AgentCard key={crop} state={state} crop={crop} />}
       {state && <FarmerList farmers={farmers} onEdit={setFarmerForm} />}
       <FarmerForm farmer={farmerForm} onClose={() => setFarmerForm(null)} />
       <p className="small muted">All data is synthetic. <ActButton need="demo.reset" className="btn sm" busy="Resetting…" style={{ marginLeft: 8 }} run={() => act(() => api("/api/demo/reset"), "Demo data reset.")}>Reset demo data</ActButton></p>
