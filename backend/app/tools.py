@@ -1,4 +1,4 @@
-"""The six tools the voice model can call, and their handlers.
+"""The tools the voice model can call, and their handlers.
 
 Each call gets its own ToolHandlers bound to one farmer, so the model can never
 read or write another farmer's records. Handlers return two things: the result the
@@ -87,6 +87,18 @@ TOOL_DECLARATIONS = [
                 "farmer_requested_price": {"type": "NUMBER"},
             },
             "required": ["crop", "kg", "price_per_kg"],
+        },
+    },
+    {
+        "name": "record_consent",
+        "description": "Record the farmer's answer to the consent question, as soon as they answer it. "
+                       "Then a call that is cut off later still keeps (or still does not keep) the transcript "
+                       "as the farmer said.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {"transcript_consent": {"type": "BOOLEAN",
+                                                  "description": "True only if the farmer agreed."}},
+            "required": ["transcript_consent"],
         },
     },
     {
@@ -310,6 +322,12 @@ class ToolHandlers:
         return {"saved": True, "status": "pending", "offer_id": offer["id"], "kg": offer["kg"],
                 "price_per_kg": offer["price_per_kg"], "deliver_week": fc.week_label(self.session.gap_week),
                 "say": "Repeat the terms and say the cooperative must approve the deal before it is final."}
+
+    def _tool_record_consent(self, transcript_consent: bool) -> dict:
+        # finish_call keeps the transcript whenever session.consent is true, also when the call drops later.
+        self.session.consent = bool(transcript_consent)
+        self.last_ui = {"consent": self.session.consent}
+        return {"ok": True, "say": "Carry on with the call. Do not ask the consent question again."}
 
     def _tool_end_call(self, outcome: str, summary: str, transcript_consent: bool) -> dict:
         self.session.ended = True

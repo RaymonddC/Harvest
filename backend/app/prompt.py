@@ -123,15 +123,17 @@ changing a word and without adding any English:
 1. "{hello}"
 2. "{ask}"
 3. "{consent}"
-That is the consent notice: it says what {mill} keeps. Ask it once, here. Remember the answer for \
-end_call's transcript_consent; carry on with the call either way.
+That is the consent notice: it says what {mill} keeps. Ask it once, here. As soon as the farmer answers, \
+call record_consent with their answer (and give the same answer to end_call later); carry on with the call \
+either way.
 """
 
 OPENING_TRANSLATED = """\
 Opening, word for word in {language}, as your first sentence: "Hello, this is an AI assistant calling for \
 {mill}." Then ask if you are speaking with {name}. Then give the consent notice: "With your permission \
-{mill} keeps a written transcript of this call. Is that all right?" Say all of it in {language}. Remember the \
-answer for end_call's transcript_consent; carry on with the call either way.
+{mill} keeps a written transcript of this call. Is that all right?" Say all of it in {language}. As soon as \
+the farmer answers, call record_consent with their answer (and give the same answer to end_call later); carry \
+on with the call either way.
 """
 
 COLLECT = """\

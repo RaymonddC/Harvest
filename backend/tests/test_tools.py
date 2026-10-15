@@ -17,7 +17,8 @@ def make(store, settings, farmer_id="f01", kind="collect", gap_week=3, offer=Non
 def test_declarations_are_valid_for_live_api():
     tool = types.Tool(function_declarations=TOOL_DECLARATIONS)
     assert [d.name for d in tool.function_declarations] == [
-        "get_farmer", "record_harvest", "get_reference_price", "check_offer", "save_offer", "end_call"]
+        "get_farmer", "record_harvest", "get_reference_price", "check_offer", "save_offer", "record_consent",
+        "end_call"]
 
 
 def test_record_harvest_reads_back_before_saving(store, settings):
@@ -226,3 +227,30 @@ def test_prices_never_leave_limits_in_random_negotiations(store, settings):
             if r.get("price_per_kg") is not None:
                 assert limits.within(r["price_per_kg"])
         assert all(limits.within(p) for p in session.quoted_prices.get("palm", ()))
+
+
+def test_consent_recorded_early_keeps_the_transcript_of_a_call_that_drops(store, settings):
+    from app import services
+    from app.tools import CallSession, ToolHandlers
+
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect")
+    session = CallSession(call_id=call_id, farmer=store.get("farmers", "f01"), kind="collect")
+    h = ToolHandlers(store, settings, session)
+    assert h.dispatch("record_consent", {"transcript_consent": True})["ok"]
+    lines = [{"who": "agent", "text": "Halo"}, {"who": "farmer", "text": "Iya, setuju"}]
+    services.finish_call(store, settings, call_id, ended_cleanly=False, outcome=None, summary=None,
+                         consent=session.consent, transcript=lines)
+    call = store.get("calls", call_id)
+    assert call["status"] == "dropped" and call["consent"] is True and call["transcript"] == lines
+
+
+def test_a_no_to_consent_still_keeps_nothing(store, settings):
+    from app import services
+    from app.tools import CallSession, ToolHandlers
+
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect")
+    session = CallSession(call_id=call_id, farmer=store.get("farmers", "f01"), kind="collect")
+    ToolHandlers(store, settings, session).dispatch("record_consent", {"transcript_consent": False})
+    services.finish_call(store, settings, call_id, ended_cleanly=False, outcome=None, summary=None,
+                         consent=session.consent, transcript=[{"who": "agent", "text": "Halo"}])
+    assert store.get("calls", call_id)["transcript"] is None
