@@ -102,7 +102,7 @@ if [[ -n "$TWILIO_ACCOUNT_SID" && -n "$TWILIO_FROM_NUMBER" ]]; then
   echo "Wiring up the Twilio channel (PUBLIC_BASE_URL=$URL, REAL_CALLS_ENABLED=$REAL_CALLS_ENABLED)..."
   gcloud run services update "$SERVICE" --region "$REGION" --update-env-vars \
     "^@^PUBLIC_BASE_URL=$URL@TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID@TWILIO_FROM_NUMBER=$TWILIO_FROM_NUMBER@REAL_CALLS_ENABLED=$REAL_CALLS_ENABLED@REAL_CALL_ALLOWLIST=$REAL_CALL_ALLOWLIST" \
-    --update-secrets TWILIO_AUTH_TOKEN=twilio-auth-token:latest
+    --update-secrets TWILIO_AUTH_TOKEN=twilio-auth-token:latest     || echo "WARNING: phone channel NOT switched on. Check the secret twilio-auth-token exists in Secret Manager and the runtime service account can read it. The rest of the deploy is fine." >&2
 fi
 
 # Point the dashboard at the gateway. WebSockets do not pass through Hosting rewrites,
