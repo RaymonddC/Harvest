@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node scripts/dev.mjs",
     "start:env": "node scripts/dev.mjs --env",
+    "start:phone": "node scripts/dev.mjs --phone",
     "test": "cd backend && python -m pytest -q"
   }
 }

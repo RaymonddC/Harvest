@@ -21,7 +21,9 @@ Planner dashboard (Firebase Hosting) ◀┘  live listeners; actions go through 
 Quickest: from the repo root, `npm start` runs the backend (port 8000) and the React dashboard
 (http://localhost:5173, sign in as `dewi` / `harvest-demo`) together; Ctrl+C stops both. It ignores
 `backend/.env` and uses the in-memory demo data; `npm run start:env` reads `backend/.env` too (for
-Gemini credentials). `npm test` runs the backend tests. The steps below run the backend on its own.
+Gemini credentials). `npm run start:phone` places real phone calls from your PC: it reads `.env` (Twilio
+settings), opens a Cloudflare quick tunnel so Twilio can reach the backend, sets `PUBLIC_BASE_URL` to it and fetches a
+Vertex token from gcloud (needs `cloudflared` and a signed-in gcloud). `npm test` runs the backend tests. The steps below run the backend on its own.
 
 ```bash
 cd backend
