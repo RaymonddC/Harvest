@@ -15,10 +15,12 @@ function HarvestBox({ farmer, harvest }) {
   const act = useAct();
   const confirm = useConfirm();
   const [form, setForm] = useState(null); // null: viewing
-  const start = () => setForm({ kg: harvest ? String(harvest.kg) : "", ready_date: harvest?.ready_date || "", confidence: harvest?.confidence || "firm" });
-  const valid = form && Number(form.kg) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(form.ready_date);
+  const start = () => setForm({ kg: harvest ? String(harvest.kg) : "", ready_date: harvest?.ready_date || "", confidence: harvest?.confidence || "firm",
+    every_days: harvest?.every_days ? String(harvest.every_days) : "" });
+  const every = Number(form?.every_days);
+  const valid = form && Number(form.kg) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(form.ready_date) && (!form.every_days || (every >= 5 && every <= 45));
   const save = async () => {
-    const r = await act(() => api(`/api/farmers/${farmer.id}/harvest`, { method: "PUT", body: { kg: Number(form.kg), ready_date: form.ready_date, confidence: form.confidence } }),
+    const r = await act(() => api(`/api/farmers/${farmer.id}/harvest`, { method: "PUT", body: { kg: Number(form.kg), ready_date: form.ready_date, confidence: form.confidence, every_days: form.every_days ? every : null } }),
       "Harvest saved. The forecast is updated.");
     if (r) setForm(null);
   };
@@ -45,6 +47,10 @@ function HarvestBox({ farmer, harvest }) {
             </select>
           </label>
         </div>
+        <label className="field">Harvests every … days <span className="sub">(optional, 5 to 45; later rounds are added to the forecast)</span>
+          <input type="text" inputMode="numeric" className="num-input" style={{ maxWidth: 160 }} placeholder="e.g. 14" value={form.every_days}
+            onChange={(e) => setForm({ ...form, every_days: e.target.value.replace(/[^0-9]/g, "") })} />
+        </label>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <ActButton className="btn sm leaf" busy="Saving…" disabled={!valid} run={save}>Save harvest</ActButton>
           <button type="button" className="btn sm ghost" onClick={() => setForm(null)}>Cancel</button>
@@ -58,6 +64,7 @@ function HarvestBox({ farmer, harvest }) {
         <>
           <b className="num">{fmtKg(harvest.kg)} kg</b> ready {day(harvest.ready_date, { weekday: "short", day: "numeric", month: "short" })}
           {" · "}{harvest.confidence === "unsure" ? "unsure (counts for half)" : "firm"}
+          {harvest.every_days ? ` · harvests every ${harvest.every_days} days, so later rounds are in the forecast too` : ""}
           {harvest.edited_by && (
             <p className="small muted" style={{ margin: "4px 0 0" }}>
               Edited by {harvest.edited_by}{harvest.edited_at ? `, ${when(harvest.edited_at)}` : ""}.

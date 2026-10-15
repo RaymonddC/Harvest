@@ -43,6 +43,9 @@ TOOL_DECLARATIONS = [
                 "ready_date": {"type": "STRING", "description": "Date the harvest is ready, YYYY-MM-DD."},
                 "confidence": {"type": "STRING", "enum": ["firm", "unsure"],
                                "description": "unsure if the farmer hedged (maybe, I think, depends on rain)."},
+                "every_days": {"type": "NUMBER",
+                               "description": "Days between the farmer's harvest rounds, if they said (palm is often "
+                                              "10 to 15). Leave it out if they did not say."},
                 "confirmed_by_farmer": {"type": "BOOLEAN",
                                         "description": "True only after the farmer confirmed the read-back."},
             },
@@ -211,7 +214,8 @@ class ToolHandlers:
         return out
 
     def _tool_record_harvest(self, crop: str, kg: float, ready_date: str,
-                             confirmed_by_farmer: bool, confidence: str = "firm") -> dict:
+                             confirmed_by_farmer: bool, confidence: str = "firm",
+                             every_days: float | None = None) -> dict:
         crop_id = normalize_crop(crop)
         kg = float(kg)
         try:
@@ -258,8 +262,14 @@ class ToolHandlers:
                            "farmer in their language and ask if it is right. If they say yes, call record_harvest "
                            "again with the same numbers and confirmed_by_farmer true. This is the normal next "
                            "step, not an error; do not apologise."}
+        try:
+            every = float(every_days) if every_days else None
+        except (TypeError, ValueError):
+            every = None
+        if every is not None and not fc.MIN_EVERY_DAYS <= every <= fc.MAX_EVERY_DAYS:
+            every = None  # a cycle outside 5 to 45 days was misheard; keep the harvest, drop the cycle
         result = services.record_harvest(self.store, self.settings, self.session.farmer["id"], crop_id,
-                                         kg, date.isoformat(), self.session.call_id, confidence)
+                                         kg, date.isoformat(), self.session.call_id, confidence, every)
         self.session.saved_kg[crop_id] = kg
         self.store.set("calls", self.session.call_id, {"harvest_read_back": None}, merge=True)
         return {"saved": True, **result}

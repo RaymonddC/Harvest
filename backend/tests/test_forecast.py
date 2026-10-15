@@ -105,3 +105,25 @@ def test_plan_start_is_monday():
         day = dt.date(2026, 10, 1) + dt.timedelta(days=d)
         nm = next_monday(day)
         assert nm.weekday() == 0 and nm > day
+
+
+def test_harvest_rounds_are_projected_from_how_often_the_farmer_harvests():
+    harvests = [{"id": "h1", "kg": 1000, "ready_date": "2026-10-13", "every_days": 14},
+                {"id": "h2", "kg": 800, "ready_date": "2026-10-20", "confidence": "unsure", "every_days": 10},
+                {"id": "h3", "kg": 500, "ready_date": "2026-10-20", "every_days": 2}]  # not a real cycle: ignored
+    rows = compute_forecast(harvests, [], PLAN_START, 5, 10_000, 0.2)
+    # h1: 13 Oct (W1), 27 Oct (W3), 10 Nov (W5). h2 (unsure, half): 20 Oct (W2), 30 Oct (W3), 9 Nov (W5).
+    assert [r["projected_kg"] for r in rows] == [0, 0, 1400, 0, 1400]
+    assert rows[0]["expected_kg"] == 1000 and rows[1]["expected_kg"] == 400 + 500
+    assert rows[1]["harvest_count"] == 2  # projected rounds are not counted as answers
+
+
+def test_offers_keep_their_calendar_week_when_the_weeks_roll():
+    import datetime as dt
+    offer = {"status": "approved", "kg": 500, "deliver_week": 3, "deliver_week_start": "2026-10-26",
+             "from_week": 4, "from_week_start": "2026-11-02"}
+    harvests = [{"id": "h", "kg": 1000, "ready_date": "2026-11-03"}]
+    rows = compute_forecast(harvests, [offer], PLAN_START, 5, 10_000, 0.2)
+    assert rows[2]["expected_kg"] == 500 and rows[3]["expected_kg"] == 500
+    rolled = compute_forecast(harvests, [offer], PLAN_START + dt.timedelta(days=7), 5, 10_000, 0.2)
+    assert rolled[1]["expected_kg"] == 500 and rolled[2]["expected_kg"] == 500  # same calendar weeks, new labels

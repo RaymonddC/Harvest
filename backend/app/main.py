@@ -83,6 +83,7 @@ class HarvestIn(BaseModel):
     kg: float
     ready_date: str
     confidence: str = "firm"
+    every_days: float | None = None  # days between harvest rounds; later rounds are projected from it
 
 
 class AnswerIn(BaseModel):
@@ -329,7 +330,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     @app.put("/api/farmers/{farmer_id}/harvest")
     def put_harvest(farmer_id: str, body: HarvestIn, actor: auth.Actor = Depends(need("farmers.manage"))):
         """Correct or add a farmer's harvest by hand (marked as edited; the call's values are kept)."""
-        return services.edit_harvest(store, settings, farmer_id, body.kg, body.ready_date, body.confidence, actor)
+        return services.edit_harvest(store, settings, farmer_id, body.kg, body.ready_date, body.confidence, actor,
+                                     body.every_days)
 
     @app.delete("/api/farmers/{farmer_id}/harvest", dependencies=[Depends(need("farmers.manage"))])
     def remove_harvest(farmer_id: str):

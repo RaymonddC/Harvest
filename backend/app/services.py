@@ -148,7 +148,7 @@ def set_agent_profile(store: Store, settings: Settings, crop: str | None, person
 
 
 def edit_harvest(store: Store, settings: Settings, farmer_id: str, kg: float, ready_date: str, confidence: str,
-                 actor=None) -> dict:
+                 actor=None, every_days: float | None = None) -> dict:
     """A planner corrects (or adds) a farmer's harvest by hand. The first values from the call are kept in
     "original", and the harvest is marked edited, so a hand-made number is never mistaken for the farmer's own."""
     farmer = store.get("farmers", farmer_id)
@@ -158,9 +158,12 @@ def edit_harvest(store: Store, settings: Settings, farmer_id: str, kg: float, re
     harvest_id = f"h-{farmer_id}-{crop}"
     before = store.get("harvests", harvest_id)
     result = record_harvest(store, settings, farmer_id, crop, float(kg), ready_date,
-                            (before or {}).get("call_id"), confidence)
+                            (before or {}).get("call_id"), confidence, every_days if every_days else None)
+    if not every_days and before and before.get("every_days"):
+        store.set("harvests", harvest_id, {"every_days": None}, merge=True)  # cleared by hand
+        recompute_forecast(store, settings)
     original = (before or {}).get("original") or (
-        {k: before.get(k) for k in ("kg", "ready_date", "confidence", "source")} if before else None)
+        {k: before.get(k) for k in ("kg", "ready_date", "confidence", "source", "every_days")} if before else None)
     store.set("harvests", harvest_id, {"source": "planner" if not before else before.get("source", "call"),
                                        "original": original, "edited_by": actor.name if actor else "Planner",
                                        "edited_at": now_iso()}, merge=True)
@@ -351,7 +354,8 @@ def forecast_summary_text(store: Store, settings: Settings, crop: str | None = N
 # ---------- harvests ----------
 
 def record_harvest(store: Store, settings: Settings, farmer_id: str, crop: str, kg: float,
-                   ready_date: str, call_id: str | None, confidence: str = "firm") -> dict:
+                   ready_date: str, call_id: str | None, confidence: str = "firm",
+                   every_days: float | None = None) -> dict:
     try:
         date = dt.date.fromisoformat(ready_date[:10])
     except (TypeError, ValueError) as e:
@@ -361,9 +365,15 @@ def record_harvest(store: Store, settings: Settings, farmer_id: str, crop: str, 
     crop = normalize_crop(crop)
     confidence = "unsure" if confidence == "unsure" else "firm"
     harvest_id = f"h-{farmer_id}-{crop}"
+    if every_days in (None, ""):
+        # A farmer's harvest cycle rarely changes: keep the one on record when this answer did not give one.
+        every_days = (store.get("harvests", harvest_id) or {}).get("every_days")
+    elif not fc.MIN_EVERY_DAYS <= float(every_days) <= fc.MAX_EVERY_DAYS:
+        raise ServiceError(f"A harvest cycle must be {fc.MIN_EVERY_DAYS} to {fc.MAX_EVERY_DAYS} days.")
     store.set("harvests", harvest_id, {
         "farmer_id": farmer_id, "crop": crop, "kg": round(kg), "ready_date": date.isoformat(),
         "confidence": confidence, "source": "call", "call_id": call_id, "updated_at": now_iso(),
+        "every_days": int(every_days) if every_days else None,
     })
     if call_id:
         store.set("calls", call_id, {"harvest_confidence": confidence}, merge=True)
@@ -391,9 +401,13 @@ def create_offer(store: Store, settings: Settings, *, farmer: dict, crop: str, k
         if hw and deliver_week and hw > deliver_week:
             from_week, harvest_id = hw, harvest["id"]
             kg = min(kg, float(harvest["kg"]))
+    plan_start = settings_for_crop(store, settings, crop).plan_start
     doc = {
         "farmer_id": farmer["id"], "farmer_name": farmer.get("name", farmer["id"]),
         "village": farmer.get("village", ""),
+        # The calendar weeks, so the offer stays right when the planning weeks roll forward.
+        "deliver_week_start": fc.week_start(deliver_week, plan_start).isoformat() if deliver_week else None,
+        "from_week_start": fc.week_start(from_week, plan_start).isoformat() if from_week else None,
         "kind": farmer.get("type", "farmer"), "crop": crop, "kg": round(kg),
         "price_per_kg": round(price, 2), "reference_price": limits.reference,
         "premium_pct": premium_pct(limits, price), "currency": limits.currency,
