@@ -154,8 +154,9 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     when the farmer consented; a failure never stops a call finishing), `GET /api/calls/{id}/audio` (capability `calls.listen`, planner
     only, 410 after the retention period), a start time (`t`) on every transcript line, the consent notice switching to the recording
     wording when a folder is set, and an audio player with click-to-jump times in the call recap. **Not built yet:** (2) the Cloud
-    Storage bucket (Jakarta, private, 90-day delete rule) and a bucket store behind the same `CallAudioStore` interface, so recording
-    can be switched on in the cloud (until then Cloud Run does not record: `deploy.sh` does not pass `CALL_AUDIO_DIR`); (3) a way for a
+    Storage bucket (script written: `deploy/setup-call-audio.sh`, Jakarta, private, delete after 91 days, soft delete off, only the Cloud Run account
+    may use it; its logic was tested against a stand-in `gcloud`, not against Google Cloud, so run it with `--check` first) and a bucket store
+    behind the same `CallAudioStore` interface (`CALL_AUDIO_BUCKET`), so recording can be switched on in the cloud (until then Cloud Run does not record: `deploy.sh` does not pass `CALL_AUDIO_DIR`); (3) a way for a
     planner to delete a farmer's recordings by hand; (4) a check of the real thing on a live call (the tests use fake calls). Before real use:
     a lawyer checks the consent wording, and a native speaker checks the Javanese and Sundanese notices.
     **Consent wording now follows the call's language** (done 15 Oct, `prompt.NOTICES`): fixed sentences for the greeting (says it is an
