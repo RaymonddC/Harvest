@@ -24,7 +24,7 @@ import logging
 
 from fastapi import WebSocket
 
-from .audio_codec import mulaw_to_pcm16, pcm16_to_mulaw, resample_pcm16
+from .audio_codec import StreamResampler, mulaw_to_pcm16, pcm16_to_mulaw
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +39,10 @@ class TwilioChannel:
         self._expected_token = expected_token
         self.stream_sid: str | None = None
         self._started = asyncio.Event()
+        # One stateful resampler per direction for the whole call: no clicks at chunk joins,
+        # and the agent's voice is low-pass filtered before it is cut down to the phone's 8 kHz.
+        self._up = StreamResampler(TWILIO_RATE, GATEWAY_IN_RATE)
+        self._down = StreamResampler(GATEWAY_OUT_RATE, TWILIO_RATE)
 
     async def accept(self) -> None:
         await self._ws.accept()
@@ -68,7 +72,7 @@ class TwilioChannel:
         if kind == "media":
             mulaw = base64.b64decode(evt["media"]["payload"])
             pcm_8k = mulaw_to_pcm16(mulaw)
-            return resample_pcm16(pcm_8k, TWILIO_RATE, GATEWAY_IN_RATE)
+            return self._up.process(pcm_8k)
         if kind == "stop":
             return None
         return {}  # "connected", "mark": nothing to act on
@@ -80,7 +84,7 @@ class TwilioChannel:
             # well before a real network round trip to Gemini could return anything) -
             # wait for it rather than drop audio or race run_call's task bookkeeping.
             await self._started.wait()
-        pcm_8k = resample_pcm16(pcm16, GATEWAY_OUT_RATE, TWILIO_RATE)
+        pcm_8k = self._down.process(pcm16)
         payload = base64.b64encode(pcm16_to_mulaw(pcm_8k)).decode("ascii")
         await self._send({"event": "media", "streamSid": self.stream_sid, "media": {"payload": payload}})
 
@@ -89,6 +93,7 @@ class TwilioChannel:
         # whatever Twilio already buffered when the farmer talks over the
         # agent. Twilio keeps playing queued audio until told to clear it.
         if payload.get("type") == "interrupted" and self.stream_sid:
+            self._down.reset()  # the next reply starts fresh, not from the cut-off one
             await self._send({"event": "clear", "streamSid": self.stream_sid})
         # Everything else (captions, tool events, connected/ended/error) has no
         # screen on a phone call; it's already in the transcript services.finish_call
