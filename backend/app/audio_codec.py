@@ -1,4 +1,4 @@
-"""G.711 mu-law <-> PCM16 codec, and simple linear resampling.
+"""G.711 mu-law <-> PCM16 codec, and resampling (filtered and stateful for streams).
 
 Twilio Media Streams carries 8 kHz mono mu-law; Gemini Live speaks 16 kHz PCM16
 in, 24 kHz PCM16 out (see live_session.py). TwilioChannel converts at its own
@@ -11,6 +11,8 @@ Written from scratch rather than stdlib `audioop`, which is deprecated since
 from __future__ import annotations
 
 import bisect
+import math
+import operator
 import struct
 
 _EXP_LUT = (0, 132, 396, 924, 1980, 4092, 8316, 16764)
@@ -61,8 +63,87 @@ def pcm16_to_mulaw(data: bytes) -> bytes:
     return bytes(_encode_sample(s) for s in samples)
 
 
+def _lowpass_taps(cutoff: float, count: int) -> tuple[float, ...]:
+    """Windowed-sinc low-pass FIR. cutoff is a fraction of the sample rate (0 to 0.5)."""
+    mid = (count - 1) / 2
+    taps = []
+    for n in range(count):
+        x = n - mid
+        sinc = 2 * cutoff if x == 0 else math.sin(2 * math.pi * cutoff * x) / (math.pi * x)
+        window = 0.54 - 0.46 * math.cos(2 * math.pi * n / (count - 1))  # Hamming
+        taps.append(sinc * window)
+    total = sum(taps)
+    return tuple(t / total for t in taps)
+
+
+def _clip(value: float) -> int:
+    return max(-32768, min(32767, int(round(value))))
+
+
+class StreamResampler:
+    """Resamples a stream of PCM16 chunks, keeping state between chunks.
+
+    Converting each chunk on its own (resample_pcm16) puts a small step at every chunk
+    boundary, heard as clicks. Going down (Gemini's 24 kHz to the phone's 8 kHz) it also
+    filters first: dropping samples without a low-pass folds everything above 4 kHz back
+    into the speech band, which is the harsh, metallic sound of a badly downsampled voice.
+    Integer ratios only (24k to 8k, 8k to 16k); anything else falls back to resample_pcm16.
+    """
+
+    TAPS = 63  # sharp enough to keep 3 kHz (voice clarity) while cutting what folds back above 4 kHz
+
+    def __init__(self, from_rate: int, to_rate: int) -> None:
+        self.from_rate, self.to_rate = from_rate, to_rate
+        self.down = from_rate // to_rate if from_rate > to_rate and from_rate % to_rate == 0 else 0
+        self.up = to_rate // from_rate if to_rate > from_rate and to_rate % from_rate == 0 else 0
+        if self.down:
+            # Cut off a little below the new Nyquist (about 3.4 kHz for 8 kHz, the classic phone band).
+            self._taps_rev = tuple(reversed(_lowpass_taps(0.425 / self.down, self.TAPS)))
+        self.reset()
+
+    def reset(self) -> None:
+        """Forget the previous audio, e.g. after a barge-in cleared what was queued."""
+        self._hist = [0] * (self.TAPS - 1)
+        self._offset = 0
+        self._prev = 0
+
+    def process(self, data: bytes) -> bytes:
+        if not data or self.from_rate == self.to_rate:
+            return data
+        samples = struct.unpack(f"<{len(data) // 2}h", data[: len(data) // 2 * 2])
+        if self.down:
+            return self._decimate(samples)
+        if self.up:
+            return self._interpolate(samples)
+        return resample_pcm16(data, self.from_rate, self.to_rate)
+
+    def _decimate(self, samples) -> bytes:
+        buf = self._hist + list(samples)
+        taps, n = self._taps_rev, self.TAPS
+        i = len(self._hist) + self._offset
+        out = []
+        while i < len(buf):
+            out.append(_clip(sum(map(operator.mul, taps, buf[i - n + 1:i + 1]))))
+            i += self.down
+        self._offset = i - len(buf)
+        self._hist = buf[-(n - 1):]
+        return struct.pack(f"<{len(out)}h", *out)
+
+    def _interpolate(self, samples) -> bytes:
+        out = []
+        prev, k = self._prev, self.up
+        for s in samples:
+            for j in range(1, k):
+                out.append(_clip(prev + (s - prev) * j / k))
+            out.append(s)
+            prev = s
+        self._prev = prev
+        return struct.pack(f"<{len(out)}h", *out)
+
+
 def resample_pcm16(data: bytes, from_rate: int, to_rate: int) -> bytes:
-    """Linear-interpolation resample of mono 16-bit PCM. Fine for speech, not hi-fi."""
+    """Linear-interpolation resample of mono 16-bit PCM, one chunk on its own. Fine for speech,
+    not hi-fi; for a stream (a phone call) use StreamResampler."""
     if from_rate == to_rate or not data:
         return data
     src = struct.unpack(f"<{len(data) // 2}h", data[: len(data) // 2 * 2])

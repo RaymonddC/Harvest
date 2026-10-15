@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -13,9 +14,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-import datetime as dt
-
-from . import access, auth, seed_data, services
+from . import access, agent_profile, auth, seed_data, services
 from .call_audio import make_audio_store
 from .config import Settings, get_settings
 from .live_session import BrowserChannel, run_call
@@ -51,6 +50,7 @@ class CsvIn(BaseModel):
 class CampaignIn(BaseModel):
     kind: str = "collect"
     crop: str = ""  # empty: the default crop
+    channel: str = "browser"  # "twilio": real phone calls, dialled one at a time
 
 
 class NewCampaignIn(BaseModel):
@@ -74,6 +74,21 @@ class UserIn(BaseModel):
 
 class CallNowIn(BaseModel):
     kind: str | None = None
+
+
+class AgentProfileIn(BaseModel):
+    persona: dict = {}
+    questions: list[dict] = []
+
+
+class HarvestIn(BaseModel):
+    kg: float
+    ready_date: str
+    confidence: str = "firm"
+
+
+class AnswerIn(BaseModel):
+    answer: str
 
 
 class DialIn(BaseModel):
@@ -199,7 +214,10 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "max_call_attempts": settings.max_call_attempts,
                             "plan_start": settings.plan_start.isoformat(),
                             "weeks": settings.weeks, "target_kg_per_week": settings.target_kg_per_week,
-                            "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop}
+                            "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop,
+                            "phone_calls": services.phone_calls_ready(settings),
+                            "phone_calls_note": services.phone_calls_note(settings),
+                            "agent_options": agent_profile.options()}
         return data
 
     @app.get("/api/state")
@@ -299,7 +317,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.post("/api/campaign/start", dependencies=[Depends(need("campaign.run"))])
     def campaign_start(body: CampaignIn):
-        return services.start_campaign(store, settings, body.kind, body.crop or None)
+        return services.start_campaign(store, settings, body.kind, body.crop or None, body.channel)
 
     @app.post("/api/campaign/stop", dependencies=[Depends(need("campaign.run"))])
     def campaign_stop(body: CampaignIn | None = None):
@@ -312,7 +330,38 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     @app.post("/api/campaigns/{campaign_id}/start", dependencies=[Depends(need("campaign.run"))])
     def campaign_start_one(campaign_id: str, body: CampaignIn | None = None):
         crop = services.crop_of_campaign_id(settings, campaign_id)
-        return services.start_campaign(store, settings, body.kind if body else "collect", crop)
+        return services.start_campaign(store, settings, body.kind if body else "collect", crop,
+                                       body.channel if body else "browser")
+
+    @app.put("/api/campaigns/{campaign_id}/agent", dependencies=[Depends(need("campaign.run"))])
+    def campaign_agent(campaign_id: str, body: AgentProfileIn):
+        """The campaign's persona (name, voice, speaking style) and the planner's own questions."""
+        crop = services.crop_of_campaign_id(settings, campaign_id)
+        return services.set_agent_profile(store, settings, crop, body.persona, body.questions)
+
+    @app.post("/api/calls/{call_id}/confirm-harvest")
+    def confirm_harvest(call_id: str, actor: auth.Actor = Depends(need("farmers.manage"))):
+        """Save the harvest read back on a call that ended before the agent saved it."""
+        return services.confirm_read_back(store, settings, call_id, actor.name)
+
+    @app.put("/api/farmers/{farmer_id}/harvest")
+    def put_harvest(farmer_id: str, body: HarvestIn, actor: auth.Actor = Depends(need("farmers.manage"))):
+        """Correct or add a farmer's harvest by hand (marked as edited; the call's values are kept)."""
+        return services.edit_harvest(store, settings, farmer_id, body.kg, body.ready_date, body.confidence, actor)
+
+    @app.delete("/api/farmers/{farmer_id}/harvest", dependencies=[Depends(need("farmers.manage"))])
+    def remove_harvest(farmer_id: str):
+        return services.delete_harvest(store, settings, farmer_id)
+
+    @app.put("/api/calls/{call_id}/answers/{question_id}")
+    def put_answer(call_id: str, question_id: str, body: AnswerIn, actor: auth.Actor = Depends(need("farmers.manage"))):
+        """Correct the answer to one of the planner's questions (the agent's version is kept)."""
+        return services.edit_answer(store, call_id, question_id, body.answer, actor)
+
+    @app.get("/api/answers.csv")
+    def answers_csv():
+        return PlainTextResponse(services.answers_csv(store, settings), media_type="text/csv",
+                                 headers={"Content-Disposition": "attachment; filename=answers.csv"})
 
     @app.post("/api/campaigns/{campaign_id}/stop", dependencies=[Depends(need("campaign.run"))])
     def campaign_stop_one(campaign_id: str):
@@ -360,22 +409,26 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     # ----- Twilio (VA-8): the real phone leg -----
 
-    @app.post("/twilio/voice", include_in_schema=False)
-    async def twilio_voice(request: Request, call_id: str):
+    async def twilio_form(request: Request, path: str) -> dict:
+        """The webhook's form, after checking Twilio signed it. Fails closed."""
         if not services.twilio_ready(settings):
             raise HTTPException(404, "Twilio is not configured.")
-        form = await request.form()
-        base = settings.public_base_url.rstrip("/")
-        full_url = f"{base}/twilio/voice?call_id={call_id}"
+        form = dict(await request.form())
         # Validate against the configured public URL, never the request Cloud Run
         # hands the app - Cloud Run terminates TLS and rewrites the host, so a
         # signature checked against request.url always fails behind it.
         from twilio.request_validator import RequestValidator
 
-        validator = RequestValidator(settings.twilio_auth_token)
+        full_url = f"{settings.public_base_url.rstrip('/')}{path}"
         signature = request.headers.get("X-Twilio-Signature", "")
-        if not validator.validate(full_url, dict(form), signature):
+        if not RequestValidator(settings.twilio_auth_token).validate(full_url, form, signature):
             raise HTTPException(403, "Invalid Twilio signature.")
+        return form
+
+    @app.post("/twilio/voice", include_in_schema=False)
+    async def twilio_voice(request: Request, call_id: str):
+        await twilio_form(request, f"/twilio/voice?call_id={call_id}")
+        base = settings.public_base_url.rstrip("/")
 
         call = store.get("calls", call_id)
         if not call or call.get("status") != "queued" or call.get("channel") != "twilio":
@@ -384,13 +437,26 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             return Response(content=twiml, media_type="text/xml")
 
         stream_url = f"{base}/twilio/stream/{call_id}".replace("https://", "wss://").replace("http://", "ws://")
+        token = services.stream_token(settings, call_id)
         twiml = ('<?xml version="1.0" encoding="UTF-8"?>'
-                 f'<Response><Connect><Stream url="{stream_url}" /></Connect></Response>')
+                 f'<Response><Connect><Stream url="{stream_url}">'
+                 f'<Parameter name="token" value="{token}" />'
+                 '</Stream></Connect></Response>')
         return Response(content=twiml, media_type="text/xml")
+
+    @app.post("/twilio/status", include_in_schema=False)
+    async def twilio_status(request: Request, call_id: str):
+        form = await twilio_form(request, f"/twilio/status?call_id={call_id}")
+        services.twilio_status(store, settings, call_id, str(form.get("CallStatus", "")))
+        return Response(status_code=204)
 
     @app.websocket("/twilio/stream/{call_id}")
     async def twilio_stream(ws: WebSocket, call_id: str):
-        await run_call(TwilioChannel(ws), store, settings, call_id, expected_channel="twilio")
+        if not services.twilio_ready(settings):
+            await ws.close(code=1008)
+            return
+        channel = TwilioChannel(ws, expected_token=services.stream_token(settings, call_id))
+        await run_call(channel, store, settings, call_id, expected_channel="twilio")
 
     if settings.static_dir:
         app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="web")

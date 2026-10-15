@@ -69,10 +69,29 @@ deliberately before testing — they're env vars, not a dashboard toggle, on pur
 misclick live in front of an audience. For production (call anyone, not just test numbers), set
 `REAL_CALL_ALLOWLIST=*` — the same wildcard convention `CORS_ORIGINS` already uses in this file.
 
-Known, accepted gap: Twilio doesn't sign the Media Streams WebSocket handshake itself (only the
-`/twilio/voice` webhook that sets it up) — `/twilio/stream/{call_id}`'s only protection is the
-unguessable `call_id` and `run_call`'s own queued/channel checks. Fine for a hackathon demo; not
-something to rely on for real traffic.
+Twilio doesn't sign the Media Streams WebSocket handshake itself (only the `/twilio/voice` webhook
+that sets it up). Since 16 Oct the signed webhook's TwiML passes a per-call token
+(`services.stream_token`, an HMAC of the call id keyed on the auth token) as a `<Parameter>`; Twilio
+returns it in the stream's `start` frame and `TwilioChannel` hangs up when it does not match. The
+idea comes from Honeypot's shared secret in the media-stream URL.
+
+Added 16 Oct, after comparing with Honeypot (`RaymonddC/Honeypot`, `app/infiltrate/telephony.py`,
+`media_stream.py`), which has the signature check and TwiML but no live bridge:
+- **Status callback** (`POST /twilio/status`, signature-checked): an unanswered, busy, failed or
+  cancelled call, or one answered whose stream never reached the agent, ends as `dropped` with
+  that outcome and gets its one retry, instead of staying `queued` for ever. Rings for 30 s.
+- **Retries are not dialled automatically** (ringing a farmer straight back after a missed call is
+  rude); dialling the farmer again picks up the waiting retry. A farmer already on a phone call
+  cannot be dialled twice.
+- **Dashboard:** "Call by phone…" in each farmer's "⋯" menu, with a confirm step; shown only when
+  `/api/state` reports `settings.phone_calls` (Twilio configured and `REAL_CALLS_ENABLED`).
+- **Deploys keep it on:** the GitHub workflow passes `TWILIO_ACCOUNT_SID`, `TWILIO_FROM_NUMBER`,
+  `REAL_CALLS_ENABLED` and `REAL_CALL_ALLOWLIST` (GitHub variables) and `deploy.sh` re-applies them on
+  every deploy; before, `--set-env-vars` wiped a channel set up by hand on the next push to `main`.
+
+Not built: answering-machine detection (Twilio `machineDetection`, extra cost and a few seconds'
+delay at answer; today the agent would talk to a voicemail greeting until the call times out),
+automatic redial of retries, an Indonesian caller ID.
 
 ## Multi-crop campaigns (14 Oct)
 One campaign per crop, keyed by crop. The default crop (`DEMO_CROP`, palm) keeps the ids it always had (campaign `current`,

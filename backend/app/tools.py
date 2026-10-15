@@ -1,4 +1,4 @@
-"""The six tools the voice model can call, and their handlers.
+"""The tools the voice model can call, and their handlers.
 
 Each call gets its own ToolHandlers bound to one farmer, so the model can never
 read or write another farmer's records. Handlers return two things: the result the
@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from . import forecast as fc
 from . import rules_engine, services
 from .config import Settings
+from .agent_profile import AgentProfileError, parse_answer
 from .rules_engine import crop_label, normalize_crop
 from .store import Store
 
@@ -90,6 +91,31 @@ TOOL_DECLARATIONS = [
         },
     },
     {
+        "name": "record_answer",
+        "description": "Save the farmer's answer to one of the planner's extra questions, by its id.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "question_id": {"type": "STRING", "description": "The id in brackets, e.g. q-1a2b3c4d."},
+                "answer": {"type": "STRING", "description": "The answer as the farmer gave it; \"skipped\" if they "
+                                                            "did not want to answer."},
+            },
+            "required": ["question_id", "answer"],
+        },
+    },
+    {
+        "name": "record_consent",
+        "description": "Record the farmer's answer to the consent question, as soon as they answer it. "
+                       "Then a call that is cut off later still keeps (or still does not keep) the transcript "
+                       "as the farmer said.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {"transcript_consent": {"type": "BOOLEAN",
+                                                  "description": "True only if the farmer agreed."}},
+            "required": ["transcript_consent"],
+        },
+    },
+    {
         "name": "end_call",
         "description": "End the call after the closing sentence. Give a short summary and whether "
                        "the farmer agreed to the transcript being saved.",
@@ -122,7 +148,10 @@ class CallSession:
     summary: str | None = None
     consent: bool | None = None
     saved_offer_ids: list[str] = field(default_factory=list)
+    questions: list[dict] = field(default_factory=list)  # the campaign's extra questions
+    answers: dict[str, dict] = field(default_factory=dict)  # question id -> {question, type, answer}
     read_back: dict[str, tuple[float, str]] = field(default_factory=dict)  # per crop: (kg, date) last read back
+    end_refused: bool = False  # end_call was refused once because a read-back was never saved
     saved_kg: dict[str, float] = field(default_factory=dict)  # per crop: the volume saved on this call
     price_warned: set[tuple[str, float]] = field(default_factory=set)  # (crop, number) already refused as a price
 
@@ -204,7 +233,15 @@ class ToolHandlers:
                                      "confidence": confidence.title(),
                                      "status": "saved" if confirmed_by_farmer else "waiting"}}
         if not confirmed_by_farmer:
+            if self.session.read_back.get(crop_id) == (kg, date.isoformat()) and self.session.saved_kg.get(crop_id) != kg:
+                # Seen in recorded calls: the agent reads the same numbers back again and again while the farmer
+                # keeps saying yes, and never saves. Say plainly what the next step is instead of a fresh read-back.
+                return {"saved": False, "status": "already_read_back",
+                        "say": "You already read these exact numbers back. If the farmer said yes, call record_harvest "
+                               "now with the same numbers and confirmed_by_farmer true. Do not read them back again. "
+                               "Only if the farmer corrected something, call it with the new numbers."}
             self.session.read_back[crop_id] = (kg, date.isoformat())
+            self._note_read_back(crop_id, kg, date, confidence)
             return {"saved": False, "status": "waiting_for_read_back",
                     "read_back": f"{round(kg):,} kg of {crop_label(crop_id)}, ready on {date:%A %d %B}.",
                     "say": "Read this back in the farmer's language and ask if it is right. If they "
@@ -213,6 +250,7 @@ class ToolHandlers:
             # Enforced here, not only in the prompt: nothing is saved until these exact numbers were read back.
             # The call that skipped the read-back becomes the read-back step, so there is nothing to retry.
             self.session.read_back[crop_id] = (kg, date.isoformat())
+            self._note_read_back(crop_id, kg, date, confidence)
             self.last_ui = {"captured": {**self.last_ui["captured"], "status": "waiting"}}
             return {"saved": False, "status": "read_back_required",
                     "read_back": f"{round(kg):,} kg of {crop_label(crop_id)}, ready on {date:%A %d %B}.",
@@ -223,7 +261,19 @@ class ToolHandlers:
         result = services.record_harvest(self.store, self.settings, self.session.farmer["id"], crop_id,
                                          kg, date.isoformat(), self.session.call_id, confidence)
         self.session.saved_kg[crop_id] = kg
+        self.store.set("calls", self.session.call_id, {"harvest_read_back": None}, merge=True)
         return {"saved": True, **result}
+
+    def _note_read_back(self, crop_id: str, kg: float, date: dt.date, confidence: str) -> None:
+        self.store.set("calls", self.session.call_id, {"harvest_read_back": {
+            "crop": crop_id, "kg": round(kg), "ready_date": date.isoformat(), "confidence": confidence}}, merge=True)
+
+    def _unsaved_read_back(self) -> tuple[str, float, str] | None:
+        """A harvest read back to the farmer on this call but never saved with confirmed_by_farmer true."""
+        for crop_id, (kg, date) in self.session.read_back.items():
+            if self.session.saved_kg.get(crop_id) != kg:
+                return crop_id, kg, date
+        return None
 
     def _looks_like_price(self, crop_id: str, kg: float) -> bool:
         """A second, different 'volume' that falls inside this crop's price range is almost surely a price the
@@ -252,6 +302,18 @@ class ToolHandlers:
             return {"error": "There is no supply gap to fill right now. Do not make an offer."}
         limits = services.get_limits(self.store, crop)
         crop_id = limits.crop
+        harvest = self.store.get("harvests", f"h-{self.session.farmer['id']}-{crop_id}")
+        hw = fc.week_index(harvest["ready_date"], self.settings.plan_start, self.settings.weeks) if harvest else None
+        if self.session.farmer.get("type") != "supplier" and harvest and (hw is None or hw <= self.session.gap_week):
+            when = f"week {hw}" if hw else "outside the forecast weeks"
+            return {"error": f"No offer: this farmer's harvest is ready in {when}, not after the short week "
+                             f"({fc.week_label(self.session.gap_week)}), so there is nothing to bring forward. Do not "
+                             "make an offer; thank the farmer and close the call."}
+        unsaved = self._unsaved_read_back()
+        if unsaved:
+            return {"error": f"First save the harvest you read back ({round(unsaved[1]):,} kg, ready {unsaved[2]}): if the "
+                             "farmer said yes, call record_harvest with those numbers and confirmed_by_farmer true, "
+                             "then make the offer."}
         counter = float(farmer_counter_price) if farmer_counter_price else None
         rung = self.session.rung_index.get(crop_id, -1)
         decision = rules_engine.check_offer(limits, rung, float(kg), counter)
@@ -311,7 +373,36 @@ class ToolHandlers:
                 "price_per_kg": offer["price_per_kg"], "deliver_week": fc.week_label(self.session.gap_week),
                 "say": "Repeat the terms and say the cooperative must approve the deal before it is final."}
 
+    def _tool_record_answer(self, question_id: str, answer: str) -> dict:
+        question = next((q for q in self.session.questions if q["id"] == str(question_id).strip("[] ")), None)
+        if not question:
+            return {"error": "No extra question has that id on this call. Use an id from your instructions."}
+        try:
+            value = parse_answer(question, answer)
+        except AgentProfileError as e:
+            return {"error": str(e)}
+        self.session.answers[question["id"]] = {"question": question["text"], "type": question["type"], "answer": value}
+        self.store.set("calls", self.session.call_id, {"answers": dict(self.session.answers)}, merge=True)
+        self.last_ui = {"answer": {"question": question["text"], "answer": value}}
+        left = [q["id"] for q in self.session.questions if q["id"] not in self.session.answers]
+        return {"saved": True, "answer": value, "questions_left": left}
+
+    def _tool_record_consent(self, transcript_consent: bool) -> dict:
+        # finish_call keeps the transcript whenever session.consent is true, also when the call drops later.
+        self.session.consent = bool(transcript_consent)
+        self.last_ui = {"consent": self.session.consent}
+        return {"ok": True, "say": "Carry on with the call. Do not ask the consent question again."}
+
     def _tool_end_call(self, outcome: str, summary: str, transcript_consent: bool) -> dict:
+        unsaved = self._unsaved_read_back()
+        if unsaved and not self.session.end_refused and outcome == "completed":
+            # Refused once only, so a call can never be held open by this: the second end_call always ends it,
+            # and the read-back stays on the call (harvest_read_back) for the planner to confirm by hand.
+            self.session.end_refused = True
+            return {"ended": False, "error": f"Not ended yet: you read back {round(unsaved[1]):,} kg ready {unsaved[2]} "
+                                             "but never saved it. If the farmer said yes to that read-back, call "
+                                             "record_harvest with the same numbers and confirmed_by_farmer true, then "
+                                             "call end_call again. If they did not confirm it, call end_call again."}
         self.session.ended = True
         self.session.outcome = outcome if outcome in OUTCOMES else "completed"
         self.session.summary = summary

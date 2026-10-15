@@ -3,7 +3,7 @@ import { api } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { Dialog, DialogClose, SubmitButton } from "../../ui.jsx";
 
-const LANGUAGES = ["Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese"];
+const LANGUAGES = ["Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese", "Thai", "Vietnamese", "Filipino"];
 const EMPTY = { name: "", phone: "", crop: "palm", language: "Bahasa Indonesia", village: "", usual_kg_week: "", can_pull_forward: false };
 
 // Add a farmer (farmer = {}) or edit one (farmer = the record); null keeps it closed.

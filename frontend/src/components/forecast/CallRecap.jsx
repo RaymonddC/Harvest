@@ -1,9 +1,10 @@
 import * as RDialog from "@radix-ui/react-dialog";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiUrl, callChip, can, fmtT, getSession, KIND_WORD, plainPrice } from "../../lib.js";
+import { api, apiUrl, callChip, can, fmtT, getSession, KIND_WORD, plainPrice } from "../../lib.js";
+import { useAct } from "../../toast.jsx";
 import { useLive } from "../../live.jsx";
-import { Avatar, Icon, Pill } from "../../ui.jsx";
+import { ActButton, Avatar, Icon, Pill } from "../../ui.jsx";
 import { shortDate } from "./Chart.jsx";
 
 const length = (c) => {
@@ -56,6 +57,7 @@ const Fact = ({ ok, label, children }) => (
 // while the panel is open (an offer approved meanwhile shows as approved).
 export default function CallRecap({ call, onClose }) {
   const { state } = useLive();
+  const act = useAct();
   const [english, setEnglish] = useState(true);
   const c = (call && state?.calls.find((x) => x.id === call.id)) || call;
   const harvest = c && state ? state.harvests.find((h) => h.call_id === c.id) : null;
@@ -104,6 +106,20 @@ export default function CallRecap({ call, onClose }) {
                         <span className={`deal-state ${offer.status}`}>{{ pending: "waiting for you", escalated: "above the ceiling", approved: "approved", rejected: "rejected" }[offer.status] || offer.status}</span></> : "No deal agreed"}
                     </Fact>
                   )}
+                  {!harvest && c.harvest_read_back && (
+                    <li className="none">
+                      <span className="mark" aria-hidden="true">!</span>
+                      <div><span className="label">Read back, not confirmed</span>
+                        <b>{c.harvest_read_back.kg.toLocaleString("en-US")} kg, ready {new Date(c.harvest_read_back.ready_date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</b>
+                        <span className="sub" style={{ display: "block" }}>The agent read this back but the call ended before it was saved. Check the conversation below, then save it.</span>
+                        <ActButton need="farmers.manage" className="btn sm leaf" busy="Saving…" style={{ marginTop: 6 }}
+                          run={() => act(() => api(`/api/calls/${c.id}/confirm-harvest`, { body: {} }), "Harvest saved. The forecast is updated.")}>Save this harvest</ActButton>
+                      </div>
+                    </li>
+                  )}
+                  {Object.values(c.answers || {}).map((a) => (
+                    <Fact key={a.question} ok={a.answer !== "skipped"} label={a.question}>{a.answer === "skipped" ? "Farmer did not answer" : a.answer}{a.edited_by ? ` (edited by ${a.edited_by})` : ""}</Fact>
+                  ))}
                   {c.kind === "confirm" && <Fact ok={c.status === "done"} label="Confirmation">{c.status === "done" ? "Farmer heard the approved deal" : "Not confirmed yet"}</Fact>}
                 </ul>
                 {offer && ["pending", "escalated"].includes(offer.status) && (

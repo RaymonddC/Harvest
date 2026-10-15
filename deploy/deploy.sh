@@ -49,6 +49,7 @@ TWILIO_ACCOUNT_SID="${TWILIO_ACCOUNT_SID:-}"
 TWILIO_AUTH_TOKEN="${TWILIO_AUTH_TOKEN:-}"
 TWILIO_FROM_NUMBER="${TWILIO_FROM_NUMBER:-}"
 REAL_CALLS_ENABLED="${REAL_CALLS_ENABLED:-false}"
+[[ -n "$REAL_CALLS_ENABLED" ]] || REAL_CALLS_ENABLED=false  # an unset GitHub variable arrives as ""
 REAL_CALL_ALLOWLIST="${REAL_CALL_ALLOWLIST:-}"
 # Seeding wipes every Firestore collection and reloads the demo data. Leave it on for the first
 # deploy, turn it off (SEED_DEMO_DATA=false) for every redeploy and in CI so live data survives.
@@ -94,11 +95,14 @@ gcloud run jobs deploy "$JOB" --source "$ROOT/backend" --region "$REGION" \
 URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.url)')"
 echo "Gateway: $URL"
 
-if [[ -n "$TWILIO_ACCOUNT_SID" && -n "$TWILIO_AUTH_TOKEN" && -n "$TWILIO_FROM_NUMBER" ]]; then
+# The token itself comes from the twilio-auth-token secret, so CI only needs the SID and the number.
+# Every deploy re-applies this: "gcloud run deploy --set-env-vars" above replaces all variables,
+# so a channel set up by hand once would be switched off again by the next push to main.
+if [[ -n "$TWILIO_ACCOUNT_SID" && -n "$TWILIO_FROM_NUMBER" ]]; then
   echo "Wiring up the Twilio channel (PUBLIC_BASE_URL=$URL, REAL_CALLS_ENABLED=$REAL_CALLS_ENABLED)..."
   gcloud run services update "$SERVICE" --region "$REGION" --update-env-vars \
     "^@^PUBLIC_BASE_URL=$URL@TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID@TWILIO_FROM_NUMBER=$TWILIO_FROM_NUMBER@REAL_CALLS_ENABLED=$REAL_CALLS_ENABLED@REAL_CALL_ALLOWLIST=$REAL_CALL_ALLOWLIST" \
-    --update-secrets TWILIO_AUTH_TOKEN=twilio-auth-token:latest
+    --update-secrets TWILIO_AUTH_TOKEN=twilio-auth-token:latest     || echo "WARNING: phone channel NOT switched on. Check the secret twilio-auth-token exists in Secret Manager and the runtime service account can read it. The rest of the deploy is fine." >&2
 fi
 
 # Point the dashboard at the gateway. WebSockets do not pass through Hosting rewrites,

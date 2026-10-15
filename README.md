@@ -18,6 +18,13 @@ Planner dashboard (Firebase Hosting) ◀┘  live listeners; actions go through 
 
 ## Run it locally (no GCP needed)
 
+Quickest: from the repo root, `npm start` runs the backend (port 8000) and the React dashboard
+(http://localhost:5173, sign in as `dewi` / `harvest-demo`) together; Ctrl+C stops both. It ignores
+`backend/.env` and uses the in-memory demo data; `npm run start:env` reads `backend/.env` too (for
+Gemini credentials). `npm run start:phone` places real phone calls from your PC: it reads `.env` (Twilio
+settings), opens a Cloudflare quick tunnel so Twilio can reach the backend, sets `PUBLIC_BASE_URL` to it and fetches a
+Vertex token from gcloud (needs `cloudflared` and a signed-in gcloud). `npm test` runs the backend tests. The steps below run the backend on its own.
+
 ```bash
 cd backend
 pip install -r requirements-dev.txt
@@ -61,7 +68,7 @@ cd backend && python -m pytest -q
 ```
 
 The suite covers the rules engine, including a randomised check that no price ever leaves the
-limits. It also covers the forecast and seed data, the six tools, the HTTP API, and the voice
+limits. It also covers the forecast and seed data, the agent's tools, the HTTP API, and the voice
 gateway: a scripted gap-fill call runs through a fake Live session, and a dropped call is
 retried once.
 
@@ -89,7 +96,7 @@ WebSockets to the Cloud Run URL directly, because Hosting rewrites do not carry 
 |---|---|
 | `backend/app/main.py` | FastAPI app: planner API, SSE stream, `/ws/call/{id}`, static files in local mode |
 | `backend/app/live_session.py` | Voice gateway: browser audio ⇄ Gemini Live, tool calls, captions, transcript |
-| `backend/app/tools.py` | The six tools and their per-call handlers |
+| `backend/app/tools.py` | The agent's tools (six from the plan, plus record_consent) and their per-call handlers |
 | `backend/app/rules_engine.py` | Floor, ceiling and offer ladder; `check_offer` decisions |
 | `backend/app/forecast.py` | Weekly totals, gap flags and the pull-forward shortlist |
 | `backend/app/services.py` | Shared operations: offers, approvals, campaigns, retries |
@@ -114,7 +121,7 @@ WebSockets to the Cloud Run URL directly, because Hosting rewrites do not carry 
 | Counters inside the limits | Accepted at once, with no ladder, even at the ceiling (by design: the limits are already the planner's approved range, and the planner still approves every deal) |
 | Agent is not given the floor and ceiling | The prompt and `get_reference_price` carry only the reference price. `check_offer` returns just the next price the agent may say; that is the ceiling only when the farmer asks for more (the top of the ladder), and the floor only when the farmer counters below it. The agent never gets the range itself |
 | Reference price read aloud first | Prompt rule only (stage 4); `get_reference_price` returns the sentence to say, but nothing forces the agent to call it |
-| Consent before a transcript is saved | `end_call(transcript_consent)`; the transcript is dropped when false |
+| Consent before a transcript is saved | `record_consent` right after the answer (so a call cut off later keeps it), confirmed by `end_call(transcript_consent)`; the transcript is dropped when false |
 | Human approval on every deal | Offers start `pending`; only approved offers count in the forecast |
 | One farmer per call | Tool handlers are bound to the call's farmer and cannot read others |
 | Retry once; dropped calls keep saved data (NFR) | `services.finish_call` |

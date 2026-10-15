@@ -7,9 +7,10 @@ live_session.Channel - so none of the negotiation/tool/retry code needed to
 change to add this.
 
 Twilio does not sign the Media Streams WebSocket handshake itself (only the
-/twilio/voice webhook that sets it up); the call_id in the stream URL is an
-unguessable id (store.new_id), and run_call() already refuses anything that
-isn't the queued call it expects, which is enough for a hackathon demo.
+/twilio/voice webhook that sets it up). So the signed webhook's TwiML passes a
+per-call token (services.stream_token) as a custom <Parameter>, Twilio hands it
+back in the "start" frame, and this channel hangs up if it does not match - on
+top of the unguessable call_id and run_call()'s own queued/channel checks.
 """
 
 from __future__ import annotations
@@ -17,12 +18,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import hmac
 import json
 import logging
 
 from fastapi import WebSocket
 
-from .audio_codec import mulaw_to_pcm16, pcm16_to_mulaw, resample_pcm16
+from .audio_codec import StreamResampler, mulaw_to_pcm16, pcm16_to_mulaw
 
 log = logging.getLogger(__name__)
 
@@ -32,10 +34,15 @@ GATEWAY_OUT_RATE = 24000  # what Gemini's audio comes back as
 
 
 class TwilioChannel:
-    def __init__(self, ws: WebSocket) -> None:
+    def __init__(self, ws: WebSocket, expected_token: str | None = None) -> None:
         self._ws = ws
+        self._expected_token = expected_token
         self.stream_sid: str | None = None
         self._started = asyncio.Event()
+        # One stateful resampler per direction for the whole call: no clicks at chunk joins,
+        # and the agent's voice is low-pass filtered before it is cut down to the phone's 8 kHz.
+        self._up = StreamResampler(TWILIO_RATE, GATEWAY_IN_RATE)
+        self._down = StreamResampler(GATEWAY_OUT_RATE, TWILIO_RATE)
 
     async def accept(self) -> None:
         await self._ws.accept()
@@ -53,13 +60,19 @@ class TwilioChannel:
             return {}
         kind = evt.get("event")
         if kind == "start":
-            self.stream_sid = evt["start"]["streamSid"]
+            start = evt.get("start") or {}
+            if self._expected_token is not None:
+                token = str((start.get("customParameters") or {}).get("token", ""))
+                if not hmac.compare_digest(token, self._expected_token):
+                    log.warning("twilio stream: bad or missing token, hanging up")
+                    return None
+            self.stream_sid = start.get("streamSid")
             self._started.set()
             return {}
         if kind == "media":
             mulaw = base64.b64decode(evt["media"]["payload"])
             pcm_8k = mulaw_to_pcm16(mulaw)
-            return resample_pcm16(pcm_8k, TWILIO_RATE, GATEWAY_IN_RATE)
+            return self._up.process(pcm_8k)
         if kind == "stop":
             return None
         return {}  # "connected", "mark": nothing to act on
@@ -71,7 +84,7 @@ class TwilioChannel:
             # well before a real network round trip to Gemini could return anything) -
             # wait for it rather than drop audio or race run_call's task bookkeeping.
             await self._started.wait()
-        pcm_8k = resample_pcm16(pcm16, GATEWAY_OUT_RATE, TWILIO_RATE)
+        pcm_8k = self._down.process(pcm16)
         payload = base64.b64encode(pcm16_to_mulaw(pcm_8k)).decode("ascii")
         await self._send({"event": "media", "streamSid": self.stream_sid, "media": {"payload": payload}})
 
@@ -80,6 +93,7 @@ class TwilioChannel:
         # whatever Twilio already buffered when the farmer talks over the
         # agent. Twilio keeps playing queued audio until told to clear it.
         if payload.get("type") == "interrupted" and self.stream_sid:
+            self._down.reset()  # the next reply starts fresh, not from the cut-off one
             await self._send({"event": "clear", "streamSid": self.stream_sid})
         # Everything else (captions, tool events, connected/ended/error) has no
         # screen on a phone call; it's already in the transcript services.finish_call

@@ -17,7 +17,8 @@ def make(store, settings, farmer_id="f01", kind="collect", gap_week=3, offer=Non
 def test_declarations_are_valid_for_live_api():
     tool = types.Tool(function_declarations=TOOL_DECLARATIONS)
     assert [d.name for d in tool.function_declarations] == [
-        "get_farmer", "record_harvest", "get_reference_price", "check_offer", "save_offer", "end_call"]
+        "get_farmer", "record_harvest", "get_reference_price", "check_offer", "save_offer", "record_answer",
+        "record_consent", "end_call"]
 
 
 def test_record_harvest_reads_back_before_saving(store, settings):
@@ -226,3 +227,87 @@ def test_prices_never_leave_limits_in_random_negotiations(store, settings):
             if r.get("price_per_kg") is not None:
                 assert limits.within(r["price_per_kg"])
         assert all(limits.within(p) for p in session.quoted_prices.get("palm", ()))
+
+
+def test_consent_recorded_early_keeps_the_transcript_of_a_call_that_drops(store, settings):
+    from app import services
+    from app.tools import CallSession, ToolHandlers
+
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect")
+    session = CallSession(call_id=call_id, farmer=store.get("farmers", "f01"), kind="collect")
+    h = ToolHandlers(store, settings, session)
+    assert h.dispatch("record_consent", {"transcript_consent": True})["ok"]
+    lines = [{"who": "agent", "text": "Halo"}, {"who": "farmer", "text": "Iya, setuju"}]
+    services.finish_call(store, settings, call_id, ended_cleanly=False, outcome=None, summary=None,
+                         consent=session.consent, transcript=lines)
+    call = store.get("calls", call_id)
+    assert call["status"] == "dropped" and call["consent"] is True and call["transcript"] == lines
+
+
+def test_a_no_to_consent_still_keeps_nothing(store, settings):
+    from app import services
+    from app.tools import CallSession, ToolHandlers
+
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect")
+    session = CallSession(call_id=call_id, farmer=store.get("farmers", "f01"), kind="collect")
+    ToolHandlers(store, settings, session).dispatch("record_consent", {"transcript_consent": False})
+    services.finish_call(store, settings, call_id, ended_cleanly=False, outcome=None, summary=None,
+                         consent=session.consent, transcript=[{"who": "agent", "text": "Halo"}])
+    assert store.get("calls", call_id)["transcript"] is None
+
+
+def test_end_call_is_refused_once_while_a_read_back_is_unsaved(store, settings):
+    from app import services
+    from app.tools import CallSession, ToolHandlers
+
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect")
+    session = CallSession(call_id=call_id, farmer=store.get("farmers", "f01"), kind="collect", gap_week=3)
+    h = ToolHandlers(store, settings, session)
+    h.dispatch("record_harvest", {"crop": "palm", "kg": 1600, "ready_date": "2026-11-02", "confirmed_by_farmer": False})
+    assert store.get("calls", call_id)["harvest_read_back"]["kg"] == 1600  # kept for the planner straight away
+    r = h.dispatch("end_call", {"outcome": "completed", "summary": "x", "transcript_consent": True})
+    assert r["ended"] is False and "1,600 kg" in r["error"] and not session.ended
+    h.dispatch("record_harvest", {"crop": "palm", "kg": 1600, "ready_date": "2026-11-02", "confirmed_by_farmer": True})
+    assert store.get("harvests", "h-f01-palm")["kg"] == 1600 and store.get("calls", call_id)["harvest_read_back"] is None
+    assert h.dispatch("end_call", {"outcome": "completed", "summary": "x", "transcript_consent": True})["ok"]
+
+
+def test_a_second_end_call_always_ends_the_call(store, settings):
+    from app import services
+    from app.tools import CallSession, ToolHandlers
+
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect")
+    session = CallSession(call_id=call_id, farmer=store.get("farmers", "f01"), kind="collect")
+    h = ToolHandlers(store, settings, session)
+    h.dispatch("record_harvest", {"crop": "palm", "kg": 900, "ready_date": "2026-11-02", "confirmed_by_farmer": False})
+    h.dispatch("end_call", {"outcome": "completed", "summary": "x", "transcript_consent": False})
+    assert h.dispatch("end_call", {"outcome": "completed", "summary": "x", "transcript_consent": False})["ok"]
+    assert session.ended and store.get("harvests", "h-f01-palm") is None
+    assert store.get("calls", call_id)["harvest_read_back"]["kg"] == 900  # left for the planner to confirm
+
+
+def test_no_offer_when_the_harvest_is_not_after_the_gap_week(store, settings):
+    from app import services
+    from app.tools import CallSession, ToolHandlers
+
+    services.record_harvest(store, settings, "f02", "palm", 1400, "2026-10-19", None)  # week 2, before the gap
+    h = ToolHandlers(store, settings, CallSession(call_id="c", farmer=store.get("farmers", "f02"), kind="collect", gap_week=3))
+    r = h.dispatch("check_offer", {"crop": "palm", "kg": 1400})
+    assert "error" in r and "nothing to bring forward" in r["error"]
+
+
+def test_planner_saves_a_read_back_the_agent_left_unsaved(store, settings):
+    from app import services
+    from app.tools import CallSession, ToolHandlers
+
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect")
+    h = ToolHandlers(store, settings, CallSession(call_id=call_id, farmer=store.get("farmers", "f01"), kind="collect"))
+    h.dispatch("record_harvest", {"crop": "palm", "kg": 1250, "ready_date": "2026-11-02", "confirmed_by_farmer": False,
+                                  "confidence": "unsure"})
+    services.confirm_read_back(store, settings, call_id, "Dewi")
+    harvest = store.get("harvests", "h-f01-palm")
+    assert harvest["kg"] == 1250 and harvest["confidence"] == "unsure" and harvest["source"] == "planner"
+    assert store.get("calls", call_id)["harvest_read_back"] is None
+    import pytest
+    with pytest.raises(services.ServiceError):
+        services.confirm_read_back(store, settings, call_id)

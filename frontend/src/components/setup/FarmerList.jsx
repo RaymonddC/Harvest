@@ -2,6 +2,7 @@ import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useState } from "react";
 import { api, can, cropLabel, fmtKg, maskPhone } from "../../lib.js";
 import { useConfirm } from "../../dialogs.jsx";
+import { useLive } from "../../live.jsx";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar } from "../../ui.jsx";
 
@@ -46,9 +47,13 @@ function SortHead({ col, sort, setSort, className, style }) {
 }
 
 // Every farmer: search, sort, pages; Call now on each row, Edit and Delete in its "⋯" menu.
-export default function FarmerList({ farmers, onEdit }) {
+// "Call phone" (a real Twilio call) appears next to it only when the backend has phone calls switched on;
+// "Call now" then becomes "Browser call" (the demo, answered in the call client).
+export default function FarmerList({ farmers, onEdit, onOpen }) {
   const confirm = useConfirm();
   const act = useAct();
+  const { state } = useLive();
+  const phoneCalls = !!state?.settings?.phone_calls;
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ key: null, dir: 1 });
@@ -66,6 +71,11 @@ export default function FarmerList({ farmers, onEdit }) {
   const first = (current - 1) * PAGE;
   const go = (n) => { setPage(n); document.getElementById("farmer-list").scrollIntoView({ block: "start" }); };
   const sortBy = (s) => { setSort(s); setPage(1); };
+  const dial = async (f) => {
+    if (await confirm({ title: `Call ${f.name}'s phone?`, body: `This places a real phone call to ${maskPhone(f.phone)}. The AI agent talks to whoever answers.`, confirm: "Call by phone" })) {
+      act(() => api(`/api/farmers/${f.id}/dial`, { body: {} }), `Calling ${f.name}'s phone…`);
+    }
+  };
   const remove = async (f) => {
     if (await confirm({ title: `Delete ${f.name}?`, body: "Their waiting calls are withdrawn. Past calls and offers stay.", confirm: "Delete farmer", danger: true })) {
       act(() => api(`/api/farmers/${f.id}`, { method: "DELETE" }), `${f.name} deleted.`);
@@ -94,13 +104,14 @@ export default function FarmerList({ farmers, onEdit }) {
           <tbody id="farmer-rows">
             {rows.slice(first, first + PAGE).map((f) => (
               <tr key={f.id}>
-                <td style={{ paddingLeft: 22 }}><div className="who-cell"><Avatar name={f.name} cls="sm" /><div><b>{f.name}</b><span>{f.village || ""}</span></div></div></td>
+                <td style={{ paddingLeft: 22 }}><button type="button" className="who-cell who-link" onClick={() => onOpen?.(f)} aria-label={`Open ${f.name}`}><Avatar name={f.name} cls="sm" /><div><b>{f.name}</b><span>{f.village || ""}</span></div></button></td>
                 <td className="num">{maskPhone(f.phone)}</td>
                 <td>{f.language}</td>
                 <td>{cropLabel(f.crop)}</td>
                 <td className="r num">{f.usual_kg_week ? fmtKg(f.usual_kg_week) : "–"}</td>
                 <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
-                  <ActButton need="campaign.run" className="btn sm" busy="Queuing…" run={() => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`)}>Call now</ActButton>{" "}
+                  {phoneCalls && <><ActButton need="campaign.run" className="btn sm leaf" busy="Calling…" run={() => dial(f)}>Call phone</ActButton>{" "}</>}
+                  <ActButton need="campaign.run" className="btn sm" busy="Queuing…" run={() => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`)}>{phoneCalls ? "Browser call" : "Call now"}</ActButton>{" "}
                   <Menu.Root>
                     <Menu.Trigger asChild><button className="btn sm more" type="button" aria-label={`More for ${f.name}`}>⋯</button></Menu.Trigger>
                     <Menu.Portal>

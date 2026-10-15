@@ -150,12 +150,21 @@ export function elapsed(iso) {
 }
 
 // Call status in words, never colour alone.
+// Phone calls (channel "twilio") say so, and say why they ended: a missed call is not a dropped line.
+const PHONE_OUTCOME = { no_answer: "No answer", busy: "Busy", failed: "Call failed", canceled: "Cancelled",
+  not_connected: "Not connected", skipped: "Skipped" };
 export function callChip(c) {
-  if (c.status === "on_call") return { cls: "leaf", text: `On call · ${elapsed(c.started_at)}` };
-  if (c.status === "done") return { cls: "mint", text: c.harvest_confidence ? `Done · ${c.harvest_confidence}` : "Done" };
-  if (c.status === "dropped") return { cls: "", text: c.retry_queued ? "Dropped · retry queued" : "Dropped" };
-  if (c.status === "declined") return { cls: "", text: "Declined" };
-  return { cls: "", text: "Queued" };
+  const phone = c.channel === "twilio";
+  const tag = phone ? "Phone · " : "";
+  if (c.status === "on_call") return { cls: "leaf", text: `${tag}On call · ${elapsed(c.started_at)}` };
+  if (c.status === "done") return { cls: "mint", text: tag + (c.harvest_confidence ? `Done · ${c.harvest_confidence}` : "Done") };
+  if (c.status === "dropped") {
+    const why = phone && PHONE_OUTCOME[c.outcome] ? PHONE_OUTCOME[c.outcome] : "Dropped";
+    return { cls: "", text: tag + (c.retry_queued ? `${why} · retry queued` : why) };
+  }
+  if (c.status === "declined") return { cls: "", text: `${tag}Declined` };
+  if (phone && c.dialed_at) return { cls: "leaf", text: "Phone · ringing" };
+  return { cls: "", text: `${tag}Queued` };
 }
 
 export function el(tag, attrs = {}, ...children) {
