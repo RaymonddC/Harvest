@@ -1,0 +1,10 @@
+{
+  "name": "harvest-call",
+  "private": true,
+  "description": "Runs the backend and the React dashboard together for local development.",
+  "scripts": {
+    "start": "node scripts/dev.mjs",
+    "start:env": "node scripts/dev.mjs --env",
+    "test": "cd backend && python -m pytest -q"
+  }
+}
