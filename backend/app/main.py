@@ -79,6 +79,16 @@ class AgentProfileIn(BaseModel):
     questions: list[dict] = []
 
 
+class HarvestIn(BaseModel):
+    kg: float
+    ready_date: str
+    confidence: str = "firm"
+
+
+class AnswerIn(BaseModel):
+    answer: str
+
+
 class DialIn(BaseModel):
     kind: str | None = None
 
@@ -311,10 +321,24 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         crop = services.crop_of_campaign_id(settings, campaign_id)
         return services.set_agent_profile(store, settings, crop, body.persona, body.questions)
 
-    @app.post("/api/calls/{call_id}/confirm-harvest", dependencies=[Depends(need("farmers.manage"))])
-    def confirm_harvest(call_id: str):
+    @app.post("/api/calls/{call_id}/confirm-harvest")
+    def confirm_harvest(call_id: str, actor: auth.Actor = Depends(need("farmers.manage"))):
         """Save the harvest read back on a call that ended before the agent saved it."""
-        return services.confirm_read_back(store, settings, call_id)
+        return services.confirm_read_back(store, settings, call_id, actor.name)
+
+    @app.put("/api/farmers/{farmer_id}/harvest")
+    def put_harvest(farmer_id: str, body: HarvestIn, actor: auth.Actor = Depends(need("farmers.manage"))):
+        """Correct or add a farmer's harvest by hand (marked as edited; the call's values are kept)."""
+        return services.edit_harvest(store, settings, farmer_id, body.kg, body.ready_date, body.confidence, actor)
+
+    @app.delete("/api/farmers/{farmer_id}/harvest", dependencies=[Depends(need("farmers.manage"))])
+    def remove_harvest(farmer_id: str):
+        return services.delete_harvest(store, settings, farmer_id)
+
+    @app.put("/api/calls/{call_id}/answers/{question_id}")
+    def put_answer(call_id: str, question_id: str, body: AnswerIn, actor: auth.Actor = Depends(need("farmers.manage"))):
+        """Correct the answer to one of the planner's questions (the agent's version is kept)."""
+        return services.edit_answer(store, call_id, question_id, body.answer, actor)
 
     @app.get("/api/answers.csv")
     def answers_csv():

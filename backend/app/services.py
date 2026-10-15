@@ -147,6 +147,57 @@ def set_agent_profile(store: Store, settings: Settings, crop: str | None, person
     return {**profile, "crop": crop}
 
 
+def edit_harvest(store: Store, settings: Settings, farmer_id: str, kg: float, ready_date: str, confidence: str,
+                 actor=None) -> dict:
+    """A planner corrects (or adds) a farmer's harvest by hand. The first values from the call are kept in
+    "original", and the harvest is marked edited, so a hand-made number is never mistaken for the farmer's own."""
+    farmer = store.get("farmers", farmer_id)
+    if not farmer:
+        raise ServiceError("Farmer not found.")
+    crop = farmer_crop(settings, farmer)
+    harvest_id = f"h-{farmer_id}-{crop}"
+    before = store.get("harvests", harvest_id)
+    result = record_harvest(store, settings, farmer_id, crop, float(kg), ready_date,
+                            (before or {}).get("call_id"), confidence)
+    original = (before or {}).get("original") or (
+        {k: before.get(k) for k in ("kg", "ready_date", "confidence", "source")} if before else None)
+    store.set("harvests", harvest_id, {"source": "planner" if not before else before.get("source", "call"),
+                                       "original": original, "edited_by": actor.name if actor else "Planner",
+                                       "edited_at": now_iso()}, merge=True)
+    return {**result, "harvest": store.get("harvests", harvest_id)}
+
+
+def delete_harvest(store: Store, settings: Settings, farmer_id: str) -> dict:
+    farmer = store.get("farmers", farmer_id)
+    if not farmer:
+        raise ServiceError("Farmer not found.")
+    harvest_id = f"h-{farmer_id}-{farmer_crop(settings, farmer)}"
+    if not store.get("harvests", harvest_id):
+        raise ServiceError("This farmer has no harvest on record.")
+    store.delete("harvests", harvest_id)
+    recompute_forecast(store, settings)
+    return {"deleted": harvest_id}
+
+
+def edit_answer(store: Store, call_id: str, question_id: str, answer: str, actor=None) -> dict:
+    """Correct an answer to one of the planner's questions; the agent's version is kept in "original"."""
+    call = store.get("calls", call_id)
+    if not call:
+        raise ServiceError("Call not found.")
+    answers = dict(call.get("answers") or {})
+    entry = answers.get(question_id)
+    if not entry:
+        raise ServiceError("This call has no answer to that question.")
+    try:
+        value = agent_profile.parse_answer({"type": entry.get("type", "text")}, answer)
+    except agent_profile.AgentProfileError as e:
+        raise ServiceError(str(e)) from e
+    answers[question_id] = {**entry, "answer": value, "original": entry.get("original", entry.get("answer")),
+                            "edited_by": actor.name if actor else "Planner", "edited_at": now_iso()}
+    store.set("calls", call_id, {"answers": answers}, merge=True)
+    return answers[question_id]
+
+
 def confirm_read_back(store: Store, settings: Settings, call_id: str, user: str | None = None) -> dict:
     """Save a harvest the agent read back but did not save (the call dropped, or it forgot the second
     record_harvest). A planner does this from the call recap, after checking the transcript."""
@@ -158,7 +209,8 @@ def confirm_read_back(store: Store, settings: Settings, call_id: str, user: str 
         raise ServiceError("This call has no unsaved harvest.")
     result = record_harvest(store, settings, call["farmer_id"], rb["crop"], float(rb["kg"]), rb["ready_date"],
                             call_id, rb.get("confidence", "firm"))
-    store.set("harvests", result["harvest_id"], {"source": "planner", "confirmed_by": user}, merge=True)
+    store.set("harvests", result["harvest_id"], {"source": "planner", "confirmed_by": user,
+                                                 "edited_by": user or "Planner", "edited_at": now_iso()}, merge=True)
     store.set("calls", call_id, {"harvest_read_back": None}, merge=True)
     return result
 

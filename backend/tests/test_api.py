@@ -721,3 +721,39 @@ def test_phone_calls_note_explains_the_state(settings):
     assert "REAL_CALLS_ENABLED" in services.phone_calls_note(twilio_settings(settings))
     on = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=("+628114617000",))
     assert services.phone_calls_note(on) == "Real phone calls are on, only to the 1 number on the allowlist."
+
+
+# ---------- manual edits: harvests and answers ----------
+
+def test_planner_corrects_a_harvest_and_the_call_values_are_kept(client, store):
+    services.record_harvest(store, client.app.state.settings, "f01", "palm", 1600, "2026-11-02", "call-x", "firm")
+    before = store.get("forecast", "W4")["expected_kg"]
+    r = client.put("/api/farmers/f01/harvest", json={"kg": 1200, "ready_date": "2026-11-03", "confidence": "unsure"})
+    assert r.status_code == 200
+    h = store.get("harvests", "h-f01-palm")
+    assert h["kg"] == 1200 and h["confidence"] == "unsure" and h["edited_by"]
+    assert h["original"] == {"kg": 1600, "ready_date": "2026-11-02", "confidence": "firm", "source": "call"}
+    assert h["call_id"] == "call-x"
+    assert store.get("forecast", "W4")["expected_kg"] == before - 1600 + 600  # unsure counts half
+    client.put("/api/farmers/f01/harvest", json={"kg": 1300, "ready_date": "2026-11-03", "confidence": "firm"})
+    assert store.get("harvests", "h-f01-palm")["original"]["kg"] == 1600  # still the farmer's first answer
+    assert client.put("/api/farmers/f01/harvest", json={"kg": 0, "ready_date": "2026-11-03"}).status_code == 400
+    assert client.delete("/api/farmers/f01/harvest").status_code == 200
+    assert store.get("harvests", "h-f01-palm") is None
+    assert client.delete("/api/farmers/f01/harvest").status_code == 400
+
+
+def test_planner_adds_a_harvest_for_a_farmer_without_one(client, store):
+    r = client.put("/api/farmers/f02/harvest", json={"kg": 700, "ready_date": "2026-10-20", "confidence": "firm"})
+    h = store.get("harvests", "h-f02-palm")
+    assert r.status_code == 200 and h["source"] == "planner" and h["original"] is None
+
+
+def test_planner_corrects_an_answer(client, store):
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect")
+    store.set("calls", call_id, {"answers": {"q-abcd1234": {"question": "Berapa pohon?", "type": "number", "answer": "12"}}}, merge=True)
+    r = client.put(f"/api/calls/{call_id}/answers/q-abcd1234", json={"answer": "kira-kira 120"})
+    a = store.get("calls", call_id)["answers"]["q-abcd1234"]
+    assert r.status_code == 200 and a["answer"] == "120" and a["original"] == "12" and a["edited_by"]
+    assert client.put(f"/api/calls/{call_id}/answers/q-abcd1234", json={"answer": "banyak"}).status_code == 400
+    assert client.put(f"/api/calls/{call_id}/answers/q-nope", json={"answer": "1"}).status_code == 400
