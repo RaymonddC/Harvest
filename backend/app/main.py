@@ -196,7 +196,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "max_call_attempts": settings.max_call_attempts,
                             "plan_start": settings.plan_start.isoformat(),
                             "weeks": settings.weeks, "target_kg_per_week": settings.target_kg_per_week,
-                            "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop}
+                            "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop,
+                            "phone_calls": services.phone_calls_ready(settings)}
         return data
 
     @app.get("/api/state")
@@ -341,22 +342,26 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     # ----- Twilio (VA-8): the real phone leg -----
 
-    @app.post("/twilio/voice", include_in_schema=False)
-    async def twilio_voice(request: Request, call_id: str):
+    async def twilio_form(request: Request, path: str) -> dict:
+        """The webhook's form, after checking Twilio signed it. Fails closed."""
         if not services.twilio_ready(settings):
             raise HTTPException(404, "Twilio is not configured.")
-        form = await request.form()
-        base = settings.public_base_url.rstrip("/")
-        full_url = f"{base}/twilio/voice?call_id={call_id}"
+        form = dict(await request.form())
         # Validate against the configured public URL, never the request Cloud Run
         # hands the app - Cloud Run terminates TLS and rewrites the host, so a
         # signature checked against request.url always fails behind it.
         from twilio.request_validator import RequestValidator
 
-        validator = RequestValidator(settings.twilio_auth_token)
+        full_url = f"{settings.public_base_url.rstrip('/')}{path}"
         signature = request.headers.get("X-Twilio-Signature", "")
-        if not validator.validate(full_url, dict(form), signature):
+        if not RequestValidator(settings.twilio_auth_token).validate(full_url, form, signature):
             raise HTTPException(403, "Invalid Twilio signature.")
+        return form
+
+    @app.post("/twilio/voice", include_in_schema=False)
+    async def twilio_voice(request: Request, call_id: str):
+        await twilio_form(request, f"/twilio/voice?call_id={call_id}")
+        base = settings.public_base_url.rstrip("/")
 
         call = store.get("calls", call_id)
         if not call or call.get("status") != "queued" or call.get("channel") != "twilio":
@@ -365,13 +370,26 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             return Response(content=twiml, media_type="text/xml")
 
         stream_url = f"{base}/twilio/stream/{call_id}".replace("https://", "wss://").replace("http://", "ws://")
+        token = services.stream_token(settings, call_id)
         twiml = ('<?xml version="1.0" encoding="UTF-8"?>'
-                 f'<Response><Connect><Stream url="{stream_url}" /></Connect></Response>')
+                 f'<Response><Connect><Stream url="{stream_url}">'
+                 f'<Parameter name="token" value="{token}" />'
+                 '</Stream></Connect></Response>')
         return Response(content=twiml, media_type="text/xml")
+
+    @app.post("/twilio/status", include_in_schema=False)
+    async def twilio_status(request: Request, call_id: str):
+        form = await twilio_form(request, f"/twilio/status?call_id={call_id}")
+        services.twilio_status(store, settings, call_id, str(form.get("CallStatus", "")))
+        return Response(status_code=204)
 
     @app.websocket("/twilio/stream/{call_id}")
     async def twilio_stream(ws: WebSocket, call_id: str):
-        await run_call(TwilioChannel(ws), store, settings, call_id, expected_channel="twilio")
+        if not services.twilio_ready(settings):
+            await ws.close(code=1008)
+            return
+        channel = TwilioChannel(ws, expected_token=services.stream_token(settings, call_id))
+        await run_call(channel, store, settings, call_id, expected_channel="twilio")
 
     if settings.static_dir:
         app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="web")

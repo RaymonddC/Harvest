@@ -2,6 +2,7 @@ import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useState } from "react";
 import { api, can, cropLabel, fmtKg, maskPhone } from "../../lib.js";
 import { useConfirm } from "../../dialogs.jsx";
+import { useLive } from "../../live.jsx";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar } from "../../ui.jsx";
 
@@ -46,9 +47,12 @@ function SortHead({ col, sort, setSort, className, style }) {
 }
 
 // Every farmer: search, sort, pages; Call now on each row, Edit and Delete in its "⋯" menu.
+// "Call by phone" (a real Twilio call) joins that menu only when the backend has phone calls switched on.
 export default function FarmerList({ farmers, onEdit }) {
   const confirm = useConfirm();
   const act = useAct();
+  const { state } = useLive();
+  const phoneCalls = !!state?.settings?.phone_calls;
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ key: null, dir: 1 });
@@ -66,6 +70,11 @@ export default function FarmerList({ farmers, onEdit }) {
   const first = (current - 1) * PAGE;
   const go = (n) => { setPage(n); document.getElementById("farmer-list").scrollIntoView({ block: "start" }); };
   const sortBy = (s) => { setSort(s); setPage(1); };
+  const dial = async (f) => {
+    if (await confirm({ title: `Call ${f.name}'s phone?`, body: `This places a real phone call to ${maskPhone(f.phone)}. The AI agent talks to whoever answers.`, confirm: "Call by phone" })) {
+      act(() => api(`/api/farmers/${f.id}/dial`, { body: {} }), `Calling ${f.name}'s phone…`);
+    }
+  };
   const remove = async (f) => {
     if (await confirm({ title: `Delete ${f.name}?`, body: "Their waiting calls are withdrawn. Past calls and offers stay.", confirm: "Delete farmer", danger: true })) {
       act(() => api(`/api/farmers/${f.id}`, { method: "DELETE" }), `${f.name} deleted.`);
@@ -105,6 +114,7 @@ export default function FarmerList({ farmers, onEdit }) {
                     <Menu.Trigger asChild><button className="btn sm more" type="button" aria-label={`More for ${f.name}`}>⋯</button></Menu.Trigger>
                     <Menu.Portal>
                       <Menu.Content className="hc-menu" align="end" sideOffset={4}>
+                        {phoneCalls && <Menu.Item className="hc-menu-item" disabled={!can("campaign.run")} onSelect={() => dial(f)}>Call by phone…</Menu.Item>}
                         <Menu.Item className="hc-menu-item" disabled={!can("farmers.manage")} onSelect={() => onEdit(f)}>Edit</Menu.Item>
                         <Menu.Item className="hc-menu-item danger" disabled={!can("farmers.manage")} onSelect={() => remove(f)}>Delete…</Menu.Item>
                       </Menu.Content>

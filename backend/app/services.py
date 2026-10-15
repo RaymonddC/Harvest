@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import dataclasses
 import hashlib
+import hmac
 import datetime as dt
 import io
 
@@ -453,6 +454,51 @@ def twilio_ready(settings: Settings) -> bool:
                and settings.twilio_from_number and settings.public_base_url)
 
 
+def phone_calls_ready(settings: Settings) -> bool:
+    """True when the dashboard may offer "Call by phone": Twilio configured and the safety gate open."""
+    return twilio_ready(settings) and settings.real_calls_enabled
+
+
+def stream_token(settings: Settings, call_id: str) -> str:
+    """Per-call secret for the Twilio media stream.
+
+    Twilio signs the /twilio/voice webhook but not the WebSocket it then opens, so the
+    TwiML hands the stream this token as a custom parameter and TwilioChannel checks it
+    in the "start" frame. Keyed on the auth token, which only Twilio and we know.
+    """
+    key = (settings.twilio_auth_token or "").encode()
+    return hmac.new(key, call_id.encode(), hashlib.sha256).hexdigest()[:32]
+
+
+# Twilio CallStatus values that mean nobody was ever connected to the agent.
+TWILIO_NOT_REACHED = {"no-answer": "no_answer", "busy": "busy", "failed": "failed", "canceled": "canceled"}
+
+
+def twilio_status(store: Store, settings: Settings, call_id: str, call_status: str) -> str | None:
+    """Twilio's status callback for a dialled call.
+
+    Without it a call that is never answered stays "queued" for ever: the voice webhook and
+    the media stream only happen when someone picks up. A call still queued when Twilio
+    reports it over has not reached the agent, so it ends as dropped (and is retried once,
+    like a browser call). A call that reached the agent is finished by run_call; ignore it.
+    """
+    call = store.get("calls", call_id)
+    if not call or call.get("channel") != "twilio":
+        return None
+    store.set("calls", call_id, {"twilio_status": call_status}, merge=True)
+    if call.get("status") != "queued":
+        return None
+    if call_status in TWILIO_NOT_REACHED:
+        outcome = TWILIO_NOT_REACHED[call_status]
+    elif call_status == "completed":
+        outcome = "not_connected"  # answered, but the audio stream never reached the agent
+    else:
+        return None  # queued, ringing, in-progress: not over yet
+    finish_call(store, settings, call_id, ended_cleanly=False, outcome=outcome, summary=None,
+                consent=None, transcript=[])
+    return outcome
+
+
 def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None = None) -> str:
     """Place a real outbound call (VA-8). Same preconditions as call_now, plus Twilio config
     and the REAL_CALLS_ENABLED/REAL_CALL_ALLOWLIST safety gate - see config.py."""
@@ -476,19 +522,43 @@ def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None 
         raise ServiceError(f"{to_number} is not on the real-call allowlist (REAL_CALL_ALLOWLIST). "
                            "This is a safety gate, not a bug - add the number there, or set it to "
                            "\"*\" to allow any number (production).")
-    gap = first_gap_week(store, farmer_crop(settings, farmer))
-    call_id = queue_call(store, farmer, kind or "collect", gap_week=gap["week"] if gap else None,
-                         channel="twilio")
+    if any(c["farmer_id"] == farmer_id and c.get("channel") == "twilio" and c["status"] == "on_call"
+           for c in store.list("calls")):
+        raise ServiceError("This farmer is on a phone call right now.")
+    # A dropped phone call is retried as a queued phone call; nothing dials it on its own
+    # (calling a farmer back the moment they missed a call would be rude), so dialling the
+    # farmer again picks that retry up instead of starting a new attempt count.
+    waiting = sorted((c for c in store.list("calls")
+                      if c["farmer_id"] == farmer_id and c.get("channel") == "twilio"
+                      and c["status"] == "queued" and (not kind or c["kind"] == kind)),
+                     key=lambda c: c.get("created_at") or "")
+    if waiting:
+        call_id, created = waiting[0]["id"], False
+    else:
+        gap = first_gap_week(store, farmer_crop(settings, farmer))
+        call_id = queue_call(store, farmer, kind or "collect", gap_week=gap["week"] if gap else None,
+                             channel="twilio")
+        created = True
     from twilio.rest import Client  # imported lazily: only needed once Twilio is actually configured
 
     client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
-    voice_url = f"{settings.public_base_url.rstrip('/')}/twilio/voice?call_id={call_id}"
+    base = settings.public_base_url.rstrip("/")
     try:
-        client.calls.create(to=to_number, from_=settings.twilio_from_number,
-                            url=voice_url, method="POST")
+        placed = client.calls.create(
+            to=to_number, from_=settings.twilio_from_number, method="POST",
+            url=f"{base}/twilio/voice?call_id={call_id}",
+            # So an unanswered, busy or failed call ends instead of staying queued.
+            status_callback=f"{base}/twilio/status?call_id={call_id}",
+            status_callback_method="POST", status_callback_event=["completed"],
+            # Ring for 30 s, not Twilio's 60: long enough for a farmer to reach the phone,
+            # short enough that a voicemail greeting rarely picks up first.
+            timeout=30)
     except Exception as e:
-        store.delete("calls", call_id)
+        if created:
+            store.delete("calls", call_id)
         raise ServiceError(f"Twilio call failed: {e}") from e
+    store.set("calls", call_id, {"twilio_sid": getattr(placed, "sid", None), "dialed_at": now_iso()},
+              merge=True)
     return call_id
 
 
