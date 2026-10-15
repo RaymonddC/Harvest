@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { campaignFor, useCrop } from "../../campaigns.jsx";
-import { api, fmtPrice, fmtT } from "../../lib.js";
+import { api, fmtPrice, fmtT, followCalls, gapFillBody, gapFillToast } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar, Icon, Pill } from "../../ui.jsx";
 import { shortDate } from "./Chart.jsx";
@@ -54,9 +54,11 @@ export function Hero({ gap, rows, state }) {
       </div>
       <div className="hero-acts">
         {/* While gap-fill calls run, the next step is answering them, not starting more. */}
-        {calling ? <a className="btn solid big" href="/call.html" target="_blank" rel="noopener"><Icon name="phone" size={16} />Open call client</a> : (
+        {calling ? (followCalls(campaign).external
+          ? <a className="btn solid big" href="/call.html" target="_blank" rel="noopener"><Icon name="phone" size={16} />Open call client</a>
+          : <span className="pill lg dot running">Ringing phones, one at a time</span>) : (
         <ActButton need="campaign.run" className="btn solid big" busy="Queuing calls…" disabled={!canFill}
-          run={() => act(() => api("/api/campaign/start", { body: { kind: "gap_fill", crop } }), (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`)}>
+          run={() => act(() => api("/api/campaign/start", { body: gapFillBody(state, crop) }), gapFillToast)}>
           <Icon name="phone" size={16} />Start gap-fill calls
         </ActButton>)}
         {waiting > 0 && <Link className="btn" to="/approvals">Review {waiting} waiting</Link>}

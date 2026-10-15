@@ -47,8 +47,9 @@ function SortHead({ col, sort, setSort, className, style }) {
 }
 
 // Every farmer: search, sort, pages; Call now on each row, Edit and Delete in its "⋯" menu.
-// "Call by phone" (a real Twilio call) joins that menu only when the backend has phone calls switched on.
-export default function FarmerList({ farmers, onEdit }) {
+// "Call phone" (a real Twilio call) appears next to it only when the backend has phone calls switched on;
+// "Call now" then becomes "Browser call" (the demo, answered in the call client).
+export default function FarmerList({ farmers, onEdit, onOpen }) {
   const confirm = useConfirm();
   const act = useAct();
   const { state } = useLive();
@@ -103,18 +104,18 @@ export default function FarmerList({ farmers, onEdit }) {
           <tbody id="farmer-rows">
             {rows.slice(first, first + PAGE).map((f) => (
               <tr key={f.id}>
-                <td style={{ paddingLeft: 22 }}><div className="who-cell"><Avatar name={f.name} cls="sm" /><div><b>{f.name}</b><span>{f.village || ""}</span></div></div></td>
+                <td style={{ paddingLeft: 22 }}><button type="button" className="who-cell who-link" onClick={() => onOpen?.(f)} aria-label={`Open ${f.name}`}><Avatar name={f.name} cls="sm" /><div><b>{f.name}</b><span>{f.village || ""}</span></div></button></td>
                 <td className="num">{maskPhone(f.phone)}</td>
                 <td>{f.language}</td>
                 <td>{cropLabel(f.crop)}</td>
                 <td className="r num">{f.usual_kg_week ? fmtKg(f.usual_kg_week) : "–"}</td>
                 <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
-                  <ActButton need="campaign.run" className="btn sm" busy="Queuing…" run={() => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`)}>Call now</ActButton>{" "}
+                  {phoneCalls && <><ActButton need="campaign.run" className="btn sm leaf" busy="Calling…" run={() => dial(f)}>Call phone</ActButton>{" "}</>}
+                  <ActButton need="campaign.run" className="btn sm" busy="Queuing…" run={() => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`)}>{phoneCalls ? "Browser call" : "Call now"}</ActButton>{" "}
                   <Menu.Root>
                     <Menu.Trigger asChild><button className="btn sm more" type="button" aria-label={`More for ${f.name}`}>⋯</button></Menu.Trigger>
                     <Menu.Portal>
                       <Menu.Content className="hc-menu" align="end" sideOffset={4}>
-                        {phoneCalls && <Menu.Item className="hc-menu-item" disabled={!can("campaign.run")} onSelect={() => dial(f)}>Call by phone…</Menu.Item>}
                         <Menu.Item className="hc-menu-item" disabled={!can("farmers.manage")} onSelect={() => onEdit(f)}>Edit</Menu.Item>
                         <Menu.Item className="hc-menu-item danger" disabled={!can("farmers.manage")} onSelect={() => remove(f)}>Delete…</Menu.Item>
                       </Menu.Content>

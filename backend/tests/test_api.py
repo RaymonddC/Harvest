@@ -677,3 +677,83 @@ def test_state_says_whether_phone_calls_are_on(store, settings):
     s = twilio_settings(settings, real_calls_enabled=True)
     with TestClient(create_app(s, store)) as c:
         assert c.get("/api/state").json()["settings"]["phone_calls"] is True
+
+
+# ---------- phone campaigns: one real call at a time ----------
+
+def test_phone_campaign_dials_one_farmer_at_a_time_and_skips_refused_numbers(store, settings, monkeypatch):
+    from app.config import normalize_phone
+
+    fake = _FakeTwilio()
+    monkeypatch.setattr("twilio.rest.Client", fake.Client)
+    monkeypatch.setattr(services, "_after_phone_call", services.dial_next)  # run the next dial inline
+    to_call = sorted(f["id"] for f in store.list("farmers") if f.get("to_call"))
+    allowed = tuple(normalize_phone(store.get("farmers", fid)["phone"]) for fid in to_call[1:3])
+    s = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=allowed)
+
+    r = services.start_campaign(store, s, "collect", channel="twilio")
+    assert r["channel"] == "twilio" and r["queued"] == len(to_call)
+    first = store.get("calls", r["dialled"])
+    assert first["farmer_id"] == to_call[1] and len(fake.created) == 1  # to_call[0] is not on the allowlist
+    skipped = [c for c in store.list("calls") if c["farmer_id"] == to_call[0]][0]
+    assert skipped["status"] == "dropped" and skipped["outcome"] == "skipped" and "allowlist" in skipped["summary"]
+    assert services.dial_next(store, s) is None  # one call is already ringing
+
+    services.finish_call(store, s, first["id"], ended_cleanly=True, outcome="completed", summary="ok",
+                         consent=False, transcript=[])
+    assert len(fake.created) == 2 and fake.created[1]["to"] == allowed[1]
+    second = next(c for c in store.list("calls") if c["farmer_id"] == to_call[2])
+    # A missed call gets its retry queued but not dialled; everyone else not allowed is skipped, campaign ends.
+    services.twilio_status(store, s, second["id"], "no-answer")
+    assert len(fake.created) == 2
+    assert all(c["status"] in ("done", "dropped") or c.get("attempt") == 2
+               for c in store.list("calls") if c.get("channel") == "twilio")
+
+
+def test_phone_campaign_refuses_when_phone_calls_are_off(store, settings):
+    with pytest.raises(services.ServiceError, match="Real phone calls are off"):
+        services.start_campaign(store, settings, "collect", channel="twilio")
+    assert not [c for c in store.list("calls") if c.get("channel") == "twilio"]
+
+
+def test_phone_calls_note_explains_the_state(settings):
+    assert "not set up" in services.phone_calls_note(settings)
+    assert "REAL_CALLS_ENABLED" in services.phone_calls_note(twilio_settings(settings))
+    on = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=("+628114617000",))
+    assert services.phone_calls_note(on) == "Real phone calls are on, only to the 1 number on the allowlist."
+
+
+# ---------- manual edits: harvests and answers ----------
+
+def test_planner_corrects_a_harvest_and_the_call_values_are_kept(client, store):
+    services.record_harvest(store, client.app.state.settings, "f01", "palm", 1600, "2026-11-02", "call-x", "firm")
+    before = store.get("forecast", "W4")["expected_kg"]
+    r = client.put("/api/farmers/f01/harvest", json={"kg": 1200, "ready_date": "2026-11-03", "confidence": "unsure"})
+    assert r.status_code == 200
+    h = store.get("harvests", "h-f01-palm")
+    assert h["kg"] == 1200 and h["confidence"] == "unsure" and h["edited_by"]
+    assert h["original"] == {"kg": 1600, "ready_date": "2026-11-02", "confidence": "firm", "source": "call"}
+    assert h["call_id"] == "call-x"
+    assert store.get("forecast", "W4")["expected_kg"] == before - 1600 + 600  # unsure counts half
+    client.put("/api/farmers/f01/harvest", json={"kg": 1300, "ready_date": "2026-11-03", "confidence": "firm"})
+    assert store.get("harvests", "h-f01-palm")["original"]["kg"] == 1600  # still the farmer's first answer
+    assert client.put("/api/farmers/f01/harvest", json={"kg": 0, "ready_date": "2026-11-03"}).status_code == 400
+    assert client.delete("/api/farmers/f01/harvest").status_code == 200
+    assert store.get("harvests", "h-f01-palm") is None
+    assert client.delete("/api/farmers/f01/harvest").status_code == 400
+
+
+def test_planner_adds_a_harvest_for_a_farmer_without_one(client, store):
+    r = client.put("/api/farmers/f02/harvest", json={"kg": 700, "ready_date": "2026-10-20", "confidence": "firm"})
+    h = store.get("harvests", "h-f02-palm")
+    assert r.status_code == 200 and h["source"] == "planner" and h["original"] is None
+
+
+def test_planner_corrects_an_answer(client, store):
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect")
+    store.set("calls", call_id, {"answers": {"q-abcd1234": {"question": "Berapa pohon?", "type": "number", "answer": "12"}}}, merge=True)
+    r = client.put(f"/api/calls/{call_id}/answers/q-abcd1234", json={"answer": "kira-kira 120"})
+    a = store.get("calls", call_id)["answers"]["q-abcd1234"]
+    assert r.status_code == 200 and a["answer"] == "120" and a["original"] == "12" and a["edited_by"]
+    assert client.put(f"/api/calls/{call_id}/answers/q-abcd1234", json={"answer": "banyak"}).status_code == 400
+    assert client.put(f"/api/calls/{call_id}/answers/q-nope", json={"answer": "1"}).status_code == 400

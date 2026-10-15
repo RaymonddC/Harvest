@@ -7,6 +7,7 @@ import datetime as dt
 
 from . import forecast as fc
 from .config import Settings
+from .agent_profile import persona_rules, profile_of, questions_stage
 from .rules_engine import crop_label, normalize_crop
 
 PERSONA = """\
@@ -65,6 +66,7 @@ call open and never start a new topic after the deal is saved.
 NOTICES = {
     "Bahasa Indonesia": {
         "hello": "Halo, ini asisten AI yang menelepon untuk {mill}.",
+        "hello_named": "Halo, saya {agent}, asisten AI yang menelepon untuk {mill}.",
         "ask": "Apakah saya berbicara dengan {name}?",
         "transcript": "Dengan izin Bapak/Ibu, {mill} menyimpan catatan tertulis dari percakapan ini. Apakah Bapak/Ibu setuju?",
         "recording": "Dengan izin Bapak/Ibu, {mill} merekam percakapan ini dan menyimpan rekaman serta catatan tertulisnya "
@@ -72,6 +74,7 @@ NOTICES = {
     },
     "Bahasa Malaysia": {
         "hello": "Helo, ini pembantu AI yang menelefon untuk {mill}.",
+        "hello_named": "Helo, saya {agent}, pembantu AI yang menelefon untuk {mill}.",
         "ask": "Adakah saya bercakap dengan {name}?",
         "transcript": "Dengan kebenaran anda, {mill} menyimpan transkrip bertulis perbualan ini. Adakah anda bersetuju?",
         "recording": "Dengan kebenaran anda, {mill} merakam perbualan ini dan menyimpan rakaman serta transkrip bertulisnya "
@@ -79,6 +82,7 @@ NOTICES = {
     },
     "English": {
         "hello": "Hello, this is an AI assistant calling for {mill}.",
+        "hello_named": "Hello, this is {agent}, an AI assistant calling for {mill}.",
         "ask": "Am I speaking with {name}?",
         "transcript": "With your permission, {mill} keeps a written transcript of this call. Is that all right?",
         "recording": "With your permission, {mill} records this call and keeps the recording and a written transcript "
@@ -86,6 +90,7 @@ NOTICES = {
     },
     "Javanese": {
         "hello": "Halo, iki asisten AI sing nelpon kanggo {mill}.",
+        "hello_named": "Halo, kula {agent}, asisten AI sing nelpon kanggo {mill}.",
         "ask": "Apa aku lagi ngomong karo {name}?",
         "transcript": "Kanthi idin Panjenengan, {mill} nyimpen cathetan tertulis saka omongan iki. Apa Panjenengan setuju?",
         "recording": "Kanthi idin Panjenengan, {mill} ngrekam omongan iki lan nyimpen rekaman sarta cathetan tertulise nganti "
@@ -93,27 +98,58 @@ NOTICES = {
     },
     "Sundanese": {
         "hello": "Halo, ieu asisten AI nu nelepon pikeun {mill}.",
+        "hello_named": "Halo, abdi {agent}, asisten AI nu nelepon pikeun {mill}.",
         "ask": "Naha abdi nuju ngobrol sareng {name}?",
         "transcript": "Kalayan widi Bapa/Ibu, {mill} nyimpen catetan tinulis tina obrolan ieu. Naha Bapa/Ibu satuju?",
         "recording": "Kalayan widi Bapa/Ibu, {mill} ngarékam obrolan ieu sareng nyimpen rékaman sarta catetan tinulisna salila "
                      "{days} dinten, supados perencana tiasa mariksa deui kasapukanana. Naha Bapa/Ibu satuju?",
     },
+    # Thai, Vietnamese and Filipino added 16 Oct without a native reviewer: have a speaker check them before real use.
+    "Thai": {
+        "hello": "สวัสดี นี่คือผู้ช่วย AI ที่โทรมาในนามของ {mill}",
+        "hello_named": "สวัสดี ฉันชื่อ {agent} เป็นผู้ช่วย AI ที่โทรมาในนามของ {mill}",
+        "ask": "ไม่ทราบว่าใช่คุณ{name}หรือเปล่า?",
+        "transcript": "หากคุณอนุญาต {mill} จะเก็บบันทึกข้อความของการสนทนานี้ไว้ คุณยินยอมไหม?",
+        "recording": "หากคุณอนุญาต {mill} จะบันทึกเสียงการสนทนานี้ และเก็บไฟล์เสียงพร้อมบันทึกข้อความไว้ {days} วัน "
+                     "เพื่อให้ผู้วางแผนตรวจสอบข้อตกลงได้ คุณยินยอมไหม?",
+    },
+    "Vietnamese": {
+        "hello": "Xin chào, đây là trợ lý AI gọi thay mặt cho {mill}.",
+        "hello_named": "Xin chào, tôi là {agent}, trợ lý AI gọi thay mặt cho {mill}.",
+        "ask": "Có phải tôi đang nói chuyện với {name} không ạ?",
+        "transcript": "Nếu anh/chị đồng ý, {mill} sẽ lưu bản ghi chép cuộc gọi này. Anh/chị có đồng ý không ạ?",
+        "recording": "Nếu anh/chị đồng ý, {mill} sẽ ghi âm cuộc gọi này và lưu bản ghi âm cùng bản ghi chép trong {days} "
+                     "ngày để người lập kế hoạch có thể kiểm tra lại thỏa thuận. Anh/chị có đồng ý không ạ?",
+    },
+    "Filipino": {
+        "hello": "Magandang araw, ito ay isang AI assistant na tumatawag para sa {mill}.",
+        "hello_named": "Magandang araw, ako si {agent}, isang AI assistant na tumatawag para sa {mill}.",
+        "ask": "Si {name} po ba ang kausap ko?",
+        "transcript": "Kung papayag po kayo, itatago ng {mill} ang nakasulat na transcript ng tawag na ito. "
+                      "Pumapayag po ba kayo?",
+        "recording": "Kung papayag po kayo, ire-record ng {mill} ang tawag na ito at itatago ang recording at nakasulat na "
+                     "transcript nang {days} araw, para masuri ng planner ang napagkasunduan. Pumapayag po ba kayo?",
+    },
 }
 NOTICE_ALIASES = {"indonesian": "Bahasa Indonesia", "indonesia": "Bahasa Indonesia", "bahasa": "Bahasa Indonesia",
                   "malay": "Bahasa Malaysia", "malaysian": "Bahasa Malaysia", "bahasa melayu": "Bahasa Malaysia",
-                  "jawa": "Javanese", "bahasa jawa": "Javanese", "sunda": "Sundanese", "bahasa sunda": "Sundanese"}
+                  "jawa": "Javanese", "bahasa jawa": "Javanese", "sunda": "Sundanese", "bahasa sunda": "Sundanese",
+                  "thai": "Thai", "ภาษาไทย": "Thai", "vietnamese": "Vietnamese", "tiếng việt": "Vietnamese",
+                  "tagalog": "Filipino", "filipino": "Filipino", "pilipino": "Filipino"}
 RETENTION_DAYS = 90  # how long a call recording is kept (said in the recording notice)
 
 
-def notice_for(language: str, mill: str, name: str, recording: bool = False, days: int = RETENTION_DAYS) -> dict | None:
+def notice_for(language: str, mill: str, name: str, recording: bool = False, days: int = RETENTION_DAYS,
+               agent: str = "") -> dict | None:
     """The opening sentences in this language, or None for a language without fixed wording."""
     key = " ".join((language or "").strip().lower().split())
     lang = next((n for n in NOTICES if n.lower() == key), None) or NOTICE_ALIASES.get(key)
     if not lang:
         return None
     n = NOTICES[lang]
-    fill = {"mill": mill, "name": name, "days": days}
-    return {"hello": n["hello"].format(**fill), "ask": n["ask"].format(**fill),
+    fill = {"mill": mill, "name": name, "days": days, "agent": agent}
+    hello = n["hello_named"] if agent and "hello_named" in n else n["hello"]
+    return {"hello": hello.format(**fill), "ask": n["ask"].format(**fill),
             "consent": n["recording" if recording else "transcript"].format(**fill)}
 
 
@@ -123,15 +159,17 @@ changing a word and without adding any English:
 1. "{hello}"
 2. "{ask}"
 3. "{consent}"
-That is the consent notice: it says what {mill} keeps. Ask it once, here. Remember the answer for \
-end_call's transcript_consent; carry on with the call either way.
+That is the consent notice: it says what {mill} keeps. Ask it once, here. As soon as the farmer answers, \
+call record_consent with their answer (and give the same answer to end_call later); carry on with the call \
+either way.
 """
 
 OPENING_TRANSLATED = """\
 Opening, word for word in {language}, as your first sentence: "Hello, this is an AI assistant calling for \
 {mill}." Then ask if you are speaking with {name}. Then give the consent notice: "With your permission \
-{mill} keeps a written transcript of this call. Is that all right?" Say all of it in {language}. Remember the \
-answer for end_call's transcript_consent; carry on with the call either way.
+{mill} keeps a written transcript of this call. Is that all right?" Say all of it in {language}. As soon as \
+the farmer answers, call record_consent with their answer (and give the same answer to end_call later); carry \
+on with the call either way.
 """
 
 COLLECT = """\
@@ -200,16 +238,20 @@ def calendar(settings: Settings) -> str:
 
 def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_week: int | None,
                              harvest: dict | None = None, offer: dict | None = None,
-                             today: dt.date | None = None) -> str:
+                             today: dt.date | None = None, campaign: dict | None = None) -> str:
     today = today or dt.date.today()
     language = farmer.get("language") or settings.demo_language
     crop = crop_label(normalize_crop(farmer.get("crop") or settings.demo_crop))
     fmt = {"mill": settings.mill_name, "language": language, "name": farmer.get("name", "the farmer"),
            "crop": crop}
 
-    notice = notice_for(language, settings.mill_name, fmt["name"])
+    profile = profile_of(campaign)  # the campaign's persona and the planner's own questions
+    agent = profile["persona"].get("name", "")
+    notice = notice_for(language, settings.mill_name, fmt["name"], agent=agent)
     opening = OPENING_FIXED.format(**fmt, **notice) if notice else OPENING_TRANSLATED.format(**fmt)
-    parts = [PERSONA.format(**fmt), opening]
+    if agent and not notice:
+        opening += f"In that first sentence, say your name, {agent}, too.\n"
+    parts = [PERSONA.format(**fmt), persona_rules(profile["persona"]), opening]
 
     gap_fmt = {}
     if gap_week:
@@ -232,6 +274,7 @@ def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_we
     else:
         offer_stage = OFFER_STAGE.format(**gap_fmt) if gap_week else NO_OFFER_STAGE
         parts.append(COLLECT.format(**fmt, offer_stage=offer_stage))
+        parts.append(questions_stage(profile["questions"]))
 
     parts.append(f"Today is {today:%A %d %B %Y}. Convert spoken dates to YYYY-MM-DD. "
                  f"The mill plans in these weeks:\n{calendar(settings)}")

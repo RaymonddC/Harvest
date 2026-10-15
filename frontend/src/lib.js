@@ -16,3 +16,14 @@ export const PAGES = [
 
 // The old one-file-per-page URLs (the call client and bookmarks still use them).
 export const OLD_URLS = { "index.html": "/", "setup.html": "/setup", "approvals.html": "/approvals", "users.html": "/users", "login.html": "/login" };
+
+// Gap-fill calls ring the farmers' real phones (one at a time) when the backend has phone calls on,
+// otherwise they wait in the browser call client as demo calls.
+export const gapFillBody = (state, crop) => ({ kind: "gap_fill", crop, channel: state?.settings?.phone_calls ? "twilio" : "browser" });
+export const gapFillToast = (r) => (r.channel === "twilio"
+  ? `${r.queued} gap-fill calls: ringing the farmers' phones one at a time.`
+  : `${r.queued} gap-fill calls queued. Answer them in the call client.`);
+// While a campaign runs: the call client for demo calls, the live forecast for real phone calls.
+export const followCalls = (campaign) => (campaign?.channel === "twilio"
+  ? { href: "/", label: "Watch the phone calls", external: false }
+  : { href: "/call.html", label: "Open call client", external: true });
