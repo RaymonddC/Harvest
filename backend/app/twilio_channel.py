@@ -7,9 +7,10 @@ live_session.Channel - so none of the negotiation/tool/retry code needed to
 change to add this.
 
 Twilio does not sign the Media Streams WebSocket handshake itself (only the
-/twilio/voice webhook that sets it up); the call_id in the stream URL is an
-unguessable id (store.new_id), and run_call() already refuses anything that
-isn't the queued call it expects, which is enough for a hackathon demo.
+/twilio/voice webhook that sets it up). So the signed webhook's TwiML passes a
+per-call token (services.stream_token) as a custom <Parameter>, Twilio hands it
+back in the "start" frame, and this channel hangs up if it does not match - on
+top of the unguessable call_id and run_call()'s own queued/channel checks.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import hmac
 import json
 import logging
 
@@ -32,8 +34,9 @@ GATEWAY_OUT_RATE = 24000  # what Gemini's audio comes back as
 
 
 class TwilioChannel:
-    def __init__(self, ws: WebSocket) -> None:
+    def __init__(self, ws: WebSocket, expected_token: str | None = None) -> None:
         self._ws = ws
+        self._expected_token = expected_token
         self.stream_sid: str | None = None
         self._started = asyncio.Event()
 
@@ -53,7 +56,13 @@ class TwilioChannel:
             return {}
         kind = evt.get("event")
         if kind == "start":
-            self.stream_sid = evt["start"]["streamSid"]
+            start = evt.get("start") or {}
+            if self._expected_token is not None:
+                token = str((start.get("customParameters") or {}).get("token", ""))
+                if not hmac.compare_digest(token, self._expected_token):
+                    log.warning("twilio stream: bad or missing token, hanging up")
+                    return None
+            self.stream_sid = start.get("streamSid")
             self._started.set()
             return {}
         if kind == "media":

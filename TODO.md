@@ -159,5 +159,11 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     AI), the identity question and the consent question in each of the five languages, instead of English for the model to translate.
     Checked in tests only; not yet checked with a real call.
 
+15. **Real phone calls over Twilio (code done 16 Oct, needs an account to test).** Status callback, stream token,
+    retry handling, "Call by phone…" in the farmer menu and the deploy wiring are built and tested with fakes (see "The Twilio
+    channel" in `DECISIONS.md`). To try it: a Twilio account and voice number, Indonesia allowed in Voice Geographic
+    Permissions, the `twilio-auth-token` secret, the four GitHub variables, then dial your own (verified) phone. Check on that
+    call: audio quality at 8 kHz, reply delay, barge-in, and that a missed call ends as dropped.
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

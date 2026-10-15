@@ -452,6 +452,9 @@ def test_dial_now_places_a_twilio_call_and_queues_it(store, settings, monkeypatc
     assert created[0]["to"] in s.real_call_allowlist
     assert created[0]["from_"] == s.twilio_from_number
     assert created[0]["url"] == f"https://gw.example.test/twilio/voice?call_id={call_id}"
+    assert created[0]["status_callback"] == f"https://gw.example.test/twilio/status?call_id={call_id}"
+    assert created[0]["status_callback_event"] == ["completed"] and created[0]["timeout"] == 30
+    assert store.get("calls", call_id)["twilio_sid"] == "CA_fake"
 
 
 def test_dial_now_rolls_back_the_queued_call_on_twilio_failure(store, settings, monkeypatch):
@@ -487,6 +490,7 @@ def test_twilio_voice_webhook_validates_signature(settings, store):
         ok = c.post(f"/twilio/voice?call_id={call_id}", data=form, headers={"X-Twilio-Signature": good_sig})
         assert ok.status_code == 200 and "<Connect><Stream" in ok.text
         assert f"/twilio/stream/{call_id}" in ok.text
+        assert f'<Parameter name="token" value="{services.stream_token(s, call_id)}" />' in ok.text
 
 
 def test_twilio_voice_webhook_404s_when_not_configured(client):
@@ -520,7 +524,9 @@ def test_twilio_stream_runs_the_same_call_over_mulaw(store, settings, fake_voice
     events = []
     with TestClient(app) as c:
         with c.websocket_connect(f"/twilio/stream/{call_id}") as ws:
-            ws.send_text(json.dumps({"event": "start", "start": {"streamSid": "MZ1"}}))
+            token = services.stream_token(s, call_id)
+            ws.send_text(json.dumps({"event": "start", "start": {"streamSid": "MZ1",
+                                                                 "customParameters": {"token": token}}}))
             payload = base64.b64encode(pcm16_to_mulaw(b"\x01\x00" * 160)).decode()
             ws.send_text(json.dumps({"event": "media", "media": {"payload": payload}}))
             # Twilio has no screen for "ended"/"error" control messages (send_control
@@ -574,3 +580,100 @@ def test_only_a_completed_confirmation_call_marks_the_offer_confirmed(
     services.finish_call(store, settings, call_id, ended_cleanly=ended_cleanly, outcome=outcome,
                          summary=None, consent=False, transcript=[])
     assert bool(store.get("offers", offer_id).get("confirmed_by_voice")) is confirmed
+
+
+# ---------- Twilio: status callback, stream token, retries ----------
+
+class _FakeTwilio:
+    def __init__(self):
+        self.created = []
+        outer = self
+
+        class Calls:
+            def create(self, **kw):
+                outer.created.append(kw)
+                return type("FakeCall", (), {"sid": f"CA{len(outer.created)}"})()
+
+        class Client:
+            def __init__(self, sid, token):
+                self.calls = Calls()
+
+        self.Client = Client
+
+
+def _signed_post(c, s, path, form):
+    from twilio.request_validator import RequestValidator
+
+    sig = RequestValidator(s.twilio_auth_token).compute_signature(f"https://gw.example.test{path}", form)
+    return c.post(path, data=form, headers={"X-Twilio-Signature": sig})
+
+
+def test_unanswered_phone_call_is_dropped_and_redialled_as_its_retry(store, settings, monkeypatch):
+    fake = _FakeTwilio()
+    monkeypatch.setattr("twilio.rest.Client", fake.Client)
+    s = allowlisted_settings(store, settings)
+    call_id = services.dial_now(store, s, "f01")
+    assert store.get("calls", call_id)["twilio_sid"] == "CA1"
+    app = create_app(s, store)
+    with TestClient(app) as c:
+        assert c.post(f"/twilio/status?call_id={call_id}", data={"CallStatus": "no-answer"},
+                      headers={"X-Twilio-Signature": "forged"}).status_code == 403
+        assert store.get("calls", call_id)["status"] == "queued"
+        r = _signed_post(c, s, f"/twilio/status?call_id={call_id}", {"CallSid": "CA1", "CallStatus": "no-answer"})
+        assert r.status_code == 204
+    call = store.get("calls", call_id)
+    assert call["status"] == "dropped" and call["outcome"] == "no_answer" and call["retry_queued"]
+    retry = [c for c in store.list("calls") if c["farmer_id"] == "f01" and c["status"] == "queued"]
+    assert len(retry) == 1 and retry[0]["channel"] == "twilio" and retry[0]["attempt"] == 2
+    # Dialling the farmer again uses that retry rather than starting a new first attempt.
+    again = services.dial_now(store, s, "f01")
+    assert again == retry[0]["id"] and fake.created[-1]["url"].endswith(f"call_id={again}")
+
+
+def test_status_callback_ignores_a_call_that_reached_the_agent(store, settings):
+    s = twilio_settings(settings)
+    call_id = services.queue_call(store, store.get("farmers", "f01"), "collect", channel="twilio")
+    store.set("calls", call_id, {"status": "on_call"}, merge=True)
+    assert services.twilio_status(store, s, call_id, "completed") is None
+    assert store.get("calls", call_id)["status"] == "on_call"
+    store.set("calls", call_id, {"status": "queued"}, merge=True)
+    assert services.twilio_status(store, s, call_id, "ringing") is None
+    assert services.twilio_status(store, s, call_id, "completed") == "not_connected"
+    assert store.get("calls", call_id)["status"] == "dropped"
+
+
+def test_dial_refuses_while_the_farmer_is_on_a_phone_call(store, settings, monkeypatch):
+    monkeypatch.setattr("twilio.rest.Client", _FakeTwilio().Client)
+    s = allowlisted_settings(store, settings)
+    call_id = services.dial_now(store, s, "f01")
+    store.set("calls", call_id, {"status": "on_call"}, merge=True)
+    with pytest.raises(services.ServiceError, match="on a phone call"):
+        services.dial_now(store, s, "f01")
+
+
+def test_twilio_stream_without_the_token_hangs_up(store, settings, fake_voice):
+    from starlette.websockets import WebSocketDisconnect
+
+    s = twilio_settings(settings)
+    app = create_app(s, store)
+    call_id = services.queue_call(store, store.get("farmers", "b001"), "gap_fill", gap_week=3, channel="twilio")
+    events = []
+    with TestClient(app) as c:
+        with c.websocket_connect(f"/twilio/stream/{call_id}") as ws:
+            ws.send_text(json.dumps({"event": "start", "start": {"streamSid": "MZ1",
+                                                                 "customParameters": {"token": "guess"}}}))
+            try:
+                while True:
+                    events.append(json.loads(ws.receive_text()))
+            except WebSocketDisconnect:
+                pass
+    assert not any(e.get("event") == "media" for e in events)  # nothing spoken into the forged stream
+    assert store.get("calls", call_id)["status"] == "dropped"
+
+
+def test_state_says_whether_phone_calls_are_on(store, settings):
+    with TestClient(create_app(settings, store)) as c:
+        assert c.get("/api/state").json()["settings"]["phone_calls"] is False
+    s = twilio_settings(settings, real_calls_enabled=True)
+    with TestClient(create_app(s, store)) as c:
+        assert c.get("/api/state").json()["settings"]["phone_calls"] is True

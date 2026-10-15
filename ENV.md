@@ -84,12 +84,12 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | `STATIC_DIR` | the repo's `web/` folder | No | Pages the backend serves. Left unset in the cloud, where Firebase Hosting serves them. | Left unset in production (Firebase Hosting serves the pages) |
 | `CORS_ORIGINS` | `*` | No | Allowed browser origins, comma-separated. Set to your Hosting URL for anything real. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `FIREBASE_WEB_CONFIG` | none | No | Firebase web config JSON. Turns on live Firestore listeners in the dashboard. | GitHub variable `FIREBASE_WEB_CONFIG`, then redeploy |
-| `TWILIO_ACCOUNT_SID` | none | No | Real phone channel. | Only when running `deploy.sh` by hand (`deploy/deploy.env`); the GitHub workflow does not pass it yet |
+| `TWILIO_ACCOUNT_SID` | none | No | Real phone channel. | GitHub variable of the same name (Settings, Secrets and variables, Actions, Variables), or `deploy/deploy.env` when running `deploy.sh` by hand |
 | `TWILIO_AUTH_TOKEN` | none | Yes | Real phone channel. In the cloud it comes from the `twilio-auth-token` secret. | Secret Manager, secret `twilio-auth-token`, created by hand |
-| `TWILIO_FROM_NUMBER` | none | No | Real phone channel. | Only when running `deploy.sh` by hand (`deploy/deploy.env`); the GitHub workflow does not pass it yet |
+| `TWILIO_FROM_NUMBER` | none | No | Real phone channel. | GitHub variable of the same name (Settings, Secrets and variables, Actions, Variables), or `deploy/deploy.env` when running `deploy.sh` by hand |
 | `PUBLIC_BASE_URL` | none | No | The service's own https URL. `deploy.sh` sets it when Twilio is configured. | Set by `deploy.sh` automatically |
-| `REAL_CALLS_ENABLED` | `false` | No | Safety gate: real calls need this on **and** the number on the allow list. | Only when running `deploy.sh` by hand (`deploy/deploy.env`); the GitHub workflow does not pass it yet |
-| `REAL_CALL_ALLOWLIST` | empty | No | Numbers a real call may dial. `*` allows any number. | Only when running `deploy.sh` by hand (`deploy/deploy.env`); the GitHub workflow does not pass it yet |
+| `REAL_CALLS_ENABLED` | `false` | No | Safety gate: real calls need this on **and** the number on the allow list. | GitHub variable of the same name (Settings, Secrets and variables, Actions, Variables), or `deploy/deploy.env` when running `deploy.sh` by hand |
+| `REAL_CALL_ALLOWLIST` | empty | No | Numbers a real call may dial. `*` allows any number. | GitHub variable of the same name (Settings, Secrets and variables, Actions, Variables), or `deploy/deploy.env` when running `deploy.sh` by hand |
 
 Using Vertex AI instead of an API key (the cloud default): set `GOOGLE_GENAI_USE_VERTEXAI=true`,
 `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` and a Vertex `LIVE_MODEL`, and leave `GOOGLE_API_KEY`
@@ -117,7 +117,7 @@ options of that one script, not of the service, and need no entry elsewhere.
 | `DEMO_PASSWORD` | `harvest-demo` | Passed to the service; also used to sign in as `dewi` when seeding. |
 | `SEED_DEMO_DATA` | `true` | Replace everything in Firestore with the demo data after deploying. Use `true` on the first deploy only. |
 | `SKIP_API_ENABLE` | `false` | Skip enabling Google Cloud APIs. Automatic deploys set `true`. |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | none | If all three are set, `deploy.sh` wires up the phone channel. The token's value is only checked here; the secret itself must exist in Secret Manager as `twilio-auth-token`. |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | none | If the SID and the number are set, `deploy.sh` wires up the phone channel on every deploy. The token is never passed: it is read from the Secret Manager secret `twilio-auth-token`, which must exist first. |
 | `REAL_CALLS_ENABLED`, `REAL_CALL_ALLOWLIST` | `false`, empty | The real-call gate, passed to the service. |
 
 ## Automatic deploys (GitHub repository settings)

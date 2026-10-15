@@ -68,6 +68,12 @@ jobs:
           LIVE_MODEL: ${{ vars.LIVE_MODEL }}
           MULTI_CROP: ${{ vars.MULTI_CROP }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          # Real phone calls (Twilio). Leave the variables unset to keep them off. The auth token is
+          # not passed here: it lives in Secret Manager as twilio-auth-token and is mounted by deploy.sh.
+          TWILIO_ACCOUNT_SID: ${{ vars.TWILIO_ACCOUNT_SID }}
+          TWILIO_FROM_NUMBER: ${{ vars.TWILIO_FROM_NUMBER }}
+          REAL_CALLS_ENABLED: ${{ vars.REAL_CALLS_ENABLED }}
+          REAL_CALL_ALLOWLIST: ${{ vars.REAL_CALL_ALLOWLIST }}
           # Redeploys must not wipe live data, and the deployer account has no right to enable APIs.
           SEED_DEMO_DATA: "false"
           SKIP_API_ENABLE: "true"
