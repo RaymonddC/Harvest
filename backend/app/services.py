@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import datetime as dt
 import io
+import threading
 
 from . import forecast as fc
 from .config import Settings, normalize_phone
@@ -394,8 +395,16 @@ def _open_call_for(store: Store, farmer_id: str, kind: str) -> bool:
                for c in store.list("calls"))
 
 
-def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop: str | None = None) -> dict:
-    """Queue the calls of one crop's campaign (the default crop when none is named)."""
+def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop: str | None = None,
+                   channel: str = "browser") -> dict:
+    """Queue the calls of one crop's campaign (the default crop when none is named).
+
+    channel "browser": the calls wait in the call client (the demo). channel "twilio": real phone
+    calls, dialled one at a time by dial_next (each finished call starts the next)."""
+    if channel not in ("browser", "twilio"):
+        raise ServiceError("Channel must be browser or twilio.")
+    if channel == "twilio" and not phone_calls_ready(settings):
+        raise ServiceError(phone_calls_note(settings))
     crop = normalize_crop(crop) if crop else default_crop(settings)
     camp = get_campaign(store, settings, crop)
     if not camp:
@@ -423,11 +432,14 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
     queued = 0
     for farmer in sorted(targets, key=lambda f: f["id"]):
         if not _open_call_for(store, farmer["id"], kind):
-            queue_call(store, farmer, kind, gap_week=gap_week)
+            queue_call(store, farmer, kind, gap_week=gap_week, channel=channel)
             queued += 1
     store.set("campaigns", campaign_id(settings, crop), {"status": "running", "kind": kind, "started_at": now_iso(),
-                                                         "gap_week": gap_week, "crop": crop}, merge=True)
-    return {"queued": queued, "kind": kind, "gap_week": gap_week, "crop": crop}
+                                                         "gap_week": gap_week, "crop": crop,
+                                                         "channel": channel}, merge=True)
+    dialled = dial_next(store, settings) if channel == "twilio" else None
+    return {"queued": queued, "kind": kind, "gap_week": gap_week, "crop": crop, "channel": channel,
+            "dialled": dialled}
 
 
 def stop_campaign(store: Store, settings: Settings, crop: str | None = None) -> dict:
@@ -457,6 +469,23 @@ def twilio_ready(settings: Settings) -> bool:
 def phone_calls_ready(settings: Settings) -> bool:
     """True when the dashboard may offer "Call by phone": Twilio configured and the safety gate open."""
     return twilio_ready(settings) and settings.real_calls_enabled
+
+
+def phone_calls_note(settings: Settings) -> str:
+    """Why real phone calls are on or off, in words for the dashboard."""
+    if not twilio_ready(settings):
+        missing = [name for name, value in (("TWILIO_ACCOUNT_SID", settings.twilio_account_sid),
+                                            ("TWILIO_AUTH_TOKEN", settings.twilio_auth_token),
+                                            ("TWILIO_FROM_NUMBER", settings.twilio_from_number),
+                                            ("PUBLIC_BASE_URL", settings.public_base_url)) if not value]
+        return "Real phone calls are off: Twilio is not set up (missing " + ", ".join(missing) + ")."
+    if not settings.real_calls_enabled:
+        return "Real phone calls are off: REAL_CALLS_ENABLED is not true."
+    if "*" in settings.real_call_allowlist:
+        return "Real phone calls are on, to any number."
+    n = len(settings.real_call_allowlist)
+    return (f"Real phone calls are on, only to the {n} number{'s' if n != 1 else ''} on the allowlist."
+            if n else "Real phone calls are on, but the allowlist is empty, so every number is refused.")
 
 
 def stream_token(settings: Settings, call_id: str) -> str:
@@ -499,17 +528,13 @@ def twilio_status(store: Store, settings: Settings, call_id: str, call_status: s
     return outcome
 
 
-def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None = None) -> str:
-    """Place a real outbound call (VA-8). Same preconditions as call_now, plus Twilio config
-    and the REAL_CALLS_ENABLED/REAL_CALL_ALLOWLIST safety gate - see config.py."""
+def _dialable_number(settings: Settings, farmer: dict) -> str:
+    """The farmer's number in E.164, after the safety gate. Raises ServiceError with the reason."""
     if not twilio_ready(settings):
         raise ServiceError("Twilio is not configured (need TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, "
                            "TWILIO_FROM_NUMBER and PUBLIC_BASE_URL).")
     if not settings.real_calls_enabled:
         raise ServiceError("Real calls are turned off. Set REAL_CALLS_ENABLED=true to place one.")
-    farmer = store.get("farmers", farmer_id)
-    if not farmer:
-        raise ServiceError("Farmer not found.")
     if farmer.get("do_not_call"):
         raise ServiceError("This farmer asked not to be called again.")
     phone = (farmer.get("phone") or "").strip()
@@ -522,6 +547,40 @@ def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None 
         raise ServiceError(f"{to_number} is not on the real-call allowlist (REAL_CALL_ALLOWLIST). "
                            "This is a safety gate, not a bug - add the number there, or set it to "
                            "\"*\" to allow any number (production).")
+    return to_number
+
+
+def _place_twilio_call(store: Store, settings: Settings, call_id: str, to_number: str) -> None:
+    """Ask Twilio to ring the farmer for an already queued phone call."""
+    from twilio.rest import Client  # imported lazily: only needed once Twilio is actually configured
+
+    client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
+    base = settings.public_base_url.rstrip("/")
+    try:
+        placed = client.calls.create(
+            to=to_number, from_=settings.twilio_from_number, method="POST",
+            url=f"{base}/twilio/voice?call_id={call_id}",
+            # So an unanswered, busy or failed call ends instead of staying queued.
+            status_callback=f"{base}/twilio/status?call_id={call_id}",
+            status_callback_method="POST", status_callback_event=["completed"],
+            # Ring for 30 s, not Twilio's 60: long enough for a farmer to reach the phone,
+            # short enough that a voicemail greeting rarely picks up first.
+            timeout=30)
+    except Exception as e:
+        raise ServiceError(f"Twilio call failed: {e}") from e
+    store.set("calls", call_id, {"twilio_sid": getattr(placed, "sid", None), "dialed_at": now_iso()},
+              merge=True)
+
+
+def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None = None) -> str:
+    """Place a real outbound call (VA-8). Same preconditions as call_now, plus Twilio config
+    and the REAL_CALLS_ENABLED/REAL_CALL_ALLOWLIST safety gate - see config.py."""
+    farmer = store.get("farmers", farmer_id)
+    if not farmer:
+        if not twilio_ready(settings):
+            _dialable_number(settings, {})  # report the configuration problem first
+        raise ServiceError("Farmer not found.")
+    to_number = _dialable_number(settings, farmer)
     if any(c["farmer_id"] == farmer_id and c.get("channel") == "twilio" and c["status"] == "on_call"
            for c in store.list("calls")):
         raise ServiceError("This farmer is on a phone call right now.")
@@ -539,27 +598,58 @@ def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None 
         call_id = queue_call(store, farmer, kind or "collect", gap_week=gap["week"] if gap else None,
                              channel="twilio")
         created = True
-    from twilio.rest import Client  # imported lazily: only needed once Twilio is actually configured
-
-    client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
-    base = settings.public_base_url.rstrip("/")
     try:
-        placed = client.calls.create(
-            to=to_number, from_=settings.twilio_from_number, method="POST",
-            url=f"{base}/twilio/voice?call_id={call_id}",
-            # So an unanswered, busy or failed call ends instead of staying queued.
-            status_callback=f"{base}/twilio/status?call_id={call_id}",
-            status_callback_method="POST", status_callback_event=["completed"],
-            # Ring for 30 s, not Twilio's 60: long enough for a farmer to reach the phone,
-            # short enough that a voicemail greeting rarely picks up first.
-            timeout=30)
-    except Exception as e:
+        _place_twilio_call(store, settings, call_id, to_number)
+    except ServiceError:
         if created:
             store.delete("calls", call_id)
-        raise ServiceError(f"Twilio call failed: {e}") from e
-    store.set("calls", call_id, {"twilio_sid": getattr(placed, "sid", None), "dialed_at": now_iso()},
-              merge=True)
+        raise
     return call_id
+
+
+_dial_lock = threading.Lock()
+
+
+def dial_next(store: Store, settings: Settings) -> str | None:
+    """Phone campaigns ring one farmer at a time: the Live API allows only a few sessions at once,
+    and a planner can follow one call. Dial the oldest waiting first-attempt phone call of a running
+    phone campaign, unless a phone call is already ringing or in progress. A farmer the safety gate
+    refuses is skipped (the call ends as dropped with the reason, no retry) and the next one is tried.
+    Retries of missed calls are left for the planner to dial (see dial_now)."""
+    with _dial_lock:
+        calls = store.list("calls")
+        if any(c.get("channel") == "twilio" and (c["status"] == "on_call"
+                                                 or (c["status"] == "queued" and c.get("dialed_at")))
+               for c in calls):
+            return None
+        phone_crops = {normalize_crop(c.get("crop") or settings.demo_crop) for c in store.list("campaigns")
+                       if c.get("status") == "running" and c.get("channel") == "twilio"}
+        if not phone_crops:
+            return None
+        farmers = {f["id"]: f for f in store.list("farmers")}
+        waiting = sorted((c for c in calls
+                          if c.get("channel") == "twilio" and c["status"] == "queued" and not c.get("dialed_at")
+                          and (c.get("attempt") or 1) == 1 and c.get("kind") in ("collect", "gap_fill")
+                          and farmer_crop(settings, farmers.get(c["farmer_id"], {})) in phone_crops),
+                         key=lambda c: (c.get("created_at") or "", c["farmer_id"], c["id"]))
+        for call in waiting:
+            farmer = farmers.get(call["farmer_id"])
+            try:
+                if not farmer:
+                    raise ServiceError("Farmer not found.")
+                _place_twilio_call(store, settings, call["id"], _dialable_number(settings, farmer))
+                return call["id"]
+            except ServiceError as e:
+                store.set("calls", call["id"], {"status": "dropped", "outcome": "skipped", "summary": f"Not dialled: {e}",
+                                                "ended_at": now_iso()}, merge=True)
+        refresh_campaign_status(store, settings)
+        return None
+
+
+def _after_phone_call(store: Store, settings: Settings) -> None:
+    """Start the next call of a phone campaign without holding up the caller (a Twilio request
+    takes up to a few seconds, and finish_call runs inside the voice gateway's event loop)."""
+    threading.Thread(target=dial_next, args=(store, settings), daemon=True).start()
 
 
 def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly: bool,
@@ -592,6 +682,8 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
                        offer_id=call.get("offer_id"), attempt=call.get("attempt", 1) + 1,
                        channel=call.get("channel", "browser"))
     refresh_campaign_status(store, settings)  # after any retry was queued: the last call ending ends the campaign
+    if call.get("channel") == "twilio" and call.get("kind") in ("collect", "gap_fill"):
+        _after_phone_call(store, settings)
 
 
 # The languages a farmer can be called in. The agent speaks whatever the name says, so a typo here

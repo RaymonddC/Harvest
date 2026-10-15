@@ -677,3 +677,47 @@ def test_state_says_whether_phone_calls_are_on(store, settings):
     s = twilio_settings(settings, real_calls_enabled=True)
     with TestClient(create_app(s, store)) as c:
         assert c.get("/api/state").json()["settings"]["phone_calls"] is True
+
+
+# ---------- phone campaigns: one real call at a time ----------
+
+def test_phone_campaign_dials_one_farmer_at_a_time_and_skips_refused_numbers(store, settings, monkeypatch):
+    from app.config import normalize_phone
+
+    fake = _FakeTwilio()
+    monkeypatch.setattr("twilio.rest.Client", fake.Client)
+    monkeypatch.setattr(services, "_after_phone_call", services.dial_next)  # run the next dial inline
+    to_call = sorted(f["id"] for f in store.list("farmers") if f.get("to_call"))
+    allowed = tuple(normalize_phone(store.get("farmers", fid)["phone"]) for fid in to_call[1:3])
+    s = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=allowed)
+
+    r = services.start_campaign(store, s, "collect", channel="twilio")
+    assert r["channel"] == "twilio" and r["queued"] == len(to_call)
+    first = store.get("calls", r["dialled"])
+    assert first["farmer_id"] == to_call[1] and len(fake.created) == 1  # to_call[0] is not on the allowlist
+    skipped = [c for c in store.list("calls") if c["farmer_id"] == to_call[0]][0]
+    assert skipped["status"] == "dropped" and skipped["outcome"] == "skipped" and "allowlist" in skipped["summary"]
+    assert services.dial_next(store, s) is None  # one call is already ringing
+
+    services.finish_call(store, s, first["id"], ended_cleanly=True, outcome="completed", summary="ok",
+                         consent=False, transcript=[])
+    assert len(fake.created) == 2 and fake.created[1]["to"] == allowed[1]
+    second = next(c for c in store.list("calls") if c["farmer_id"] == to_call[2])
+    # A missed call gets its retry queued but not dialled; everyone else not allowed is skipped, campaign ends.
+    services.twilio_status(store, s, second["id"], "no-answer")
+    assert len(fake.created) == 2
+    assert all(c["status"] in ("done", "dropped") or c.get("attempt") == 2
+               for c in store.list("calls") if c.get("channel") == "twilio")
+
+
+def test_phone_campaign_refuses_when_phone_calls_are_off(store, settings):
+    with pytest.raises(services.ServiceError, match="Real phone calls are off"):
+        services.start_campaign(store, settings, "collect", channel="twilio")
+    assert not [c for c in store.list("calls") if c.get("channel") == "twilio"]
+
+
+def test_phone_calls_note_explains_the_state(settings):
+    assert "not set up" in services.phone_calls_note(settings)
+    assert "REAL_CALLS_ENABLED" in services.phone_calls_note(twilio_settings(settings))
+    on = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=("+628114617000",))
+    assert services.phone_calls_note(on) == "Real phone calls are on, only to the 1 number on the allowlist."

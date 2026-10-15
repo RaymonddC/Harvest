@@ -48,6 +48,7 @@ class CsvIn(BaseModel):
 class CampaignIn(BaseModel):
     kind: str = "collect"
     crop: str = ""  # empty: the default crop
+    channel: str = "browser"  # "twilio": real phone calls, dialled one at a time
 
 
 class NewCampaignIn(BaseModel):
@@ -197,7 +198,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "plan_start": settings.plan_start.isoformat(),
                             "weeks": settings.weeks, "target_kg_per_week": settings.target_kg_per_week,
                             "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop,
-                            "phone_calls": services.phone_calls_ready(settings)}
+                            "phone_calls": services.phone_calls_ready(settings),
+                            "phone_calls_note": services.phone_calls_note(settings)}
         return data
 
     @app.get("/api/state")
@@ -281,7 +283,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     # The first two stay for older screens: they act on the crop in the body, or the default crop.
     @app.post("/api/campaign/start", dependencies=[Depends(need("campaign.run"))])
     def campaign_start(body: CampaignIn):
-        return services.start_campaign(store, settings, body.kind, body.crop or None)
+        return services.start_campaign(store, settings, body.kind, body.crop or None, body.channel)
 
     @app.post("/api/campaign/stop", dependencies=[Depends(need("campaign.run"))])
     def campaign_stop(body: CampaignIn | None = None):
@@ -294,7 +296,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     @app.post("/api/campaigns/{campaign_id}/start", dependencies=[Depends(need("campaign.run"))])
     def campaign_start_one(campaign_id: str, body: CampaignIn | None = None):
         crop = services.crop_of_campaign_id(settings, campaign_id)
-        return services.start_campaign(store, settings, body.kind if body else "collect", crop)
+        return services.start_campaign(store, settings, body.kind if body else "collect", crop,
+                                       body.channel if body else "browser")
 
     @app.post("/api/campaigns/{campaign_id}/stop", dependencies=[Depends(need("campaign.run"))])
     def campaign_stop_one(campaign_id: str):
