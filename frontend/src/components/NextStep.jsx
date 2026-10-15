@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { campaignFor, forCrop, useCrop } from "../campaigns.jsx";
-import { api } from "../lib.js";
+import { api, followCalls, gapFillBody, gapFillToast } from "../lib.js";
 import { useLive } from "../live.jsx";
 import { useAct } from "../toast.jsx";
 import { ActButton, Icon } from "../ui.jsx";
@@ -25,11 +25,14 @@ export default function NextStep({ page }) {
   if (waiting && page !== "approvals") {
     step = <Link className="btn solid" to="/approvals"><Icon name="approvals" size={16} />Review {waiting} offer{waiting > 1 ? "s" : ""}</Link>;
   } else if (campaign.status === "running" && page !== "forecast") { // the forecast banner has this button too
-    step = <a className="btn solid" href="/call.html" target="_blank" rel="noopener"><Icon name="phone" size={16} />Open call client</a>;
+    const follow = followCalls(campaign);
+    step = follow.external
+      ? <a className="btn solid" href={follow.href} target="_blank" rel="noopener"><Icon name="phone" size={16} />{follow.label}</a>
+      : <Link className="btn solid" to={follow.href}><Icon name="phone" size={16} />{follow.label}</Link>;
   } else if (canFill && page !== "forecast") { // the forecast page leads with this in its banner
     step = (
       <ActButton className="btn solid" need="campaign.run" busy="Queuing calls…"
-        run={() => act(() => api("/api/campaign/start", { body: { kind: "gap_fill", crop } }), (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`)}>
+        run={() => act(() => api("/api/campaign/start", { body: gapFillBody(state, crop) }), gapFillToast)}>
         <Icon name="phone" size={16} />Fill week {gap.week}
       </ActButton>
     );

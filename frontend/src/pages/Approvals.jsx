@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Link } from "react-router-dom";
 import Meter from "../components/approvals/Meter.jsx";
 import Offer from "../components/approvals/Offer.jsx";
-import { api, plainPrice } from "../lib.js";
+import { api, gapFillBody, gapFillToast, plainPrice } from "../lib.js";
 import { forCrop, useCrop } from "../campaigns.jsx";
 import { useConfirm } from "../dialogs.jsx";
 import { useLive } from "../live.jsx";
@@ -113,7 +113,7 @@ export default function Approvals() {
                 <>
                   <p>No offers yet. Week {gap.week} is {(gap.gap_kg / 1000).toFixed(0)} t short: gap-fill calls ask farmers to move harvest into it, and every deal they agree lands here.</p>
                   <ActButton need="campaign.run" className="btn solid" busy="Queuing calls…"
-                    run={() => act(() => api("/api/campaign/start", { body: { kind: "gap_fill", crop } }), (r) => `${r.queued} gap-fill calls queued. Answer them in the call client.`)}>
+                    run={() => act(() => api("/api/campaign/start", { body: gapFillBody(state, crop) }), gapFillToast)}>
                     <Icon name="phone" size={16} />Start gap-fill calls
                   </ActButton>
                 </>
