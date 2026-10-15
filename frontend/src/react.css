@@ -626,3 +626,38 @@ body.app .answer-row { display: flex; flex-direction: column; gap: 4px; padding:
 body.app .answer-row .q { display: flex; justify-content: space-between; gap: 8px; }
 body.app .answer-row .a { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 body.app .answer-row .a input { flex: 1 1 180px; min-height: 40px; }
+
+/* ---------- Approvals: impact of approving, cost, text status, messages ---------- */
+body.app .impact-box { flex-basis: 100%; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+body.app .impact-box p { margin: 0; }
+body.app .impact-weeks span { display: inline-block; margin-right: 10px; white-space: nowrap; }
+body.app .impact-weeks .closes { color: var(--leaf, #16774E); font-weight: 700; }
+body.app .impact-weeks .turns-gap { color: var(--danger, #B3261E); font-weight: 700; }
+body.app .text-line { flex-basis: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+body.app .impact-summary p { margin: 0 0 6px; font-size: 14px; }
+body.app .messages-card { gap: 8px; }
+body.app .msg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+body.app .msg-list li { padding: 10px 0; border-bottom: 1px solid var(--line-2, #EEF0EE); display: flex; flex-direction: column; gap: 4px; }
+body.app .msg-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+body.app .msg-body { margin: 0; font-size: 13px; }
+
+/* ---------- Track record (forecast page and farmer page), weekly toggle ---------- */
+body.app .track-card { gap: 12px; }
+body.app .track-headline { margin: 0; }
+body.app .track-bars { display: flex; gap: 18px; align-items: flex-end; height: 140px; padding-top: 6px; }
+body.app .track-bars .tb { flex: 1 1 0; max-width: 90px; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+body.app .track-bars .tb-pair { flex: 1; width: 100%; display: flex; align-items: flex-end; gap: 4px; }
+body.app .track-bars .tb-pair i { flex: 1; border-radius: 6px 6px 0 0; min-height: 2px; }
+body.app .track-bars .p, body.app .legend .l-promised { background: var(--line-2, #CFE6DA); }
+body.app .track-bars .d, body.app .legend .l-delivered { background: var(--leaf, #16774E); }
+body.app .track-bars span { font-size: 12px; }
+body.app .track-bars small { font-size: 11px; color: var(--muted, #5B6660); }
+body.app .legend i.l-promised, body.app .legend i.l-delivered { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+body.app .likely h3 { margin: 4px 0 6px; font-size: 15px; }
+body.app .likely ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+body.app .likely li { display: flex; gap: 6px; align-items: baseline; }
+body.app .track-upload { display: flex; flex-direction: column; gap: 8px; }
+body.app .track-upload textarea { width: 100%; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+body.app .delivery-box p { margin: 0 0 6px; }
+body.app .weekly-toggle { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--on-ink-muted, #B8C7BF); cursor: pointer; }
+body.app .weekly-toggle input { width: 18px; height: 18px; }

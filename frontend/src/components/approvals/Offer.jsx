@@ -52,7 +52,11 @@ function proof(o, l, quote, price) {
   return out;
 }
 
-export default function Offer({ o, l, row, quote, confirming = false }) {
+const money = (n, cur) => (cur === "IDR" ? `Rp ${Math.round(n).toLocaleString("en-US")}` : `${n.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${cur}`);
+const TEXT_WORD = { sent: "Text sent", failed: "Text failed", not_sent: "Text not sent" };
+
+// imp: what approving this offer alone does to every week (from /api/approvals/impact), and its cost.
+export default function Offer({ o, l, row, quote, confirming = false, imp = null }) {
   const act = useAct();
   // An escalated offer is approved at the farmer's requested price, so that is what must fit.
   const price = o.status === "escalated" && o.requested_price != null ? o.requested_price : o.price_per_kg;
@@ -84,6 +88,26 @@ export default function Offer({ o, l, row, quote, confirming = false }) {
           </>
         )}
       </div>
+      {open && imp && (
+        <div className="impact-box">
+          {imp.weeks.length > 0 && (
+            <p className="impact-weeks"><b>If approved:</b>{" "}
+              {imp.weeks.map((w) => <span key={w.label} className={w.is_gap && !w.was_gap ? "turns-gap" : w.was_gap && !w.is_gap ? "closes" : ""}>
+                {w.label} {(w.before_kg / 1000).toFixed(1)} → {(w.after_kg / 1000).toFixed(1)} t</span>)}
+            </p>
+          )}
+          <p className="impact-cost">Costs {money(imp.cost, imp.currency)}{imp.premium > 0 ? `, ${money(imp.premium, imp.currency)} over the market price` : ""}.</p>
+          {imp.new_gaps.length > 0 && <p className="warn">Approving opens a gap in {imp.new_gaps.join(" and ")}: that week drops below the threshold.</p>}
+        </div>
+      )}
+      {o.status === "approved" && (
+        <div className="text-line">
+          <span className="small muted">{o.text_status ? TEXT_WORD[o.text_status] || o.text_status : "No written confirmation yet"}{o.text_status === "not_sent" ? " (see Messages)" : ""}</span>
+          <ActButton need="offers.decide" className="btn sm ghost" busy="Sending…"
+            run={() => act(() => api(`/api/offers/${o.id}/send-confirmation`), (m) => (m && m.status === "sent" ? "Text sent to the farmer." : `Recorded, not sent: ${m?.reason || ""}`))}>
+            {o.text_status ? "Send text again" : "Send text"}</ActButton>
+        </div>
+      )}
       {checks.length > 0 && (
         <ul className="proof" aria-label="Price check">
           {checks.map((x) => <li key={x.k} className={x.k}><i aria-hidden="true" />{x.text}</li>)}

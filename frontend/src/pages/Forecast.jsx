@@ -7,6 +7,7 @@ import Chart from "../components/forecast/Chart.jsx";
 import { FillList, Hero } from "../components/forecast/GapCard.jsx";
 import GapNote from "../components/forecast/GapNote.jsx";
 import Kpis from "../components/forecast/Kpis.jsx";
+import TrackRecord from "../components/forecast/TrackRecord.jsx";
 import { apiUrl, fmtT } from "../lib.js";
 import { campaignFor, cropName, forCrop, useCrop } from "../campaigns.jsx";
 import { useLive } from "../live.jsx";
@@ -73,8 +74,9 @@ export default function Forecast() {
                 : state ? <div className="empty"><p>No forecast yet. Start a call campaign to collect harvest answers.</p><Link className="btn" to="/setup">Go to setup</Link></div> : null}
             </div>
             <GapNote gap={gap} />
-            <p className="small muted">Unsure answers count for half. All data is synthetic.</p>
+            <p className="small muted">Unsure answers count for half; later harvest rounds are projected from how often each farmer harvests. All data is synthetic.</p>
           </section>
+          {state && <TrackRecord crop={crop} rows={rows} refreshKey={JSON.stringify(rows.map((r) => r.expected_kg))} />}
         </div>
         <div className="col-side">
           {state && gap && <FillList gap={gap} state={view} />}

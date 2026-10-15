@@ -135,7 +135,9 @@ export const CROP_LABEL = { palm: "Palm FFB", rubber: "Rubber", coffee: "Coffee"
 export const cropLabel = (c) => CROP_LABEL[c] || (c ? c[0].toUpperCase() + c.slice(1) : "");
 export function maskPhone(phone = "") {
   const parts = phone.split(" ");
-  return parts.length >= 3 ? [...parts.slice(0, 2), "••••", parts[parts.length - 1]].join(" ") : phone;
+  if (parts.length >= 3) return [...parts.slice(0, 2), "••••", parts[parts.length - 1]].join(" ");
+  // A number without spaces (+628114617000): keep the country code and the last four digits.
+  return phone.length > 8 ? `${phone.slice(0, 3)} •••• ${phone.slice(-4)}` : phone;
 }
 export const KIND_WORD = { collect: "Harvest call", gap_fill: "Gap-fill call", confirm: "Confirmation call" };
 export const STATUS_WORD = {
