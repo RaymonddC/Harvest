@@ -68,6 +68,7 @@ jobs:
           LIVE_MODEL: ${{ vars.LIVE_MODEL }}
           MULTI_CROP: ${{ vars.MULTI_CROP }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JOB_TOKEN: ${{ secrets.JOB_TOKEN }} # optional: turns on the Monday job (Cloud Scheduler)
           # Real phone calls (Twilio). Leave the variables unset to keep them off. The auth token is
           # not passed here: it lives in Secret Manager as twilio-auth-token and is mounted by deploy.sh.
           TWILIO_ACCOUNT_SID: ${{ vars.TWILIO_ACCOUNT_SID }}

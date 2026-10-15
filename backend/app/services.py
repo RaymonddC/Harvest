@@ -201,6 +201,58 @@ def edit_answer(store: Store, call_id: str, question_id: str, answer: str, actor
     return answers[question_id]
 
 
+def set_weekly_schedule(store: Store, settings: Settings, crop: str | None, enabled: bool, channel: str = "browser") -> dict:
+    """Mark a campaign to start by itself every Monday morning (run by the weekly job)."""
+    crop = normalize_crop(crop) if crop else default_crop(settings)
+    camp = get_campaign(store, settings, crop)
+    if not camp:
+        raise ServiceError(f"{CROP_LABELS.get(crop, crop)} has no campaign yet. Create one first.")
+    if channel not in ("browser", "twilio"):
+        raise ServiceError("Channel must be browser or twilio.")
+    weekly = {"enabled": bool(enabled), "channel": channel, "updated_at": now_iso()}
+    store.set("campaigns", camp["id"], {"weekly": weekly}, merge=True)
+    return {**weekly, "crop": crop}
+
+
+def roll_weeks(store: Store, settings: Settings, today: dt.date | None = None) -> Settings:
+    """Settings whose week 1 is next week. Same object when nothing changed (or PLAN_START pins the weeks)."""
+    from .config import next_monday
+
+    if not settings.plan_start_auto:
+        return settings
+    start = next_monday(today)
+    if start == settings.plan_start:
+        return settings
+    rolled = dataclasses.replace(settings, plan_start=start)
+    recompute_forecast(store, rolled)
+    return rolled
+
+
+def weekly_job(store: Store, settings: Settings) -> dict:
+    """Monday morning: snapshot what farmers promised for the week that starts now (so deliveries can be checked
+    against it later), then start every campaign marked "call every Monday" that is not already calling."""
+    from . import track_record
+
+    week = settings.plan_start - dt.timedelta(days=7)  # the week that starts today; week 1 is next week
+    snap = track_record.snapshot_promises(store, settings, week)
+    started, skipped = [], []
+    for camp in list_campaigns(store, settings):
+        weekly = camp.get("weekly") or {}
+        crop = normalize_crop(camp.get("crop") or settings.demo_crop)
+        if not weekly.get("enabled"):
+            continue
+        if camp.get("status") == "running":
+            skipped.append({"crop": crop, "why": "already calling"})
+            continue
+        try:
+            r = start_campaign(store, settings, "collect", crop, weekly.get("channel", "browser"))
+            started.append({"crop": crop, "queued": r["queued"], "channel": r["channel"]})
+        except ServiceError as e:
+            skipped.append({"crop": crop, "why": str(e)})
+    store.set("campaigns", campaign_id(settings, default_crop(settings)), {"last_weekly_job": now_iso()}, merge=True)
+    return {"plan_start": settings.plan_start.isoformat(), "promises": snap, "started": started, "skipped": skipped}
+
+
 def confirm_read_back(store: Store, settings: Settings, call_id: str, user: str | None = None) -> dict:
     """Save a harvest the agent read back but did not save (the call dropped, or it forgot the second
     record_harvest). A planner does this from the call recap, after checking the transcript."""

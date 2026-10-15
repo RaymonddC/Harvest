@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -13,7 +14,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import access, agent_profile, auth, seed_data, services
+from . import access, agent_profile, auth, seed_data, services, track_record
 from .config import Settings, get_settings
 from .live_session import BrowserChannel, run_call
 from .store import COLLECTIONS, Store, make_store
@@ -90,6 +91,17 @@ class AnswerIn(BaseModel):
     answer: str
 
 
+class ScheduleIn(BaseModel):
+    enabled: bool = False
+    channel: str = "browser"
+
+
+class DeliveryIn(BaseModel):
+    farmer_id: str
+    kg: float
+    date: str
+
+
 class DialIn(BaseModel):
     kind: str | None = None
 
@@ -111,6 +123,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     app.state.store = store
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"],
                        allow_headers=["*"])
+
+    @app.middleware("http")
+    async def roll_planning_weeks(request: Request, call_next):
+        """Week 1 is next week: on the first request of a new week, every handler (they all read the
+        `settings` of this closure) moves to the new weeks. Off when PLAN_START pins the dates."""
+        nonlocal settings
+        rolled = services.roll_weeks(store, settings)
+        if rolled is not settings:
+            settings = rolled
+            app.state.settings = rolled
+        return await call_next(request)
 
     def need(capability: str):
         return auth.require(settings, store, capability)
@@ -341,6 +364,47 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def put_answer(call_id: str, question_id: str, body: AnswerIn, actor: auth.Actor = Depends(need("farmers.manage"))):
         """Correct the answer to one of the planner's questions (the agent's version is kept)."""
         return services.edit_answer(store, call_id, question_id, body.answer, actor)
+
+    @app.put("/api/campaigns/{campaign_id}/schedule", dependencies=[Depends(need("campaign.run"))])
+    def campaign_schedule(campaign_id: str, body: ScheduleIn):
+        """Start this campaign by itself every Monday morning (Cloud Scheduler calls /api/jobs/weekly)."""
+        crop = services.crop_of_campaign_id(settings, campaign_id)
+        return services.set_weekly_schedule(store, settings, crop, body.enabled, body.channel)
+
+    @app.post("/api/jobs/weekly", include_in_schema=False)
+    def jobs_weekly(x_job_token: str | None = Header(default=None)):
+        """Monday morning job: roll the weeks, snapshot promises, start the weekly campaigns."""
+        if not settings.job_token:
+            raise HTTPException(404, "The weekly job is not set up (JOB_TOKEN).")
+        if not hmac.compare_digest(x_job_token or "", settings.job_token):
+            raise HTTPException(403, "Wrong job token.")
+        return services.weekly_job(store, settings)
+
+    # ----- track record: deliveries against promises -----
+
+    @app.get("/api/track-record")
+    def get_track_record(crop: str = ""):
+        """Forecast accuracy per week, reliability counts and the likely supply for the coming weeks."""
+        return track_record.summary(store, settings, crop or None)
+
+    @app.get("/api/farmers/{farmer_id}/track-record")
+    def get_farmer_record(farmer_id: str):
+        return track_record.farmer_record(store, farmer_id)
+
+    @app.post("/api/deliveries")
+    def post_delivery(body: DeliveryIn, actor: auth.Actor = Depends(need("farmers.manage"))):
+        return track_record.record_delivery(store, settings, body.farmer_id, body.kg, body.date, actor.name)
+
+    @app.post("/api/deliveries/upload")
+    def upload_deliveries(body: CsvIn, actor: auth.Actor = Depends(need("farmers.manage"))):
+        return track_record.upload_deliveries(store, settings, body.csv, actor.name)
+
+    @app.delete("/api/deliveries/{delivery_id}", dependencies=[Depends(need("farmers.manage"))])
+    def delete_delivery(delivery_id: str):
+        if not store.get("deliveries", delivery_id):
+            raise HTTPException(404, "Delivery not found.")
+        store.delete("deliveries", delivery_id)
+        return {"deleted": delivery_id}
 
     @app.get("/api/answers.csv")
     def answers_csv():

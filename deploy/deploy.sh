@@ -61,13 +61,14 @@ gcloud config set project "$PROJECT" >/dev/null
 if [[ "$SKIP_API_ENABLE" != "true" ]]; then
   gcloud services enable run.googleapis.com firestore.googleapis.com secretmanager.googleapis.com \
     cloudbuild.googleapis.com artifactregistry.googleapis.com logging.googleapis.com \
-    aiplatform.googleapis.com
+    aiplatform.googleapis.com cloudscheduler.googleapis.com
 fi
 
 # "^@^" switches gcloud's list delimiter to @, because the Firebase config JSON contains commas.
 ENV_VARS="^@^STORE_BACKEND=firestore@GOOGLE_CLOUD_PROJECT=$PROJECT@SEED_ON_START=false"
 ENV_VARS="$ENV_VARS@MILL_NAME=$MILL_NAME@DEMO_LANGUAGE=$DEMO_LANGUAGE"
 ENV_VARS="$ENV_VARS@JWT_SECRET=$JWT_SECRET@DEMO_PASSWORD=$DEMO_PASSWORD"
+if [[ -n "${JOB_TOKEN:-}" ]]; then ENV_VARS="$ENV_VARS@JOB_TOKEN=$JOB_TOKEN"; fi
 if [[ -n "${MULTI_CROP:-}" ]]; then ENV_VARS="$ENV_VARS@MULTI_CROP=$MULTI_CROP"; fi
 if [[ -n "${FIREBASE_WEB_CONFIG:-}" ]]; then ENV_VARS="$ENV_VARS@FIREBASE_WEB_CONFIG=$FIREBASE_WEB_CONFIG"; fi
 
@@ -103,6 +104,14 @@ if [[ -n "$TWILIO_ACCOUNT_SID" && -n "$TWILIO_FROM_NUMBER" ]]; then
   gcloud run services update "$SERVICE" --region "$REGION" --update-env-vars \
     "^@^PUBLIC_BASE_URL=$URL@TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID@TWILIO_FROM_NUMBER=$TWILIO_FROM_NUMBER@REAL_CALLS_ENABLED=$REAL_CALLS_ENABLED@REAL_CALL_ALLOWLIST=$REAL_CALL_ALLOWLIST" \
     --update-secrets TWILIO_AUTH_TOKEN=twilio-auth-token:latest     || echo "WARNING: phone channel NOT switched on. Check the secret twilio-auth-token exists in Secret Manager and the runtime service account can read it. The rest of the deploy is fine." >&2
+fi
+
+# The Monday job: roll the weeks, snapshot promises, start weekly campaigns. Needs the Cloud Scheduler API
+# (enabled with the others above; CI skips enabling) and the right to manage scheduler jobs; a missing right
+# leaves the job unset with a warning, the rest of the deploy is fine.
+if [[ -n "${JOB_TOKEN:-}" ]]; then
+  SCHED=(--location "$REGION" --schedule "0 6 * * 1" --time-zone "Asia/Jakarta" --uri "$URL/api/jobs/weekly" --http-method POST)
+  gcloud scheduler jobs update http harvest-weekly "${SCHED[@]}" --update-headers "X-Job-Token=$JOB_TOKEN" >/dev/null 2>&1     || gcloud scheduler jobs create http harvest-weekly "${SCHED[@]}" --headers "X-Job-Token=$JOB_TOKEN" >/dev/null     || echo "WARNING: the weekly Cloud Scheduler job was not created (check the Cloud Scheduler API and permissions)." >&2
 fi
 
 # Point the dashboard at the gateway. WebSockets do not pass through Hosting rewrites,

@@ -18,7 +18,7 @@ def settings(tmp_path):
     return dataclasses.replace(get_settings(), plan_start=PLAN_START, store_backend="memory",
                                seed_on_start=False, static_dir=None, auth_required=False,
                                target_kg_per_week=100_000, gap_tolerance=0.2, weeks=5,
-                               max_call_attempts=2, multi_crop=True)
+                               max_call_attempts=2, multi_crop=True, plan_start_auto=False)
 
 
 @pytest.fixture
