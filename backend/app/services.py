@@ -504,6 +504,52 @@ def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool,
     return {**offer, **changes, "status": status}
 
 
+def approval_impact(store: Store, settings: Settings, crop: str | None = None) -> dict:
+    """For each waiting offer of a crop: the weeks as they would be if the planner approved it (alone), what it
+    costs, and whether it opens a new gap somewhere else. Also the same for approving all of them together."""
+    crop = normalize_crop(crop) if crop else default_crop(settings)
+    camp = get_campaign(store, settings, crop) or {}
+    weeks = int(camp.get("weeks") or settings.weeks)
+    target = int(camp.get("target_kg_per_week") or settings.target_kg_per_week)
+    harvests = [h for h in store.list("harvests") if farmer_crop(settings, h) == crop]
+    offers = [o for o in store.list("offers") if farmer_crop(settings, o) == crop]
+
+    def rows(approve_ids: set[str]) -> list[dict]:
+        trial = [{**o, "status": "approved"} if o["id"] in approve_ids else o for o in offers]
+        return fc.compute_forecast(harvests, trial, settings.plan_start, weeks, target, settings.gap_tolerance)
+
+    def compare(after: list[dict]) -> dict:
+        changes = [{"label": a["label"], "before_kg": b["expected_kg"], "after_kg": a["expected_kg"],
+                    "was_gap": b["is_gap"], "is_gap": a["is_gap"]}
+                   for b, a in zip(now, after) if a["expected_kg"] != b["expected_kg"]]
+        return {"weeks": changes,
+                "closes_gaps": [c["label"] for c in changes if c["was_gap"] and not c["is_gap"]],
+                "new_gaps": [c["label"] for c in changes if not c["was_gap"] and c["is_gap"]]}
+
+    now = rows(set())
+    rival = min((q["price_per_kg"] for q in store.list("rival_quotes") if normalize_crop(q.get("crop") or crop) == crop),
+                default=None)
+    waiting = [o for o in offers if o.get("status") in ("pending", "escalated")]
+    per_offer = {}
+    for o in waiting:
+        price = o["requested_price"] if o.get("status") == "escalated" and o.get("requested_price") else o["price_per_kg"]
+        ref = o.get("reference_price") or price
+        per_offer[o["id"]] = {
+            **compare(rows({o["id"]})),
+            "cost": round(price * o["kg"]),
+            "premium": round((price - ref) * o["kg"]),
+            "price_per_kg": price,
+            "vs_rival_per_kg": round(price - rival, 2) if rival is not None and o.get("kind") != "supplier" else None,
+            "currency": o.get("currency", "IDR"),
+        }
+    together = compare(rows({o["id"] for o in waiting if o.get("status") == "pending"}))
+    approved = [o for o in offers if o.get("status") == "approved"]
+    return {"crop": crop, "offers": per_offer, "all_pending": together,
+            "approved_cost": round(sum(o["price_per_kg"] * o["kg"] for o in approved)),
+            "approved_premium": round(sum((o["price_per_kg"] - (o.get("reference_price") or o["price_per_kg"])) * o["kg"]
+                                          for o in approved))}
+
+
 def undo_offer(store: Store, settings: Settings, offer_id: str) -> dict:
     """Return a decided offer to waiting, while its confirmation call has not happened yet."""
     offer = store.get("offers", offer_id)

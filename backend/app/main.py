@@ -380,6 +380,11 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             raise HTTPException(403, "Wrong job token.")
         return services.weekly_job(store, settings)
 
+    @app.get("/api/approvals/impact")
+    def get_approval_impact(crop: str = ""):
+        """What approving each waiting offer would do to the weeks, and what it costs."""
+        return services.approval_impact(store, settings, crop or None)
+
     # ----- track record: deliveries against promises -----
 
     @app.get("/api/track-record")

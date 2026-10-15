@@ -92,3 +92,25 @@ def test_weekly_job_endpoint_needs_the_token(settings, store):
     with TestClient(create_app(dataclasses.replace(settings, job_token="t0ken"), store)) as c:
         assert c.post("/api/jobs/weekly", headers={"X-Job-Token": "wrong"}).status_code == 403
         assert c.post("/api/jobs/weekly", headers={"X-Job-Token": "t0ken"}).status_code == 200
+
+
+# ---------- what approving would do ----------
+
+def test_approval_impact_shows_weeks_cost_and_a_new_gap(store, settings):
+    for fid, kg in (("f01", 1600), ("f02", 1400)):
+        services.record_harvest(store, settings, fid, "palm", kg, "2026-11-02", None)
+    a = services.create_offer(store, settings, farmer=store.get("farmers", "f01"), crop="palm", kg=1600, price=3300,
+                              deliver_week=3, call_id=None)
+    rival = services.offer_from_rival_quote(store, settings, "rq01")
+    imp = services.approval_impact(store, settings, "palm")
+    one = imp["offers"][a["id"]]
+    assert {"label": "W3", "before_kg": 61000, "after_kg": 62600, "was_gap": True, "is_gap": True} in one["weeks"]
+    assert any(w["label"] == "W4" and w["after_kg"] == w["before_kg"] - 1600 for w in one["weeks"])
+    assert one["cost"] == 3300 * 1600 and one["premium"] == (3300 - 3100) * 1600 and one["vs_rival_per_kg"] == 20
+    assert imp["offers"][rival["id"]]["vs_rival_per_kg"] is None
+    assert imp["all_pending"]["new_gaps"] == []
+    # Pulling a big volume out of week 4 would open a gap there: the impact says so before approval.
+    big = services.create_offer(store, settings, farmer=store.get("farmers", "s01"), crop="palm", kg=1, price=3300,
+                                deliver_week=3, call_id=None)
+    store.set("offers", big["id"], {"kg": 30000, "from_week": 4, "from_week_start": "2026-11-02"}, merge=True)
+    assert services.approval_impact(store, settings, "palm")["offers"][big["id"]]["new_gaps"] == ["W4"]
