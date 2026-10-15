@@ -165,5 +165,14 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     Permissions, the `twilio-auth-token` secret, the four GitHub variables, then dial your own (verified) phone. Check on that
     call: audio quality at 8 kHz, reply delay, barge-in, and that a missed call ends as dropped.
 
+16. **Harvest calls save the volume reliably (A-04, done 16 Oct).** Measured with `backend/scripts/harvest_call_test.py`
+    (real Live model on Vertex, scripted text farmer, Pak Rahmat): before 7 of 8 calls saved the harvest (the failure: the
+    agent read the same numbers back over and over and never saved them); after 10 of 10, end_call in 10 of 10. Fixes in
+    `tools.py`: a repeated read-back of the same numbers answers "already read back, save it now"; the first end_call is refused
+    once while a read-back is unsaved (the second always ends the call); every read-back is written to the call
+    (`harvest_read_back`) so a dropped call keeps it, and the call recap offers **Save this harvest**
+    (`POST /api/calls/{id}/confirm-harvest`). Also: `check_offer` refuses when the farmer's harvest is not after the gap week
+    (nothing to bring forward), which the run showed the agent doing. Text farmer, not speech: still check one spoken call.
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

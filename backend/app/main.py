@@ -311,6 +311,11 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         crop = services.crop_of_campaign_id(settings, campaign_id)
         return services.set_agent_profile(store, settings, crop, body.persona, body.questions)
 
+    @app.post("/api/calls/{call_id}/confirm-harvest", dependencies=[Depends(need("farmers.manage"))])
+    def confirm_harvest(call_id: str):
+        """Save the harvest read back on a call that ended before the agent saved it."""
+        return services.confirm_read_back(store, settings, call_id)
+
     @app.get("/api/answers.csv")
     def answers_csv():
         return PlainTextResponse(services.answers_csv(store, settings), media_type="text/csv",

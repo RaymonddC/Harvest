@@ -147,6 +147,22 @@ def set_agent_profile(store: Store, settings: Settings, crop: str | None, person
     return {**profile, "crop": crop}
 
 
+def confirm_read_back(store: Store, settings: Settings, call_id: str, user: str | None = None) -> dict:
+    """Save a harvest the agent read back but did not save (the call dropped, or it forgot the second
+    record_harvest). A planner does this from the call recap, after checking the transcript."""
+    call = store.get("calls", call_id)
+    if not call:
+        raise ServiceError("Call not found.")
+    rb = call.get("harvest_read_back")
+    if not rb:
+        raise ServiceError("This call has no unsaved harvest.")
+    result = record_harvest(store, settings, call["farmer_id"], rb["crop"], float(rb["kg"]), rb["ready_date"],
+                            call_id, rb.get("confidence", "firm"))
+    store.set("harvests", result["harvest_id"], {"source": "planner", "confirmed_by": user}, merge=True)
+    store.set("calls", call_id, {"harvest_read_back": None}, merge=True)
+    return result
+
+
 def answers_csv(store: Store, settings: Settings) -> str:
     """Every saved answer to the planners' extra questions, one row per answer."""
     farmers = {f["id"]: f for f in store.list("farmers")}
