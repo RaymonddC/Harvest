@@ -198,7 +198,7 @@ def test_farmer_who_says_stop_is_never_queued_again(store, settings):
 def test_prompt_has_disclosure_two_step_read_back_and_no_limits(store, settings):
     farmer = store.get("farmers", "f01")
     text = build_system_instruction(settings, farmer, "collect", 3)
-    assert "AI assistant calling for Koperasi Sawit Maju" in text
+    assert "asisten AI yang menelepon untuk Koperasi Sawit Maju" in text  # the AI disclosure, in the call's language
     assert "Bahasa Indonesia" in text and "Palm FFB" in text
     assert "confirmed_by_farmer false" in text and "W3" in text
     # the voice rules found missing in the recorded calls

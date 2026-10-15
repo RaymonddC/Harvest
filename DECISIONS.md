@@ -80,3 +80,29 @@ forecast rows `W1`..`W5`), so existing data, tests and screens need no migration
 `rubber-W1`). Each campaign has its own weekly target and weeks; a call runs with its crop's values (`services.settings_for_crop`).
 `MULTI_CROP` is on by default (GitHub variable `MULTI_CROP=false` turns it off). The dashboard's campaign screens (Setup, Forecast, Approvals, week card, next step) use the picked crop; a crop with no price range shows a blank form, never another crop's. Demo data stays palm only; a new crop needs farmers and price limits added by the planner,
 and a gap-fill start refuses with a clear message while limits are missing.
+
+## Call audio recording (decided 15 Oct, not built yet)
+Why: the speech-to-text transcript can be wrong, so a planner needs to hear what was said.
+- **What:** record both sides of every call, but only keep it if the farmer agrees to the consent question; no consent, nothing is written.
+- **Retention:** 90 days (a lifecycle rule on the bucket deletes the files). **Who can listen:** planners only (a new `calls.listen` capability).
+- **Farmer deletion:** deleting a farmer does not delete their recordings straight away; they go when the 90 days end.
+  Note: the Indonesian PDP Law gives data subjects a right to have processing ended and data deleted, and to withdraw consent
+  (our reading of Articles 8 and 9, not verified against the official text). If a farmer asks, a planner needs a way to delete
+  that farmer's recordings by hand: build one with the recorder.
+- **Consent wording** is fixed text per language (`prompt.NOTICES`), said in the call's language (the farmer's, or `DEMO_LANGUAGE`).
+  Today the notice says only that a written transcript is kept. When recording ships, switch `notice_for(..., recording=True)`:
+  it says the call is recorded and kept, with the recording and the transcript, for 90 days, so planners can check what was agreed.
+  Javanese and Sundanese wording has no native review yet.
+- **Storage:** a private Cloud Storage bucket, preferably in Jakarta (`asia-southeast2`), audio as Opus (about 1 to 2 MB a call), a
+  link made by the backend for planners. Not set up yet.
+- **What the law check found (not legal advice; have a lawyer confirm):** Law 27/2022 (PDP Law) lets personal data be processed with
+  the data subject's consent; consent may be written or recorded, electronic or not, with equal legal force (Article 22); the person must be told
+  first the purpose, the kind of data, the retention period and their rights (Article 21); and the controller must be able to prove
+  the consent (Article 24). Our recorded "yes" in the call is itself the evidence, which is another reason to keep the recording.
+  Not verified from the official text: the language rules for the notice, the cross-border transfer rules (the live agent already sends
+  call audio to Google's Vertex AI in `us-central1`; a Jakarta bucket would not add a transfer, but the notice may need to say so),
+  and how the ITE Law's rules on recording conversations apply to a recording the participant knows about and agreed to.
+- **Cost (Google Cloud list prices; check the pricing page):** Standard storage in Jakarta is $0.023 per GB-month; uploads are Class A
+  operations at about $0.005 per 1,000; playback over the internet is about $0.12 per GB after the free allowance. At 600 calls a week
+  kept 90 days (about 8 to 16 GB), storage is roughly $0.2 to $0.4 a month; uploads and playback add cents. Under $1 a month.
+

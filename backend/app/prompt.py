@@ -58,11 +58,80 @@ add a second sentence.
 call open and never start a new topic after the deal is saved.
 """
 
-OPENING = """\
+# The opening and the consent notice, said word for word in the call's language. Fixed wording (not translated by
+# the model on the fly) so the notice says the same thing in every call and every language, and can be checked.
+# {hello} names the caller as an AI, {ask} confirms who is on the line, {consent} asks for consent to what is kept.
+# Javanese and Sundanese were written without a native reviewer: have a speaker check them before real use.
+NOTICES = {
+    "Bahasa Indonesia": {
+        "hello": "Halo, ini asisten AI yang menelepon untuk {mill}.",
+        "ask": "Apakah saya berbicara dengan {name}?",
+        "transcript": "Dengan izin Bapak/Ibu, {mill} menyimpan catatan tertulis dari percakapan ini. Apakah Bapak/Ibu setuju?",
+        "recording": "Dengan izin Bapak/Ibu, {mill} merekam percakapan ini dan menyimpan rekaman serta catatan tertulisnya "
+                     "selama {days} hari, agar perencana dapat memeriksa kembali kesepakatannya. Apakah Bapak/Ibu setuju?",
+    },
+    "Bahasa Malaysia": {
+        "hello": "Helo, ini pembantu AI yang menelefon untuk {mill}.",
+        "ask": "Adakah saya bercakap dengan {name}?",
+        "transcript": "Dengan kebenaran anda, {mill} menyimpan transkrip bertulis perbualan ini. Adakah anda bersetuju?",
+        "recording": "Dengan kebenaran anda, {mill} merakam perbualan ini dan menyimpan rakaman serta transkrip bertulisnya "
+                     "selama {days} hari, supaya perancang boleh menyemak semula persetujuan yang dibuat. Adakah anda bersetuju?",
+    },
+    "English": {
+        "hello": "Hello, this is an AI assistant calling for {mill}.",
+        "ask": "Am I speaking with {name}?",
+        "transcript": "With your permission, {mill} keeps a written transcript of this call. Is that all right?",
+        "recording": "With your permission, {mill} records this call and keeps the recording and a written transcript "
+                     "for {days} days, so planners can check what was agreed. Is that all right?",
+    },
+    "Javanese": {
+        "hello": "Halo, iki asisten AI sing nelpon kanggo {mill}.",
+        "ask": "Apa aku lagi ngomong karo {name}?",
+        "transcript": "Kanthi idin Panjenengan, {mill} nyimpen cathetan tertulis saka omongan iki. Apa Panjenengan setuju?",
+        "recording": "Kanthi idin Panjenengan, {mill} ngrekam omongan iki lan nyimpen rekaman sarta cathetan tertulise nganti "
+                     "{days} dina, supaya perencana bisa mriksa maneh kesepakatane. Apa Panjenengan setuju?",
+    },
+    "Sundanese": {
+        "hello": "Halo, ieu asisten AI nu nelepon pikeun {mill}.",
+        "ask": "Naha abdi nuju ngobrol sareng {name}?",
+        "transcript": "Kalayan widi Bapa/Ibu, {mill} nyimpen catetan tinulis tina obrolan ieu. Naha Bapa/Ibu satuju?",
+        "recording": "Kalayan widi Bapa/Ibu, {mill} ngarékam obrolan ieu sareng nyimpen rékaman sarta catetan tinulisna salila "
+                     "{days} dinten, supados perencana tiasa mariksa deui kasapukanana. Naha Bapa/Ibu satuju?",
+    },
+}
+NOTICE_ALIASES = {"indonesian": "Bahasa Indonesia", "indonesia": "Bahasa Indonesia", "bahasa": "Bahasa Indonesia",
+                  "malay": "Bahasa Malaysia", "malaysian": "Bahasa Malaysia", "bahasa melayu": "Bahasa Malaysia",
+                  "jawa": "Javanese", "bahasa jawa": "Javanese", "sunda": "Sundanese", "bahasa sunda": "Sundanese"}
+RETENTION_DAYS = 90  # how long a call recording is kept (said in the recording notice)
+
+
+def notice_for(language: str, mill: str, name: str, recording: bool = False, days: int = RETENTION_DAYS) -> dict | None:
+    """The opening sentences in this language, or None for a language without fixed wording."""
+    key = " ".join((language or "").strip().lower().split())
+    lang = next((n for n in NOTICES if n.lower() == key), None) or NOTICE_ALIASES.get(key)
+    if not lang:
+        return None
+    n = NOTICES[lang]
+    fill = {"mill": mill, "name": name, "days": days}
+    return {"hello": n["hello"].format(**fill), "ask": n["ask"].format(**fill),
+            "consent": n["recording" if recording else "transcript"].format(**fill)}
+
+
+OPENING_FIXED = """\
+Opening, in {language}. In your first turn say exactly these three sentences, in this order, without \
+changing a word and without adding any English:
+1. "{hello}"
+2. "{ask}"
+3. "{consent}"
+That is the consent notice: it says what {mill} keeps. Ask it once, here. Remember the answer for \
+end_call's transcript_consent; carry on with the call either way.
+"""
+
+OPENING_TRANSLATED = """\
 Opening, word for word in {language}, as your first sentence: "Hello, this is an AI assistant calling for \
 {mill}." Then ask if you are speaking with {name}. Then give the consent notice: "With your permission \
-{mill} keeps a written transcript of this call. Is that all right?" Remember the answer for \
-end_call's transcript_consent; carry on with the call either way.
+{mill} keeps a written transcript of this call. Is that all right?" Say all of it in {language}. Remember the \
+answer for end_call's transcript_consent; carry on with the call either way.
 """
 
 COLLECT = """\
@@ -138,7 +207,9 @@ def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_we
     fmt = {"mill": settings.mill_name, "language": language, "name": farmer.get("name", "the farmer"),
            "crop": crop}
 
-    parts = [PERSONA.format(**fmt), OPENING.format(**fmt)]
+    notice = notice_for(language, settings.mill_name, fmt["name"])
+    opening = OPENING_FIXED.format(**fmt, **notice) if notice else OPENING_TRANSLATED.format(**fmt)
+    parts = [PERSONA.format(**fmt), opening]
 
     gap_fmt = {}
     if gap_week:
