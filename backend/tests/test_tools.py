@@ -17,8 +17,8 @@ def make(store, settings, farmer_id="f01", kind="collect", gap_week=3, offer=Non
 def test_declarations_are_valid_for_live_api():
     tool = types.Tool(function_declarations=TOOL_DECLARATIONS)
     assert [d.name for d in tool.function_declarations] == [
-        "get_farmer", "record_harvest", "get_reference_price", "check_offer", "save_offer", "record_consent",
-        "end_call"]
+        "get_farmer", "record_harvest", "get_reference_price", "check_offer", "save_offer", "record_answer",
+        "record_consent", "end_call"]
 
 
 def test_record_harvest_reads_back_before_saving(store, settings):

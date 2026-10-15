@@ -10,6 +10,7 @@ import datetime as dt
 import io
 import threading
 
+from . import agent_profile
 from . import forecast as fc
 from .config import Settings, normalize_phone
 from .rules_engine import CROP_LABELS, Limits, LimitsError, normalize_crop, premium_pct
@@ -121,10 +122,43 @@ def weeks_for(store: Store, settings: Settings, crop: str | None = None) -> int:
 
 
 def settings_for_crop(store: Store, settings: Settings, crop: str | None) -> Settings:
-    """The settings a call about this crop runs with: that campaign's weeks and weekly target."""
+    """The settings a call about this crop runs with: that campaign's weeks, weekly target and voice."""
     c = get_campaign(store, settings, crop) or {}
+    voice = (c.get("persona") or {}).get("voice") or settings.voice_name
     return dataclasses.replace(settings, weeks=int(c.get("weeks") or settings.weeks),
-                               target_kg_per_week=int(c.get("target_kg_per_week") or settings.target_kg_per_week))
+                               target_kg_per_week=int(c.get("target_kg_per_week") or settings.target_kg_per_week),
+                               voice_name=voice if voice in agent_profile.VOICES or voice == settings.voice_name
+                               else settings.voice_name)
+
+
+def set_agent_profile(store: Store, settings: Settings, crop: str | None, persona: dict | None,
+                      questions: list | None) -> dict:
+    """Save one campaign's persona and extra questions (validated; see agent_profile)."""
+    crop = normalize_crop(crop) if crop else default_crop(settings)
+    camp = get_campaign(store, settings, crop)
+    if not camp:
+        raise ServiceError(f"{CROP_LABELS.get(crop, crop)} has no campaign yet. Create one first.")
+    try:
+        profile = {"persona": agent_profile.normalize_persona(persona),
+                   "questions": agent_profile.normalize_questions(questions)}
+    except agent_profile.AgentProfileError as e:
+        raise ServiceError(str(e)) from e
+    store.set("campaigns", camp["id"], {**profile, "agent_updated_at": now_iso()}, merge=True)
+    return {**profile, "crop": crop}
+
+
+def answers_csv(store: Store, settings: Settings) -> str:
+    """Every saved answer to the planners' extra questions, one row per answer."""
+    farmers = {f["id"]: f for f in store.list("farmers")}
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["call_id", "date", "farmer", "village", "crop", "question", "answer"])
+    for c in sorted(store.list("calls"), key=lambda c: c.get("started_at") or c.get("created_at") or ""):
+        for a in (c.get("answers") or {}).values():
+            f = farmers.get(c["farmer_id"], {})
+            w.writerow([c["id"], (c.get("started_at") or "")[:10], c.get("farmer_name", ""), f.get("village", ""),
+                        farmer_crop(settings, f) if f else "", a.get("question", ""), a.get("answer", "")])
+    return out.getvalue()
 
 
 def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_week: float, weeks: int) -> dict:
@@ -688,12 +722,13 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
 
 # The languages a farmer can be called in. The agent speaks whatever the name says, so a typo here
 # would make it speak the wrong thing; the dialog on the Setup page offers exactly this list.
-LANGUAGES = ("Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese")
+LANGUAGES = ("Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese", "Thai", "Vietnamese", "Filipino")
 LANGUAGE_ALIASES = {"indonesian": "Bahasa Indonesia", "indonesia": "Bahasa Indonesia",
                     "bahasa": "Bahasa Indonesia", "malay": "Bahasa Malaysia",
                     "malaysian": "Bahasa Malaysia", "bahasa melayu": "Bahasa Malaysia",
                     "jawa": "Javanese", "bahasa jawa": "Javanese", "sunda": "Sundanese",
-                    "bahasa sunda": "Sundanese"}
+                    "bahasa sunda": "Sundanese", "thai": "Thai", "vietnamese": "Vietnamese",
+                    "tiếng việt": "Vietnamese", "tagalog": "Filipino", "filipino": "Filipino", "pilipino": "Filipino"}
 
 
 def normalize_language(raw: str) -> str:

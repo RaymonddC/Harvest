@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from . import forecast as fc
 from . import rules_engine, services
 from .config import Settings
+from .agent_profile import AgentProfileError, parse_answer
 from .rules_engine import crop_label, normalize_crop
 from .store import Store
 
@@ -90,6 +91,19 @@ TOOL_DECLARATIONS = [
         },
     },
     {
+        "name": "record_answer",
+        "description": "Save the farmer's answer to one of the planner's extra questions, by its id.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "question_id": {"type": "STRING", "description": "The id in brackets, e.g. q-1a2b3c4d."},
+                "answer": {"type": "STRING", "description": "The answer as the farmer gave it; \"skipped\" if they "
+                                                            "did not want to answer."},
+            },
+            "required": ["question_id", "answer"],
+        },
+    },
+    {
         "name": "record_consent",
         "description": "Record the farmer's answer to the consent question, as soon as they answer it. "
                        "Then a call that is cut off later still keeps (or still does not keep) the transcript "
@@ -134,6 +148,8 @@ class CallSession:
     summary: str | None = None
     consent: bool | None = None
     saved_offer_ids: list[str] = field(default_factory=list)
+    questions: list[dict] = field(default_factory=list)  # the campaign's extra questions
+    answers: dict[str, dict] = field(default_factory=dict)  # question id -> {question, type, answer}
     read_back: dict[str, tuple[float, str]] = field(default_factory=dict)  # per crop: (kg, date) last read back
     saved_kg: dict[str, float] = field(default_factory=dict)  # per crop: the volume saved on this call
     price_warned: set[tuple[str, float]] = field(default_factory=set)  # (crop, number) already refused as a price
@@ -322,6 +338,20 @@ class ToolHandlers:
         return {"saved": True, "status": "pending", "offer_id": offer["id"], "kg": offer["kg"],
                 "price_per_kg": offer["price_per_kg"], "deliver_week": fc.week_label(self.session.gap_week),
                 "say": "Repeat the terms and say the cooperative must approve the deal before it is final."}
+
+    def _tool_record_answer(self, question_id: str, answer: str) -> dict:
+        question = next((q for q in self.session.questions if q["id"] == str(question_id).strip("[] ")), None)
+        if not question:
+            return {"error": "No extra question has that id on this call. Use an id from your instructions."}
+        try:
+            value = parse_answer(question, answer)
+        except AgentProfileError as e:
+            return {"error": str(e)}
+        self.session.answers[question["id"]] = {"question": question["text"], "type": question["type"], "answer": value}
+        self.store.set("calls", self.session.call_id, {"answers": dict(self.session.answers)}, merge=True)
+        self.last_ui = {"answer": {"question": question["text"], "answer": value}}
+        left = [q["id"] for q in self.session.questions if q["id"] not in self.session.answers]
+        return {"saved": True, "answer": value, "questions_left": left}
 
     def _tool_record_consent(self, transcript_consent: bool) -> dict:
         # finish_call keeps the transcript whenever session.consent is true, also when the call drops later.

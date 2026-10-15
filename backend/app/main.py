@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import access, auth, seed_data, services
+from . import access, agent_profile, auth, seed_data, services
 from .config import Settings, get_settings
 from .live_session import BrowserChannel, run_call
 from .store import COLLECTIONS, Store, make_store
@@ -72,6 +72,11 @@ class UserIn(BaseModel):
 
 class CallNowIn(BaseModel):
     kind: str | None = None
+
+
+class AgentProfileIn(BaseModel):
+    persona: dict = {}
+    questions: list[dict] = []
 
 
 class DialIn(BaseModel):
@@ -199,7 +204,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "weeks": settings.weeks, "target_kg_per_week": settings.target_kg_per_week,
                             "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop,
                             "phone_calls": services.phone_calls_ready(settings),
-                            "phone_calls_note": services.phone_calls_note(settings)}
+                            "phone_calls_note": services.phone_calls_note(settings),
+                            "agent_options": agent_profile.options()}
         return data
 
     @app.get("/api/state")
@@ -298,6 +304,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         crop = services.crop_of_campaign_id(settings, campaign_id)
         return services.start_campaign(store, settings, body.kind if body else "collect", crop,
                                        body.channel if body else "browser")
+
+    @app.put("/api/campaigns/{campaign_id}/agent", dependencies=[Depends(need("campaign.run"))])
+    def campaign_agent(campaign_id: str, body: AgentProfileIn):
+        """The campaign's persona (name, voice, speaking style) and the planner's own questions."""
+        crop = services.crop_of_campaign_id(settings, campaign_id)
+        return services.set_agent_profile(store, settings, crop, body.persona, body.questions)
+
+    @app.get("/api/answers.csv")
+    def answers_csv():
+        return PlainTextResponse(services.answers_csv(store, settings), media_type="text/csv",
+                                 headers={"Content-Disposition": "attachment; filename=answers.csv"})
 
     @app.post("/api/campaigns/{campaign_id}/stop", dependencies=[Depends(need("campaign.run"))])
     def campaign_stop_one(campaign_id: str):

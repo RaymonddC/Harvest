@@ -39,7 +39,8 @@ OUTPUT_RATE = 24000
 # Speech-to-text hint. Without it the Live API detects the language itself, and short Indonesian answers
 # came back as German or Turkish in the transcript ("Das ist ja nicht") although the agent understood them.
 LANGUAGE_CODES = {"bahasa indonesia": "id-ID", "indonesian": "id-ID", "bahasa malaysia": "ms-MY", "malay": "ms-MY",
-                  "english": "en-US", "javanese": "jv-ID", "sundanese": "su-ID"}
+                  "english": "en-US", "javanese": "jv-ID", "sundanese": "su-ID",
+                  "thai": "th-TH", "vietnamese": "vi-VN", "filipino": "fil-PH", "tagalog": "fil-PH"}
 
 
 def stt_language_codes(language: str | None) -> list[str] | None:
@@ -258,12 +259,14 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
     harvest = store.get("harvests", f"h-{farmer['id']}-{farmer.get('crop', '')}")
     # The weeks and weekly target of the crop this call is about (each campaign has its own).
     settings = services.settings_for_crop(store, settings, farmer.get("crop"))
+    campaign = services.get_campaign(store, settings, farmer.get("crop"))  # its persona and extra questions
     session = CallSession(call_id=call_id, farmer=farmer, kind=call["kind"],
-                          gap_week=call.get("gap_week"), offer=offer)
+                          gap_week=call.get("gap_week"), offer=offer,
+                          questions=list((campaign or {}).get("questions") or []) if call["kind"] == "collect" else [])
     handlers = ToolHandlers(store, settings, session)
     transcript = Transcript()
     instruction = build_system_instruction(settings, farmer, call["kind"], call.get("gap_week"),
-                                           harvest=harvest, offer=offer)
+                                           harvest=harvest, offer=offer, campaign=campaign)
     store.set("calls", call_id, {"status": "on_call", "started_at": services.now_iso()}, merge=True)
     connect = connect or default_connect
     language = (farmer.get("language") or settings.demo_language or "").lower()
