@@ -233,8 +233,15 @@ def weekly_job(store: Store, settings: Settings) -> dict:
     against it later), then start every campaign marked "call every Monday" that is not already calling."""
     from . import track_record
 
+    from . import messaging
+
     week = settings.plan_start - dt.timedelta(days=7)  # the week that starts today; week 1 is next week
     snap = track_record.snapshot_promises(store, settings, week)
+    messaging.check_gap_alerts(store, settings)
+    waiting = [o for o in store.list("offers") if o.get("status") in ("pending", "escalated")]
+    if waiting:
+        messaging.alert_planner(store, settings, f"{settings.mill_name}: {len(waiting)} offers wait for your approval.",
+                                "offers_digest")
     started, skipped = [], []
     for camp in list_campaigns(store, settings):
         weekly = camp.get("weekly") or {}
@@ -430,6 +437,10 @@ def record_harvest(store: Store, settings: Settings, farmer_id: str, crop: str, 
     if call_id:
         store.set("calls", call_id, {"harvest_confidence": confidence}, merge=True)
     recompute_forecast(store, settings)
+    if call_id:
+        from . import messaging
+
+        messaging.check_gap_alerts(store, settings)
     week = fc.week_index(date, settings.plan_start, weeks_for(store, settings, crop))
     return {"harvest_id": harvest_id, "week": week,
             "week_label": fc.week_label(week) if week else "outside the forecast horizon"}
@@ -471,6 +482,13 @@ def create_offer(store: Store, settings: Settings, *, farmer: dict, crop: str, k
     }
     offer_id = store.add("offers", doc)
     recompute_forecast(store, settings)
+    if status in ("pending", "escalated"):
+        from . import messaging
+
+        word = "above the ceiling, needs you" if status == "escalated" else "waiting for approval"
+        messaging.alert_planner(store, settings, f"{settings.mill_name}: new offer {word}: {doc['farmer_name']}, "
+                                f"{round(doc['kg']):,} kg at {doc['price_per_kg']:,.0f} {doc['currency']}/kg.",
+                                "offer_waiting", offer_id=offer_id)
     return {**doc, "id": offer_id}
 
 
@@ -885,6 +903,11 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
     if (status == "done" and outcome == "completed" and call.get("kind") == "confirm"
             and call.get("offer_id")):
         store.set("offers", call["offer_id"], {"confirmed_by_voice": True}, merge=True)
+        from . import messaging
+
+        offer = store.get("offers", call["offer_id"])
+        if offer:
+            messaging.send_deal_confirmation(store, settings, offer)
     if outcome == "stopped":
         # The farmer explicitly asked not to be called again; honour it for every future campaign.
         store.set("farmers", call["farmer_id"], {"do_not_call": True}, merge=True)

@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import access, agent_profile, auth, seed_data, services, track_record
+from . import access, agent_profile, auth, messaging, seed_data, services, track_record
 from .config import Settings, get_settings
 from .live_session import BrowserChannel, run_call
 from .store import COLLECTIONS, Store, make_store
@@ -239,7 +239,9 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop,
                             "phone_calls": services.phone_calls_ready(settings),
                             "phone_calls_note": services.phone_calls_note(settings),
-                            "agent_options": agent_profile.options()}
+                            "agent_options": agent_profile.options(),
+                            "messaging_note": messaging.channel_note(settings),
+                            "weekly_job": bool(settings.job_token)}
         return data
 
     @app.get("/api/state")
@@ -379,6 +381,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         if not hmac.compare_digest(x_job_token or "", settings.job_token):
             raise HTTPException(403, "Wrong job token.")
         return services.weekly_job(store, settings)
+
+    @app.post("/api/offers/{offer_id}/send-confirmation", dependencies=[Depends(need("offers.decide"))])
+    def send_confirmation(offer_id: str):
+        """Send (again) the written copy of an approved deal to the farmer."""
+        offer = store.get("offers", offer_id)
+        if not offer or offer.get("status") != "approved":
+            raise HTTPException(400, "Only an approved offer can be confirmed in writing.")
+        return messaging.send_deal_confirmation(store, settings, offer)
 
     @app.get("/api/approvals/impact")
     def get_approval_impact(crop: str = ""):
