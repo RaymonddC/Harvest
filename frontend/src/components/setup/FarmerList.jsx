@@ -49,7 +49,7 @@ function SortHead({ col, sort, setSort, className, style }) {
 // Every farmer: search, sort, pages; Call now on each row, Edit and Delete in its "⋯" menu.
 // "Call phone" (a real Twilio call) appears next to it only when the backend has phone calls switched on;
 // "Call now" then becomes "Browser call" (the demo, answered in the call client).
-export default function FarmerList({ farmers, onEdit }) {
+export default function FarmerList({ farmers, onEdit, onOpen }) {
   const confirm = useConfirm();
   const act = useAct();
   const { state } = useLive();
@@ -104,7 +104,7 @@ export default function FarmerList({ farmers, onEdit }) {
           <tbody id="farmer-rows">
             {rows.slice(first, first + PAGE).map((f) => (
               <tr key={f.id}>
-                <td style={{ paddingLeft: 22 }}><div className="who-cell"><Avatar name={f.name} cls="sm" /><div><b>{f.name}</b><span>{f.village || ""}</span></div></div></td>
+                <td style={{ paddingLeft: 22 }}><button type="button" className="who-cell who-link" onClick={() => onOpen?.(f)} aria-label={`Open ${f.name}`}><Avatar name={f.name} cls="sm" /><div><b>{f.name}</b><span>{f.village || ""}</span></div></button></td>
                 <td className="num">{maskPhone(f.phone)}</td>
                 <td>{f.language}</td>
                 <td>{cropLabel(f.crop)}</td>

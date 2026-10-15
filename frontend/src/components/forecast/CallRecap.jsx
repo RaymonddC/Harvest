@@ -92,7 +92,7 @@ export default function CallRecap({ call, onClose }) {
                     </li>
                   )}
                   {Object.values(c.answers || {}).map((a) => (
-                    <Fact key={a.question} ok={a.answer !== "skipped"} label={a.question}>{a.answer === "skipped" ? "Farmer did not answer" : a.answer}</Fact>
+                    <Fact key={a.question} ok={a.answer !== "skipped"} label={a.question}>{a.answer === "skipped" ? "Farmer did not answer" : a.answer}{a.edited_by ? ` (edited by ${a.edited_by})` : ""}</Fact>
                   ))}
                   {c.kind === "confirm" && <Fact ok={c.status === "done"} label="Confirmation">{c.status === "done" ? "Farmer heard the approved deal" : "Not confirmed yet"}</Fact>}
                 </ul>
