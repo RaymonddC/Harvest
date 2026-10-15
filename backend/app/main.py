@@ -13,7 +13,10 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+import datetime as dt
+
 from . import access, auth, seed_data, services
+from .call_audio import make_audio_store
 from .config import Settings, get_settings
 from .live_session import BrowserChannel, run_call
 from .store import COLLECTIONS, Store, make_store
@@ -278,6 +281,22 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return services.upload_farmers(store, settings, body.csv)
 
     # The first two stay for older screens: they act on the crop in the body, or the default crop.
+    @app.get("/api/calls/{call_id}/audio", dependencies=[Depends(need("calls.listen"))])
+    def call_audio(call_id: str):
+        """The recording of a call (stereo MP3: farmer left, agent right). Planners only; gone after the retention period."""
+        call = store.get("calls", call_id)
+        meta = (call or {}).get("audio")
+        audio_store = make_audio_store(settings)
+        if not meta or not audio_store:
+            raise HTTPException(404, "There is no recording of this call.")
+        expires = meta.get("expires_at")
+        if expires and dt.datetime.fromisoformat(expires) < dt.datetime.now(dt.timezone.utc):
+            raise HTTPException(410, "This recording was kept for %d days and has been deleted." % settings.call_audio_retention_days)
+        data = audio_store.read(call_id)
+        if data is None:
+            raise HTTPException(404, "The recording file is missing.")
+        return Response(data, media_type="audio/mpeg", headers={"Cache-Control": "private, no-store"})
+
     @app.post("/api/campaign/start", dependencies=[Depends(need("campaign.run"))])
     def campaign_start(body: CampaignIn):
         return services.start_campaign(store, settings, body.kind, body.crop or None)

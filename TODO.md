@@ -148,13 +148,16 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     (CSV with a `crop` column) and a price range on the Setup page before a gap-fill call can start; the demo data stays palm only.
     Not built: removing a campaign, renaming one, per-crop gap tolerance.
 
-14. **Call audio recording (decided 15 Oct, not built).** See "Call audio recording" in `DECISIONS.md` for what, who, how long and the
-    law and cost notes. Steps: (1) recorder in `run_call` that keeps both streams in memory and writes only with consent, local
-    files plus an audio player in the call recap; (2) the Cloud Storage bucket (Jakarta, private, 90-day delete rule), the
-    `calls.listen` capability and a short-lived link; (3) a start time on every transcript line so a click jumps the audio; (4) switch
-    the consent wording to the recording version (`notice_for(..., recording=True)`) in the same release, and add a way for a planner to
-    delete a farmer's recordings by hand. Before real use: a lawyer checks the wording, and a native speaker checks the Javanese and
-    Sundanese notices.
+14. **Call audio recording (decided 15 Oct; step 1 built 15 Oct; off until `CALL_AUDIO_DIR` is set).** See "Call audio recording" in
+    `DECISIONS.md` for what, who, how long and the law and cost notes. **Built (step 1):** `app/call_audio.py` (a recorder that puts both
+    sides on the call's clock, a stereo MP3 encoder, a local-folder store with the 90-day clean-up), wired into `run_call` (kept only
+    when the farmer consented; a failure never stops a call finishing), `GET /api/calls/{id}/audio` (capability `calls.listen`, planner
+    only, 410 after the retention period), a start time (`t`) on every transcript line, the consent notice switching to the recording
+    wording when a folder is set, and an audio player with click-to-jump times in the call recap. **Not built yet:** (2) the Cloud
+    Storage bucket (Jakarta, private, 90-day delete rule) and a bucket store behind the same `CallAudioStore` interface, so recording
+    can be switched on in the cloud (until then Cloud Run does not record: `deploy.sh` does not pass `CALL_AUDIO_DIR`); (3) a way for a
+    planner to delete a farmer's recordings by hand; (4) a check of the real thing on a live call (the tests use fake calls). Before real use:
+    a lawyer checks the consent wording, and a native speaker checks the Javanese and Sundanese notices.
     **Consent wording now follows the call's language** (done 15 Oct, `prompt.NOTICES`): fixed sentences for the greeting (says it is an
     AI), the identity question and the consent question in each of the five languages, instead of English for the model to translate.
     Checked in tests only; not yet checked with a real call.

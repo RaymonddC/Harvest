@@ -207,7 +207,8 @@ def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_we
     fmt = {"mill": settings.mill_name, "language": language, "name": farmer.get("name", "the farmer"),
            "crop": crop}
 
-    notice = notice_for(language, settings.mill_name, fmt["name"])
+    notice = notice_for(language, settings.mill_name, fmt["name"], recording=bool(settings.call_audio_dir),
+                        days=settings.call_audio_retention_days)
     opening = OPENING_FIXED.format(**fmt, **notice) if notice else OPENING_TRANSLATED.format(**fmt)
     parts = [PERSONA.format(**fmt), opening]
 

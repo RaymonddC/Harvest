@@ -53,6 +53,8 @@ class Settings:
     jwt_ttl_seconds: int
     seed_on_start: bool
     multi_crop: bool  # more than one crop campaign at a time (the dashboard's New campaign)
+    call_audio_dir: Path | None  # where call recordings are kept; None = calls are not recorded
+    call_audio_retention_days: int  # recordings older than this are deleted
     static_dir: Path | None
     cors_origins: tuple[str, ...]
     firebase_web_config: str | None  # JSON string, passed to the dashboard
@@ -127,6 +129,8 @@ def get_settings() -> Settings:
         jwt_ttl_seconds=int(os.environ.get("JWT_TTL_SECONDS", str(12 * 3600))),
         seed_on_start=_bool("SEED_ON_START", store_backend == "memory"),
         multi_crop=_bool("MULTI_CROP", True),
+        call_audio_dir=Path(os.environ["CALL_AUDIO_DIR"]) if os.environ.get("CALL_AUDIO_DIR") else None,
+        call_audio_retention_days=int(os.environ.get("CALL_AUDIO_RETENTION_DAYS", "90")),
         static_dir=static_dir,
         cors_origins=tuple(
             o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()

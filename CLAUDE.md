@@ -37,5 +37,6 @@ Hackathon project (Google Cloud AI Builder Cup 2026, Manufacturing). Read `READM
 - TODO item 12 is done: real call recorded with a scripted farmer, `web/samples/gap-fill.json` rebuilt with sound
   (`web/samples/clips/`), the replay plays the clips, and the call page has "Play the farmer for me". Rebuild with
   `backend/scripts/sample_call.py` (clips, record, build). Reply delay measured: about 1.3 to 2.4 s with the 400 ms VAD wait.
+- Call recording (TODO item 14) is built for local use (`CALL_AUDIO_DIR`); the cloud bucket and manual delete are still to do.
 - Multi-crop campaigns are built and on by default (TODO item 13; `MULTI_CROP=false` turns them off).
 - Voice prompt fixes and the adaptive stand-in farmer are done and were checked on real calls (TODO item 12); still to do: a collect-call test (the final volume save is unreliable) and the voice path on the deployed site.

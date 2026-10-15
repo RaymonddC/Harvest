@@ -25,7 +25,12 @@ CAPABILITIES: dict[str, str] = {
     "farmers.manage": "Add, edit, delete and upload farmers",
     "demo.reset": "Reset the demo data",
     "users.admin": "Add, change and remove users",
+    "calls.listen": "Listen to the recording of a call",
 }
+
+# Capabilities added after roles were first saved: the built-in role gets each one once (a planner who later
+# takes it away is not given it again, because the grant is remembered on the role).
+NEW_DEFAULT_GRANTS = [("planner", "calls.listen")]
 
 DEFAULT_ROLES: dict[str, dict] = {
     "planner": {"label": "Planner", "capabilities": list(CAPABILITIES),
@@ -65,6 +70,11 @@ def ensure_defaults(store: Store) -> None:
     if not store.list("roles"):
         for role_id, role in DEFAULT_ROLES.items():
             store.set("roles", role_id, {**role, "builtin": True})
+    for role_id, cap in NEW_DEFAULT_GRANTS:
+        role = store.get("roles", role_id)
+        if role and role.get("builtin") and cap not in role.get("capabilities", []) and cap not in role.get("granted_defaults", []):
+            store.set("roles", role_id, {"capabilities": [*role.get("capabilities", []), cap],
+                                         "granted_defaults": [*role.get("granted_defaults", []), cap]}, merge=True)
     if not store.list("users"):
         for user_id, name, role, username in DEFAULT_USERS:
             store.set("users", user_id, {"name": name, "role": role, "active": True, "username": username})

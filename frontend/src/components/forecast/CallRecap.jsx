@@ -1,7 +1,7 @@
 import * as RDialog from "@radix-ui/react-dialog";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { callChip, fmtT, KIND_WORD, plainPrice } from "../../lib.js";
+import { apiUrl, callChip, can, fmtT, getSession, KIND_WORD, plainPrice } from "../../lib.js";
 import { useLive } from "../../live.jsx";
 import { Avatar, Icon, Pill } from "../../ui.jsx";
 import { shortDate } from "./Chart.jsx";
@@ -18,6 +18,29 @@ function weekOf(rows, iso) {
   if (!iso) return null;
   const d = new Date(iso + "T00:00:00");
   return rows.find((r) => { const s = new Date(r.week_start + "T00:00:00"); return d >= s && d < new Date(s.getTime() + 7 * 864e5); }) || null;
+}
+
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+// The recording of a call, for planners. The file is fetched with the planner's sign-in (an audio tag cannot send
+// one) and played from memory. States: loading, ready, or a message saying why there is nothing to play.
+function useRecording(c) {
+  const [rec, setRec] = useState({ state: "none" });
+  const id = c?.audio ? c.id : null;
+  useEffect(() => {
+    if (!id || !can("calls.listen")) { setRec({ state: "none" }); return undefined; }
+    let url = null, live = true;
+    setRec({ state: "loading" });
+    fetch(apiUrl(`/api/calls/${id}/audio`), { headers: { Authorization: `Bearer ${getSession()?.token || ""}` } })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(r.status === 410 ? "This recording was deleted when its 90 days ended." : "The recording could not be loaded.");
+        url = URL.createObjectURL(await r.blob());
+        if (live) setRec({ state: "ready", url });
+      })
+      .catch((e) => { if (live) setRec({ state: "error", message: e.message }); });
+    return () => { live = false; if (url) URL.revokeObjectURL(url); };
+  }, [id]);
+  return rec;
 }
 
 // One thing the agent got from the call: a tick when it has it, a dash when it does not.
@@ -44,6 +67,9 @@ export default function CallRecap({ call, onClose }) {
   const lines = c?.consent && c.transcript?.length ? c.transcript : null;
   const translated = lines?.some((l) => l.translation);
   const village = c && state ? state.farmers.find((f) => f.id === c.farmer_id)?.village : "";
+  const rec = useRecording(c);
+  const player = useRef(null);
+  const jump = (t) => { if (player.current) { player.current.currentTime = t; player.current.play().catch(() => {}); } };
 
   return (
     <RDialog.Root open={!!call} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -93,11 +119,21 @@ export default function CallRecap({ call, onClose }) {
                       Show translation</label>
                   )}
                 </div>
+                {rec.state !== "none" && (
+                  <div className="recording">
+                    {rec.state === "ready" && <audio ref={player} controls preload="metadata" src={rec.url} aria-label="Recording of the call" />}
+                    {rec.state === "loading" && <p className="muted">Loading the recording…</p>}
+                    {rec.state === "error" && <p className="muted">{rec.message}</p>}
+                    {rec.state === "ready" && <p className="muted small">Farmer on the left, agent on the right. Click a time to hear that line.</p>}
+                  </div>
+                )}
                 {lines ? (
                   <div className="transcript recap">
                     {lines.map((l, i) => (
                       <div key={i} className={`bubble ${l.who}`}>
-                        <span className="who">{l.who === "agent" ? "Agent" : c.farmer_name}</span>
+                        <span className="who">{l.who === "agent" ? "Agent" : c.farmer_name}
+                          {rec.state === "ready" && typeof l.t === "number" && <button type="button" className="jump" onClick={() => jump(l.t)} aria-label={`Play from ${mmss(l.t)}`}>{mmss(l.t)}</button>}
+                        </span>
                         <span>{l.text}</span>
                         {english && l.translation && <span className="tr">{l.translation}</span>}
                       </div>
