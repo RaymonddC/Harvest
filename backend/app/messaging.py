@@ -124,12 +124,13 @@ def check_gap_alerts(store: Store, settings: Settings) -> list[dict]:
     sent = []
     for camp in services.list_campaigns(store, settings):
         crop = camp.get("crop") or settings.demo_crop
+        name = camp.get("name") or crop_label(crop)
         alerted = set(camp.get("alerted_gaps") or [])
-        rows = [r for r in store.list("forecast") if (r.get("crop") or settings.demo_crop) == crop and r.get("is_gap")]
+        rows = [r for r in store.list("forecast") if services._row_matches(r, camp["id"]) and r.get("is_gap")]
         new = [r for r in rows if r["week_start"] not in alerted]
         for r in new:
             n = len(r.get("shortlist") or [])
-            body = (f"{settings.mill_name}: {crop_label(crop)} week {r['week']} (from {r['week_start']}) is "
+            body = (f"{settings.mill_name}: {name} week {r['week']} (from {r['week_start']}) is "
                     f"{round(r['gap_kg'] / 1000, 1)} t short. {n} farmers can bring harvest forward.")
             sent += alert_planner(store, settings, body, "gap_alert", crop=crop, week_start=r["week_start"])
         if new:
