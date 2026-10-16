@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { campaignFor, useCrop } from "../../campaigns.jsx";
-import { api, fmtPrice, fmtT, followCalls, gapFillBody, gapFillToast } from "../../lib.js";
+import { api, fmtPrice, fmtT, followCalls, gapFillBody, gapFillToast, startUrl } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar, Icon, Pill } from "../../ui.jsx";
 import { shortDate } from "./Chart.jsx";
@@ -18,7 +18,7 @@ function supply(gap, state) {
 // news that every week is on track (and which approved offers closed the gap).
 export function Hero({ gap, rows, state }) {
   const act = useAct();
-  const { crop } = useCrop();
+  const { cid, crop } = useCrop();
   const target = rows[0].target_kg;
   const waiting = state.offers.filter((o) => ["pending", "escalated"].includes(o.status)).length;
   if (!gap) {
@@ -39,7 +39,7 @@ export function Hero({ gap, rows, state }) {
   }
   const { list, farmersKg, quotes, quoteKg } = supply(gap, state);
   const canFill = list.length > 0 || state.farmers.some((f) => f.type === "supplier");
-  const campaign = campaignFor(state, crop);
+  const campaign = campaignFor(state, cid);
   const calling = campaign.status === "running" && campaign.kind === "gap_fill";
   let text = list.length
     ? `${list.length} farmer${list.length > 1 ? "s" : ""} can bring about ${fmtT(farmersKg)} t forward`
@@ -55,10 +55,10 @@ export function Hero({ gap, rows, state }) {
       <div className="hero-acts">
         {/* While gap-fill calls run, the next step is answering them, not starting more. */}
         {calling ? (followCalls(campaign).external
-          ? <a className="btn solid big" href="/call.html" target="_blank" rel="noopener"><Icon name="phone" size={16} />Open call client</a>
+          ? <Link className="btn solid big" to="/calls"><Icon name="phone" size={16} />Answer the calls</Link>
           : <span className="pill lg dot running">Ringing phones, one at a time</span>) : (
         <ActButton need="campaign.run" className="btn solid big" busy="Queuing calls…" disabled={!canFill}
-          run={() => act(() => api("/api/campaign/start", { body: gapFillBody(state, crop) }), gapFillToast)}>
+          run={() => act(() => api(startUrl(cid), { body: gapFillBody(state) }), gapFillToast)}>
           <Icon name="phone" size={16} />Start gap-fill calls
         </ActButton>)}
         {waiting > 0 && <Link className="btn" to="/approvals">Review {waiting} waiting</Link>}
@@ -93,7 +93,7 @@ export function FillList({ gap, state }) {
               <span>{q.supplier_name}, quote {fmtPrice(q.price_per_kg, q.currency || "IDR")}</span>
               <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 {used(q) ? <Pill cls="mint">Offer added</Pill>
-                  : <ActButton need="offers.decide" className="btn sm" busy="Adding…" run={() => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added to approvals.")}>Add as offer</ActButton>}
+                  : <ActButton need="offers.decide" className="btn sm" busy="Adding…" run={() => act(() => api(`/api/rival-quotes/${q.id}/offer`, { body: { campaign_id: cid } }), "Rival quote added to approvals.")}>Add as offer</ActButton>}
                 <strong>{fmtT(q.kg)} t</strong>
               </span>
             </div>

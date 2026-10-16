@@ -187,9 +187,13 @@ def reliabilities(store: Store) -> dict[str, float]:
 
 
 def summary(store: Store, settings: Settings, crop: str | None = None) -> dict:
-    crop = normalize_crop(crop) if crop else normalize_crop(settings.demo_crop)
-    promises = [p for p in store.list("promises") if p["crop"] == crop]
-    deliveries = [d for d in store.list("deliveries") if d["crop"] == crop]
+    """For one campaign (by id, or a crop's first campaign): its farmers' promises against their deliveries."""
+    from . import services
+
+    camp = services.need_campaign(store, settings, crop)
+    crop = services.campaign_crop(settings, camp)
+    promises = services.campaign_records(store, settings, camp["id"], "promises")
+    deliveries = services.campaign_records(store, settings, camp["id"], "deliveries")
     recorded = sorted({d["week_start"] for d in deliveries})
     weeks = []
     for w in recorded:
@@ -200,33 +204,34 @@ def summary(store: Store, settings: Settings, crop: str | None = None) -> dict:
                       "accuracy": max(acc, 0) if acc is not None else None})
     accs = [w["accuracy"] for w in weeks if w["accuracy"] is not None]
     rel = reliabilities(store)
-    farmers = {f["id"]: f for f in store.list("farmers") if _crop_of(settings, f) == crop}
+    farmers = {f["id"]: f for f in services.campaign_members(store, settings, camp["id"])}
     rated = [r for fid, r in rel.items() if fid in farmers]
     return {
         "crop": crop,
+        "campaign_id": camp["id"],
         "weeks": weeks[-8:],
         "accuracy": round(sum(accs) / len(accs), 3) if accs else None,
         "farmers_rated": len(rated),
         "reliable": sum(1 for r in rated if r >= 0.9),
         "unreliable": sum(1 for r in rated if r < 0.7),
-        "likely": likely_supply(store, settings, crop, rel),
+        "likely": likely_supply(store, settings, camp["id"], rel),
     }
 
 
 def likely_supply(store: Store, settings: Settings, crop: str, rel: dict[str, float] | None = None) -> dict[str, int]:
-    """For each forecast week (W1, W2...): expected supply with each farmer's part scaled by their reliability.
-    Farmers without a track record count in full. Approved deals count in full (the planner approved them)."""
+    """For each forecast week (W1, W2...) of one campaign: expected supply with each farmer's part scaled by their
+    reliability. Farmers without a track record count in full. Approved deals count in full (the planner approved them)."""
+    from . import services
+
+    camp = services.need_campaign(store, settings, crop)
     rel = rel if rel is not None else reliabilities(store)
-    rows = {r["week"]: r for r in store.list("forecast")
-            if normalize_crop(r.get("crop") or settings.demo_crop) == crop and "week" in r}
+    rows = {r["week"]: r for r in store.list("forecast") if services._row_matches(r, camp["id"]) and "week" in r}
     if not rows:
         return {}
     weeks = max(rows)
     end = fc.week_start(weeks, settings.plan_start) + dt.timedelta(days=6)
     shortfall = defaultdict(float)
-    for h in store.list("harvests"):
-        if normalize_crop(h.get("crop") or settings.demo_crop) != crop:
-            continue
+    for h in services.campaign_records(store, settings, camp["id"], "harvests"):
         r = rel.get(h["farmer_id"])
         if r is None or r >= 1:
             continue

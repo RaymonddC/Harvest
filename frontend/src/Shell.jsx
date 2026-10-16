@@ -4,7 +4,7 @@ import { Link, Navigate, NavLink, useLocation, useNavigate } from "react-router-
 import { can, fmtT, getSession, PAGES } from "./lib.js";
 import AccountMenu from "./components/AccountMenu.jsx";
 import CropSwitcher from "./components/CropSwitcher.jsx";
-import { campaignFor, forCrop, useCrop } from "./campaigns.jsx";
+import { campaignFor, inCampaign, useCrop } from "./campaigns.jsx";
 import NextStep from "./components/NextStep.jsx";
 import { useUnsaved } from "./dialogs.jsx";
 import { useLive } from "./live.jsx";
@@ -13,12 +13,12 @@ import { Dialog, DialogClose, Icon } from "./ui.jsx";
 // This week at a glance, under the page links: is calling on, is a week short, does anything
 // wait for a decision. Hidden on narrow screens, where the sidebar is a single row.
 function WeekCard({ state }) {
-  const { crop } = useCrop();
+  const { cid } = useCrop();
   if (!state) return null;
-  const campaign = campaignFor(state, crop);
+  const campaign = campaignFor(state, cid);
   const running = campaign.status === "running";
-  const gap = forCrop(state.forecast, crop).sort((a, b) => a.week - b.week).find((r) => r.is_gap);
-  const waiting = forCrop(state.offers, crop).filter((o) => ["pending", "escalated"].includes(o.status)).length;
+  const gap = inCampaign(state, state.forecast, cid).sort((a, b) => a.week - b.week).find((r) => r.is_gap);
+  const waiting = inCampaign(state, state.offers, cid).filter((o) => ["pending", "escalated"].includes(o.status)).length;
   return (
     <div className="week-card" aria-label="This week">
       <span className="wc-title">This week</span>
@@ -43,10 +43,10 @@ function DemoGuide({ state }) {
   const steps = [
     ["Check the farmers and the price range", "/setup", state.farmers.length > 0 && state.limits.length > 0],
     ["Start calling", "/setup", anyRunning || calls.some((c) => c.status !== "queued")],
-    ["Answer a call as the farmer", "/call.html", calls.some((c) => ["done", "on_call"].includes(c.status))],
+    ["Answer a call as the farmer", "/calls", calls.some((c) => ["done", "on_call"].includes(c.status))],
     ["Fill the gap: gap-fill calls or the rival quote", "/", offers.length > 0],
     ["Approve the offers", "/approvals", offers.some((o) => o.status === "approved")],
-    ["Answer the confirmation call", "/call.html", offers.some((o) => o.confirmed_by_voice)],
+    ["Answer the confirmation call", "/calls", offers.some((o) => o.confirmed_by_voice)],
   ];
   const next = steps.findIndex((s) => !s[2]);
   const toggle = () => { setOpen(!open); try { localStorage.setItem(GUIDE_KEY, open ? "0" : "1"); } catch { /* storage blocked */ } };
@@ -70,10 +70,12 @@ function DemoGuide({ state }) {
 }
 
 // Keyboard shortcuts for people who use the app every day. Typing in a box never triggers them.
-const SHORTCUTS = [["g then f", "Live forecast"], ["g then s", "Setup"], ["g then a", "Approvals"], ["g then u", "Users"],
-  ["/", "Search the farmer list (Setup)"], ["?", "Show these shortcuts"]];
-const GO = { f: "/", s: "/setup", a: "/approvals", u: "/users" };
-const PAGE_OF = { "/": "forecast", "/setup": "setup", "/approvals": "approvals", "/users": "users" };
+const SHORTCUTS = [["g then f", "Live forecast"], ["g then s", "Campaign"], ["g then m", "Farmers"], ["g then c", "Calls"],
+  ["g then k", "Calendar"], ["g then g", "Agent"], ["g then a", "Approvals"], ["g then u", "Users"],
+  ["/", "Search the farmer list"], ["?", "Show these shortcuts"]];
+const GO = { f: "/", s: "/setup", m: "/farmers", c: "/calls", k: "/calendar", g: "/agent", a: "/approvals", u: "/users" };
+const PAGE_OF = { "/": "forecast", "/setup": "setup", "/farmers": "farmers", "/calls": "calls", "/calendar": "calendar",
+  "/agent": "agent", "/approvals": "approvals", "/users": "users" };
 
 // Sidebar (phone: top row plus a bottom tab bar, from app.css), a top bar holding the page
 // heading, and the banners for live-data trouble and view-only sessions.

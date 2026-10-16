@@ -43,7 +43,7 @@ export function Calls({ calls, onShow }) {
     return () => clearInterval(t);
   }, [onCall.length]);
   if (!onCall.length && !finished.length && !queued.length) {
-    return <div className="rows" id="calls"><div className="empty"><p>No calls yet. Add farmers and a price range, then start the first round of calls.</p><Link className="btn solid" to="/setup">Go to Setup</Link></div></div>;
+    return <div className="rows" id="calls"><div className="empty"><p>No calls yet. Add farmers and a price range, then start the first round of calls.</p><Link className="btn solid" to="/setup">Go to the campaign</Link></div></div>;
   }
   return (
     <div className="rows" id="calls">

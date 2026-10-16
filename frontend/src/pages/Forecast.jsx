@@ -9,7 +9,7 @@ import GapNote from "../components/forecast/GapNote.jsx";
 import Kpis from "../components/forecast/Kpis.jsx";
 import TrackRecord from "../components/forecast/TrackRecord.jsx";
 import { apiUrl, fmtT } from "../lib.js";
-import { campaignFor, cropName, forCrop, useCrop } from "../campaigns.jsx";
+import { campaignFor, forCrop, inCampaign, useCrop } from "../campaigns.jsx";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 
@@ -17,14 +17,13 @@ export default function Forecast() {
   const { state } = useLive();
   const [shown, setShown] = useState(null); // call in the detail dialog
   const [logOpen, setLogOpen] = useState(false);
-  const { crop } = useCrop();
-  const rows = state ? forCrop(state.forecast, crop).sort((a, b) => a.week - b.week) : []; // the picked crop's weeks
+  const { cid, crop, campaign: picked } = useCrop();
+  const rows = state ? inCampaign(state, state.forecast, cid).sort((a, b) => a.week - b.week) : []; // the picked campaign's weeks
   const gap = rows.find((r) => r.is_gap);
-  // Everything below shows the picked crop only: its farmers, their calls, its offers and quotes, and its campaign.
-  const farmerIds = new Set(state ? forCrop(state.farmers, crop).map((f) => f.id) : []);
-  const view = state ? { ...state, farmers: forCrop(state.farmers, crop), offers: forCrop(state.offers, crop),
-    rival_quotes: forCrop(state.rival_quotes, crop), calls: state.calls.filter((c) => farmerIds.has(c.farmer_id)) } : null;
-  const campaign = state ? campaignFor(state, crop) : {};
+  // Everything below shows the picked campaign only: its farmers, their calls and offers; the crop's rival quotes.
+  const view = state ? { ...state, farmers: inCampaign(state, state.farmers, cid), offers: inCampaign(state, state.offers, cid),
+    rival_quotes: forCrop(state.rival_quotes, crop), calls: inCampaign(state, state.calls, cid) } : null;
+  const campaign = state ? campaignFor(state, cid) : {};
   const running = campaign.status === "running";
   const campaignCalls = view ? view.calls.filter((c) => c.kind !== "confirm" && (c.attempt || 1) === 1) : [];
   const target = rows.length ? rows[0].target_kg : 0;
@@ -33,11 +32,11 @@ export default function Forecast() {
     <div className="page-head">
       <div>
         <h1>Live supply forecast</h1>
-        <p>Expected {cropName(crop)} per week against the mill's target, updated as each call is saved.</p>
+        <p>Expected supply for {picked.label || "this campaign"} per week against its target, updated as each call is saved.</p>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
         <span className={`pill lg dot ${running ? "mint running" : ""}`}>{running ? (campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Campaign running") : "No campaign running"}</span>
-        <a className="btn" href={apiUrl("/api/forecast.csv")} download="forecast.csv">Export CSV</a>
+        <a className="btn" href={apiUrl(`/api/forecast.csv?campaign=${encodeURIComponent(cid)}`)} download="forecast.csv">Export CSV</a>
       </div>
     </div>
   );
@@ -76,14 +75,14 @@ export default function Forecast() {
             <GapNote gap={gap} />
             <p className="small muted">Unsure answers count for half; later harvest rounds are projected from how often each farmer harvests. All data is synthetic.</p>
           </section>
-          {state && <TrackRecord crop={crop} rows={rows} refreshKey={JSON.stringify(rows.map((r) => r.expected_kg))} />}
+          {state && <TrackRecord cid={cid} rows={rows} refreshKey={JSON.stringify(rows.map((r) => r.expected_kg))} />}
         </div>
         <div className="col-side">
           {state && gap && <FillList gap={gap} state={view} />}
           <section className="card" aria-labelledby="calls-title">
             <div className="card-head">
               <h2 id="calls-title">Live calls</h2>
-              <a href="/call.html" target="_blank" rel="noopener">Open call client</a>
+              <Link to="/calls">Open the calls</Link>
             </div>
             {state ? <Calls calls={view.calls} onShow={setShown} /> : <div className="rows" id="calls" />}
             <button className="btn" onClick={() => setLogOpen(true)}>Call log</button>

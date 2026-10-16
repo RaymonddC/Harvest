@@ -26,7 +26,7 @@ export default function Kpis({ rows, calls, toCall }) {
       {calls.length
         ? <Kpi label="Calls" value={<span>{done} <small>of {calls.length} done</small></span>} share={done / calls.length}
           note={calls.length - done ? `${calls.length - done} still to go` : "Every farmer answered"} />
-        : <Kpi label="Calls" value={toCall ? `${toCall} ready` : "None yet"} note={toCall ? "Start calling on the Setup page" : "Add farmers on the Setup page"} />}
+        : <Kpi label="Calls" value={toCall ? `${toCall} ready` : "None yet"} note={toCall ? "Start calling on the Campaign page" : "Add farmers on the Setup page"} />}
     </div>
   );
 }

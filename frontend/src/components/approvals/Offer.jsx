@@ -114,7 +114,7 @@ export default function Offer({ o, l, row, quote, confirming = false, imp = null
         </ul>
       )}
       {o.status === "escalated" && !inLimits && (
-        <p className="warn">Above the ceiling of {plainPrice(l ? l.ceiling_price : 0, cur)}. Raise the ceiling on the Setup page to approve, or reject.</p>
+        <p className="warn">Above the ceiling of {plainPrice(l ? l.ceiling_price : 0, cur)}. Raise the ceiling on the Campaign page to approve, or reject.</p>
       )}
     </motion.div>
   );
