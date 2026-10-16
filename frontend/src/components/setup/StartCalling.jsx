@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { campaignFor, cropName, useCrop } from "../../campaigns.jsx";
-import { api, cfg } from "../../lib.js";
+import { api, can, cfg } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Icon } from "../../ui.jsx";
 import StepTop from "./StepTop.jsx";
@@ -37,6 +37,13 @@ export default function StartCalling({ state, toCall }) {
       <span className="small" style={{ color: "var(--on-ink-muted)" }}>
         {phoneCalls ? s.phone_calls_note : "Demo mode: calls are answered in the browser call page."}
       </span>
+      <label className="weekly-toggle">
+        <input type="checkbox" checked={!!campaign.weekly?.enabled} disabled={!can("campaign.run")}
+          onChange={(e) => act(() => api(`/api/campaigns/${campaign.id}/schedule`, { method: "PUT", body: { enabled: e.target.checked, channel: phoneCalls ? "twilio" : "browser" } }),
+            e.target.checked ? `Every Monday at 06:00 the agent calls these farmers${phoneCalls ? " on their phones" : ""}.` : "Weekly calls turned off.")} />
+        <span>Call every Monday at 06:00{phoneCalls ? " (phones)" : ""}
+          {campaign.weekly?.enabled && !s.weekly_job && <small> · the Monday job is not set up yet (JOB_TOKEN)</small>}</span>
+      </label>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: "auto" }}>
         {running ? <>
           <span className="pill lg dot running" style={{ alignSelf: "flex-start", background: "var(--ink-2)", color: "var(--on-ink)" }}>{byPhone ? "Calling phones, one at a time" : campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Calling farmers now"}</span>

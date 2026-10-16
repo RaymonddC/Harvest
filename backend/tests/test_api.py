@@ -732,7 +732,8 @@ def test_planner_corrects_a_harvest_and_the_call_values_are_kept(client, store):
     assert r.status_code == 200
     h = store.get("harvests", "h-f01-palm")
     assert h["kg"] == 1200 and h["confidence"] == "unsure" and h["edited_by"]
-    assert h["original"] == {"kg": 1600, "ready_date": "2026-11-02", "confidence": "firm", "source": "call"}
+    assert h["original"] == {"kg": 1600, "ready_date": "2026-11-02", "confidence": "firm", "source": "call",
+                             "every_days": None}
     assert h["call_id"] == "call-x"
     assert store.get("forecast", "W4")["expected_kg"] == before - 1600 + 600  # unsure counts half
     client.put("/api/farmers/f01/harvest", json={"kg": 1300, "ready_date": "2026-11-03", "confidence": "firm"})

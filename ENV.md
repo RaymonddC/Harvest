@@ -77,6 +77,10 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | `MAX_CALL_ATTEMPTS` | `2` | No | A dropped call is retried until this many attempts. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `MAX_CALL_SECONDS` | `360` | No | Hard limit on one call. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `AUTH_REQUIRED` | `true` | No | Planner actions need the planner role. `false` leaves them open. | Not settable from GitHub yet: the code default runs. See the rule above |
+| `MESSAGING_CHANNEL` | `off` | No | Text messages: `off` records them in the outbox only; `sms` or `whatsapp` sends them over Twilio, to numbers on `REAL_CALL_ALLOWLIST`. Deal confirmations go to the farmer after the voice confirmation; alerts go to `PLANNER_ALERT_TO`. A US number needs A2P registration for SMS. | GitHub variable `MESSAGING_CHANNEL` |
+| `TWILIO_WHATSAPP_FROM` | none | No | The WhatsApp sender number, for `MESSAGING_CHANNEL=whatsapp`. | GitHub variable `TWILIO_WHATSAPP_FROM` |
+| `PLANNER_ALERT_TO` | none | No | Comma-separated numbers that get the planner's alerts (a new gap week, an offer waiting, the Monday digest). Empty: alerts only show in the dashboard. | GitHub variable `PLANNER_ALERT_TO` |
+| `JOB_TOKEN` | none (job off) | Yes | Protects `POST /api/jobs/weekly`, the Monday job that rolls the weeks, saves what farmers promised for the week and starts campaigns marked *call every Monday*. When set, `deploy.sh` creates a Cloud Scheduler job (Monday 06:00, Asia/Jakarta) that calls it. | GitHub secret `JOB_TOKEN`, then redeploy |
 | `JWT_SECRET` | a new random value each start | Yes | Signs sign-in tokens. Set a long random value (at least 32 characters) in the cloud. | GitHub secret `JWT_SECRET`, then redeploy (everyone signs in again) |
 | `JWT_TTL_SECONDS` | `43200` (12 hours) | No | How long a sign-in lasts. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `DEMO_PASSWORD` | `harvest-demo` | No (it is shown on the sign-in page) | Password of the built-in accounts `dewi`, `budi`, `guest` and `farmer`, which the sign-in page offers as demo accounts. Setting a user's own password on the Users page takes them off that list. Empty turns the demo accounts off. | `deploy.env` or the shell when running `deploy.sh`; not settable from GitHub yet, so the code default runs |
@@ -114,6 +118,8 @@ options of that one script, not of the service, and need no entry elsewhere.
 | `MILL_NAME`, `DEMO_LANGUAGE` | as above | Passed to the service. |
 | `FIREBASE_WEB_CONFIG` | none | Passed to the service and written into `web/config.js`. |
 | `JWT_SECRET` | a new random value each deploy | Passed to the service. Fix it to keep people signed in across deploys. |
+| `MESSAGING_CHANNEL`, `TWILIO_WHATSAPP_FROM`, `PLANNER_ALERT_TO` | `off`, none, none | Passed to the service (text messages and planner alerts). |
+| `JOB_TOKEN` | none | Passed to the service; when set, `deploy.sh` also creates or updates the Cloud Scheduler job `harvest-weekly`. |
 | `DEMO_PASSWORD` | `harvest-demo` | Passed to the service; also used to sign in as `dewi` when seeding. |
 | `SEED_DEMO_DATA` | `true` | Replace everything in Firestore with the demo data after deploying. Use `true` on the first deploy only. |
 | `SKIP_API_ENABLE` | `false` | Skip enabling Google Cloud APIs. Automatic deploys set `true`. |

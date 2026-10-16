@@ -72,6 +72,12 @@ class Settings:
     # CORS_ORIGINS above) means no restriction - every number is allowed. Empty
     # (the default) means none are: a real call needs this set explicitly either way.
     real_call_allowlist: tuple[str, ...]
+    # Week 1 is always next week: true when PLAN_START is not set, and the weeks roll forward by themselves.
+    plan_start_auto: bool = False
+    job_token: str | None = None  # protects POST /api/jobs/weekly (Cloud Scheduler sends it as X-Job-Token)
+    messaging_channel: str = "off"  # "sms" or "whatsapp" sends texts over Twilio; "off" only records them
+    twilio_whatsapp_from: str | None = None  # the WhatsApp sender, when messaging_channel is "whatsapp"
+    planner_alert_to: tuple[str, ...] = ()  # numbers that get the planner's alerts (gaps, waiting offers)
 
 
 def _load_dotenv(folders: tuple[Path, ...] | None = None) -> None:
@@ -132,6 +138,12 @@ def get_settings() -> Settings:
             o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()
         ),
         firebase_web_config=os.environ.get("FIREBASE_WEB_CONFIG") or None,
+        plan_start_auto=not plan_start_raw,
+        job_token=os.environ.get("JOB_TOKEN") or None,
+        messaging_channel=(os.environ.get("MESSAGING_CHANNEL") or "off").strip().lower(),
+        twilio_whatsapp_from=os.environ.get("TWILIO_WHATSAPP_FROM") or None,
+        planner_alert_to=tuple(normalize_phone(n) for n in (os.environ.get("PLANNER_ALERT_TO") or "").split(",")
+                               if n.strip()),
         twilio_account_sid=os.environ.get("TWILIO_ACCOUNT_SID") or None,
         twilio_auth_token=os.environ.get("TWILIO_AUTH_TOKEN") or None,
         twilio_from_number=os.environ.get("TWILIO_FROM_NUMBER") or None,

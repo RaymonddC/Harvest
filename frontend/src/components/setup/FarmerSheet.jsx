@@ -1,5 +1,5 @@
 import * as RDialog from "@radix-ui/react-dialog";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, callChip, can, cropLabel, fmtKg, KIND_WORD, maskPhone, plainPrice } from "../../lib.js";
 import { useConfirm } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
@@ -15,10 +15,12 @@ function HarvestBox({ farmer, harvest }) {
   const act = useAct();
   const confirm = useConfirm();
   const [form, setForm] = useState(null); // null: viewing
-  const start = () => setForm({ kg: harvest ? String(harvest.kg) : "", ready_date: harvest?.ready_date || "", confidence: harvest?.confidence || "firm" });
-  const valid = form && Number(form.kg) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(form.ready_date);
+  const start = () => setForm({ kg: harvest ? String(harvest.kg) : "", ready_date: harvest?.ready_date || "", confidence: harvest?.confidence || "firm",
+    every_days: harvest?.every_days ? String(harvest.every_days) : "" });
+  const every = Number(form?.every_days);
+  const valid = form && Number(form.kg) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(form.ready_date) && (!form.every_days || (every >= 5 && every <= 45));
   const save = async () => {
-    const r = await act(() => api(`/api/farmers/${farmer.id}/harvest`, { method: "PUT", body: { kg: Number(form.kg), ready_date: form.ready_date, confidence: form.confidence } }),
+    const r = await act(() => api(`/api/farmers/${farmer.id}/harvest`, { method: "PUT", body: { kg: Number(form.kg), ready_date: form.ready_date, confidence: form.confidence, every_days: form.every_days ? every : null } }),
       "Harvest saved. The forecast is updated.");
     if (r) setForm(null);
   };
@@ -45,6 +47,10 @@ function HarvestBox({ farmer, harvest }) {
             </select>
           </label>
         </div>
+        <label className="field">Harvests every … days <span className="sub">(optional, 5 to 45; later rounds are added to the forecast)</span>
+          <input type="text" inputMode="numeric" className="num-input" style={{ maxWidth: 160 }} placeholder="e.g. 14" value={form.every_days}
+            onChange={(e) => setForm({ ...form, every_days: e.target.value.replace(/[^0-9]/g, "") })} />
+        </label>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <ActButton className="btn sm leaf" busy="Saving…" disabled={!valid} run={save}>Save harvest</ActButton>
           <button type="button" className="btn sm ghost" onClick={() => setForm(null)}>Cancel</button>
@@ -58,6 +64,7 @@ function HarvestBox({ farmer, harvest }) {
         <>
           <b className="num">{fmtKg(harvest.kg)} kg</b> ready {day(harvest.ready_date, { weekday: "short", day: "numeric", month: "short" })}
           {" · "}{harvest.confidence === "unsure" ? "unsure (counts for half)" : "firm"}
+          {harvest.every_days ? ` · harvests every ${harvest.every_days} days, so later rounds are in the forecast too` : ""}
           {harvest.edited_by && (
             <p className="small muted" style={{ margin: "4px 0 0" }}>
               Edited by {harvest.edited_by}{harvest.edited_at ? `, ${when(harvest.edited_at)}` : ""}.
@@ -103,6 +110,64 @@ function AnswerRow({ call, qid, a }) {
   );
 }
 
+// What the farmer promised against what they delivered, and adding or removing a delivery.
+function DeliveryBox({ farmer, stateKey }) {
+  const act = useAct();
+  const confirm = useConfirm();
+  const [rec, setRec] = useState(null);
+  const [tick, setTick] = useState(0);
+  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), kg: "" });
+  useEffect(() => {
+    let live = true;
+    api(`/api/farmers/${farmer.id}/track-record`, { method: "GET" }).then((r) => { if (live) setRec(r); }).catch(() => {});
+    return () => { live = false; };
+  }, [farmer.id, stateKey, tick]);
+  const add = async () => {
+    const r = await act(() => api("/api/deliveries", { body: { farmer_id: farmer.id, kg: Number(form.kg), date: form.date } }), "Delivery recorded.");
+    if (r) { setForm({ ...form, kg: "" }); setTick((n) => n + 1); }
+  };
+  const remove = async (d) => {
+    if (await confirm({ title: "Remove this delivery?", body: `${fmtKg(d.kg)} kg on ${day(d.date)}.`, confirm: "Remove", danger: true })) {
+      await act(() => api(`/api/deliveries/${d.id}`, { method: "DELETE" }), "Delivery removed.");
+      setTick((n) => n + 1);
+    }
+  };
+  if (!rec) return null;
+  return (
+    <div className="delivery-box">
+      <p>{rec.reliability != null
+        ? <><b>{Math.round(rec.reliability * 100)}%</b> of promised kg delivered, over {rec.weeks.length} recorded weeks.</>
+        : rec.weeks.length ? `${rec.weeks.length} recorded week so far; a reliability score needs 2.` : "No deliveries recorded against a promise yet."}</p>
+      {rec.weeks.length > 0 && (
+        <ul className="fs-list">
+          {rec.weeks.slice(-6).reverse().map((w) => (
+            <li key={w.week_start} className="row"><span className="name">Week of {day(w.week_start)}</span>
+              <span className="num">{fmtKg(w.delivered)} of {fmtKg(w.promised)} kg</span></li>
+          ))}
+        </ul>
+      )}
+      {can("farmers.manage") && (
+        <div className="grid3" style={{ alignItems: "end", marginTop: 8 }}>
+          <label className="field">Delivered on<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
+          <label className="field">Kg<input type="text" inputMode="numeric" className="num-input" value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value.replace(/[^0-9]/g, "") })} /></label>
+          <ActButton className="btn sm leaf" busy="Saving…" disabled={!(Number(form.kg) > 0)} run={add}>Add delivery</ActButton>
+        </div>
+      )}
+      {rec.deliveries.length > 0 && (
+        <details style={{ marginTop: 8 }}>
+          <summary>All deliveries ({rec.deliveries.length})</summary>
+          <ul className="fs-list">
+            {rec.deliveries.map((d) => (
+              <li key={d.id} className="row"><span className="name">{day(d.date)} · {fmtKg(d.kg)} kg · {d.recorded_by}</span>
+                {can("farmers.manage") && <button type="button" className="btn sm ghost" onClick={() => remove(d)}>Remove</button>}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
 // Everything about one farmer in one place: profile, next harvest (editable), every call (opens the recap),
 // offers and answers to the planner's questions (editable).
 export default function FarmerSheet({ farmer, state, onClose }) {
@@ -134,6 +199,11 @@ export default function FarmerSheet({ farmer, state, onClose }) {
               <section aria-labelledby="fs-harvest">
                 <h3 id="fs-harvest">Next harvest</h3>
                 <HarvestBox farmer={f} harvest={harvest} />
+              </section>
+
+              <section aria-labelledby="fs-track">
+                <h3 id="fs-track">Track record</h3>
+                <DeliveryBox farmer={f} stateKey={JSON.stringify(state?.forecast?.map((r) => r.expected_kg))} />
               </section>
 
               <section aria-labelledby="fs-calls">

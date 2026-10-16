@@ -127,13 +127,39 @@ def build_seed(plan_start: dt.date, language: str, crop: str = "palm",
 
     limits_doc = {**default_limits(crop).to_doc(),
                   "reference_source": "Illustrative. Replace with the published provincial FFB price and its date."}
+    promises, deliveries = _history(plan_start, crop, [fid for fid in farmers if fid.startswith("b")][:40], rng)
     return {
         "farmers": farmers,
         "harvests": harvests,
+        "promises": promises,
+        "deliveries": deliveries,
         "limits": {crop: limits_doc},
         "rival_quotes": rival_quotes,
         "campaigns": {"current": {"status": "idle", "kind": None, "crop": crop, "target_kg_per_week": target_kg}},
     }
+
+
+HISTORY_WEEKS = 4
+
+
+def _history(plan_start: dt.date, crop: str, farmer_ids: list[str], rng: random.Random):
+    """Four finished weeks of promises and weighbridge deliveries for 40 farmers, so forecast accuracy and
+    reliability show from the start. Most keep their word; a few deliver about three quarters, some about half."""
+    promises, deliveries = {}, {}
+    for i, fid in enumerate(farmer_ids):
+        keeps = (0.45, 0.6) if i % 10 == 3 else (0.7, 0.85) if i % 10 in (5, 8) else (0.92, 1.0)
+        for k in range(2, 2 + HISTORY_WEEKS):  # this week is not over yet: history starts the week before
+            week = plan_start - dt.timedelta(days=7 * k)
+            promised = rng.randrange(800, 2201, 50)
+            promises[f"p-{fid}-{crop}-{week.isoformat()}"] = {"farmer_id": fid, "crop": crop, "week_start": week.isoformat(),
+                                                             "kg": promised, "saved_at": "seed"}
+            got = round(promised * rng.uniform(*keeps) / 10) * 10
+            if got:
+                day = week + dt.timedelta(days=rng.randint(0, 5))
+                deliveries[f"d-{fid}-{week.isoformat()}"] = {"farmer_id": fid, "farmer_name": fid, "crop": crop, "kg": got,
+                                                            "date": day.isoformat(), "week_start": week.isoformat(),
+                                                            "source": "seed", "recorded_by": "Weighbridge"}
+    return promises, deliveries
 
 
 def load_seed(store, settings) -> None:
@@ -142,10 +168,12 @@ def load_seed(store, settings) -> None:
     data = build_seed(settings.plan_start, settings.demo_language, settings.demo_crop,
                       settings.target_kg_per_week)
     for coll in ("farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes",
-                 "campaigns"):
+                 "campaigns", "promises", "deliveries", "messages"):
         store.clear(coll)
     for coll, docs in data.items():
         for doc_id, doc in docs.items():
+            if coll == "deliveries":
+                doc = {**doc, "farmer_name": data["farmers"].get(doc["farmer_id"], {}).get("name", doc["farmer_id"])}
             store.set(coll, doc_id, doc)
     services.recompute_forecast(store, settings)
 

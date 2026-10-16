@@ -148,7 +148,7 @@ def set_agent_profile(store: Store, settings: Settings, crop: str | None, person
 
 
 def edit_harvest(store: Store, settings: Settings, farmer_id: str, kg: float, ready_date: str, confidence: str,
-                 actor=None) -> dict:
+                 actor=None, every_days: float | None = None) -> dict:
     """A planner corrects (or adds) a farmer's harvest by hand. The first values from the call are kept in
     "original", and the harvest is marked edited, so a hand-made number is never mistaken for the farmer's own."""
     farmer = store.get("farmers", farmer_id)
@@ -158,9 +158,12 @@ def edit_harvest(store: Store, settings: Settings, farmer_id: str, kg: float, re
     harvest_id = f"h-{farmer_id}-{crop}"
     before = store.get("harvests", harvest_id)
     result = record_harvest(store, settings, farmer_id, crop, float(kg), ready_date,
-                            (before or {}).get("call_id"), confidence)
+                            (before or {}).get("call_id"), confidence, every_days if every_days else None)
+    if not every_days and before and before.get("every_days"):
+        store.set("harvests", harvest_id, {"every_days": None}, merge=True)  # cleared by hand
+        recompute_forecast(store, settings)
     original = (before or {}).get("original") or (
-        {k: before.get(k) for k in ("kg", "ready_date", "confidence", "source")} if before else None)
+        {k: before.get(k) for k in ("kg", "ready_date", "confidence", "source", "every_days")} if before else None)
     store.set("harvests", harvest_id, {"source": "planner" if not before else before.get("source", "call"),
                                        "original": original, "edited_by": actor.name if actor else "Planner",
                                        "edited_at": now_iso()}, merge=True)
@@ -196,6 +199,65 @@ def edit_answer(store: Store, call_id: str, question_id: str, answer: str, actor
                             "edited_by": actor.name if actor else "Planner", "edited_at": now_iso()}
     store.set("calls", call_id, {"answers": answers}, merge=True)
     return answers[question_id]
+
+
+def set_weekly_schedule(store: Store, settings: Settings, crop: str | None, enabled: bool, channel: str = "browser") -> dict:
+    """Mark a campaign to start by itself every Monday morning (run by the weekly job)."""
+    crop = normalize_crop(crop) if crop else default_crop(settings)
+    camp = get_campaign(store, settings, crop)
+    if not camp:
+        raise ServiceError(f"{CROP_LABELS.get(crop, crop)} has no campaign yet. Create one first.")
+    if channel not in ("browser", "twilio"):
+        raise ServiceError("Channel must be browser or twilio.")
+    weekly = {"enabled": bool(enabled), "channel": channel, "updated_at": now_iso()}
+    store.set("campaigns", camp["id"], {"weekly": weekly}, merge=True)
+    return {**weekly, "crop": crop}
+
+
+def roll_weeks(store: Store, settings: Settings, today: dt.date | None = None) -> Settings:
+    """Settings whose week 1 is next week. Same object when nothing changed (or PLAN_START pins the weeks)."""
+    from .config import next_monday
+
+    if not settings.plan_start_auto:
+        return settings
+    start = next_monday(today)
+    if start == settings.plan_start:
+        return settings
+    rolled = dataclasses.replace(settings, plan_start=start)
+    recompute_forecast(store, rolled)
+    return rolled
+
+
+def weekly_job(store: Store, settings: Settings) -> dict:
+    """Monday morning: snapshot what farmers promised for the week that starts now (so deliveries can be checked
+    against it later), then start every campaign marked "call every Monday" that is not already calling."""
+    from . import track_record
+
+    from . import messaging
+
+    week = settings.plan_start - dt.timedelta(days=7)  # the week that starts today; week 1 is next week
+    snap = track_record.snapshot_promises(store, settings, week)
+    messaging.check_gap_alerts(store, settings)
+    waiting = [o for o in store.list("offers") if o.get("status") in ("pending", "escalated")]
+    if waiting:
+        messaging.alert_planner(store, settings, f"{settings.mill_name}: {len(waiting)} offers wait for your approval.",
+                                "offers_digest")
+    started, skipped = [], []
+    for camp in list_campaigns(store, settings):
+        weekly = camp.get("weekly") or {}
+        crop = normalize_crop(camp.get("crop") or settings.demo_crop)
+        if not weekly.get("enabled"):
+            continue
+        if camp.get("status") == "running":
+            skipped.append({"crop": crop, "why": "already calling"})
+            continue
+        try:
+            r = start_campaign(store, settings, "collect", crop, weekly.get("channel", "browser"))
+            started.append({"crop": crop, "queued": r["queued"], "channel": r["channel"]})
+        except ServiceError as e:
+            skipped.append({"crop": crop, "why": str(e)})
+    store.set("campaigns", campaign_id(settings, default_crop(settings)), {"last_weekly_job": now_iso()}, merge=True)
+    return {"plan_start": settings.plan_start.isoformat(), "promises": snap, "started": started, "skipped": skipped}
 
 
 def confirm_read_back(store: Store, settings: Settings, call_id: str, user: str | None = None) -> dict:
@@ -351,7 +413,8 @@ def forecast_summary_text(store: Store, settings: Settings, crop: str | None = N
 # ---------- harvests ----------
 
 def record_harvest(store: Store, settings: Settings, farmer_id: str, crop: str, kg: float,
-                   ready_date: str, call_id: str | None, confidence: str = "firm") -> dict:
+                   ready_date: str, call_id: str | None, confidence: str = "firm",
+                   every_days: float | None = None) -> dict:
     try:
         date = dt.date.fromisoformat(ready_date[:10])
     except (TypeError, ValueError) as e:
@@ -361,13 +424,23 @@ def record_harvest(store: Store, settings: Settings, farmer_id: str, crop: str, 
     crop = normalize_crop(crop)
     confidence = "unsure" if confidence == "unsure" else "firm"
     harvest_id = f"h-{farmer_id}-{crop}"
+    if every_days in (None, ""):
+        # A farmer's harvest cycle rarely changes: keep the one on record when this answer did not give one.
+        every_days = (store.get("harvests", harvest_id) or {}).get("every_days")
+    elif not fc.MIN_EVERY_DAYS <= float(every_days) <= fc.MAX_EVERY_DAYS:
+        raise ServiceError(f"A harvest cycle must be {fc.MIN_EVERY_DAYS} to {fc.MAX_EVERY_DAYS} days.")
     store.set("harvests", harvest_id, {
         "farmer_id": farmer_id, "crop": crop, "kg": round(kg), "ready_date": date.isoformat(),
         "confidence": confidence, "source": "call", "call_id": call_id, "updated_at": now_iso(),
+        "every_days": int(every_days) if every_days else None,
     })
     if call_id:
         store.set("calls", call_id, {"harvest_confidence": confidence}, merge=True)
     recompute_forecast(store, settings)
+    if call_id:
+        from . import messaging
+
+        messaging.check_gap_alerts(store, settings)
     week = fc.week_index(date, settings.plan_start, weeks_for(store, settings, crop))
     return {"harvest_id": harvest_id, "week": week,
             "week_label": fc.week_label(week) if week else "outside the forecast horizon"}
@@ -391,9 +464,13 @@ def create_offer(store: Store, settings: Settings, *, farmer: dict, crop: str, k
         if hw and deliver_week and hw > deliver_week:
             from_week, harvest_id = hw, harvest["id"]
             kg = min(kg, float(harvest["kg"]))
+    plan_start = settings_for_crop(store, settings, crop).plan_start
     doc = {
         "farmer_id": farmer["id"], "farmer_name": farmer.get("name", farmer["id"]),
         "village": farmer.get("village", ""),
+        # The calendar weeks, so the offer stays right when the planning weeks roll forward.
+        "deliver_week_start": fc.week_start(deliver_week, plan_start).isoformat() if deliver_week else None,
+        "from_week_start": fc.week_start(from_week, plan_start).isoformat() if from_week else None,
         "kind": farmer.get("type", "farmer"), "crop": crop, "kg": round(kg),
         "price_per_kg": round(price, 2), "reference_price": limits.reference,
         "premium_pct": premium_pct(limits, price), "currency": limits.currency,
@@ -405,6 +482,13 @@ def create_offer(store: Store, settings: Settings, *, farmer: dict, crop: str, k
     }
     offer_id = store.add("offers", doc)
     recompute_forecast(store, settings)
+    if status in ("pending", "escalated"):
+        from . import messaging
+
+        word = "above the ceiling, needs you" if status == "escalated" else "waiting for approval"
+        messaging.alert_planner(store, settings, f"{settings.mill_name}: new offer {word}: {doc['farmer_name']}, "
+                                f"{round(doc['kg']):,} kg at {doc['price_per_kg']:,.0f} {doc['currency']}/kg.",
+                                "offer_waiting", offer_id=offer_id)
     return {**doc, "id": offer_id}
 
 
@@ -436,6 +520,52 @@ def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool,
         if farmer:
             queue_call(store, farmer, kind="confirm", offer_id=offer_id)
     return {**offer, **changes, "status": status}
+
+
+def approval_impact(store: Store, settings: Settings, crop: str | None = None) -> dict:
+    """For each waiting offer of a crop: the weeks as they would be if the planner approved it (alone), what it
+    costs, and whether it opens a new gap somewhere else. Also the same for approving all of them together."""
+    crop = normalize_crop(crop) if crop else default_crop(settings)
+    camp = get_campaign(store, settings, crop) or {}
+    weeks = int(camp.get("weeks") or settings.weeks)
+    target = int(camp.get("target_kg_per_week") or settings.target_kg_per_week)
+    harvests = [h for h in store.list("harvests") if farmer_crop(settings, h) == crop]
+    offers = [o for o in store.list("offers") if farmer_crop(settings, o) == crop]
+
+    def rows(approve_ids: set[str]) -> list[dict]:
+        trial = [{**o, "status": "approved"} if o["id"] in approve_ids else o for o in offers]
+        return fc.compute_forecast(harvests, trial, settings.plan_start, weeks, target, settings.gap_tolerance)
+
+    def compare(after: list[dict]) -> dict:
+        changes = [{"label": a["label"], "before_kg": b["expected_kg"], "after_kg": a["expected_kg"],
+                    "was_gap": b["is_gap"], "is_gap": a["is_gap"]}
+                   for b, a in zip(now, after) if a["expected_kg"] != b["expected_kg"]]
+        return {"weeks": changes,
+                "closes_gaps": [c["label"] for c in changes if c["was_gap"] and not c["is_gap"]],
+                "new_gaps": [c["label"] for c in changes if not c["was_gap"] and c["is_gap"]]}
+
+    now = rows(set())
+    rival = min((q["price_per_kg"] for q in store.list("rival_quotes") if normalize_crop(q.get("crop") or crop) == crop),
+                default=None)
+    waiting = [o for o in offers if o.get("status") in ("pending", "escalated")]
+    per_offer = {}
+    for o in waiting:
+        price = o["requested_price"] if o.get("status") == "escalated" and o.get("requested_price") else o["price_per_kg"]
+        ref = o.get("reference_price") or price
+        per_offer[o["id"]] = {
+            **compare(rows({o["id"]})),
+            "cost": round(price * o["kg"]),
+            "premium": round((price - ref) * o["kg"]),
+            "price_per_kg": price,
+            "vs_rival_per_kg": round(price - rival, 2) if rival is not None and o.get("kind") != "supplier" else None,
+            "currency": o.get("currency", "IDR"),
+        }
+    together = compare(rows({o["id"] for o in waiting if o.get("status") == "pending"}))
+    approved = [o for o in offers if o.get("status") == "approved"]
+    return {"crop": crop, "offers": per_offer, "all_pending": together,
+            "approved_cost": round(sum(o["price_per_kg"] * o["kg"] for o in approved)),
+            "approved_premium": round(sum((o["price_per_kg"] - (o.get("reference_price") or o["price_per_kg"])) * o["kg"]
+                                          for o in approved))}
 
 
 def undo_offer(store: Store, settings: Settings, offer_id: str) -> dict:
@@ -773,6 +903,11 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
     if (status == "done" and outcome == "completed" and call.get("kind") == "confirm"
             and call.get("offer_id")):
         store.set("offers", call["offer_id"], {"confirmed_by_voice": True}, merge=True)
+        from . import messaging
+
+        offer = store.get("offers", call["offer_id"])
+        if offer:
+            messaging.send_deal_confirmation(store, settings, offer)
     if outcome == "stopped":
         # The farmer explicitly asked not to be called again; honour it for every future campaign.
         store.set("farmers", call["farmer_id"], {"do_not_call": True}, merge=True)
