@@ -190,5 +190,13 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
       `MESSAGING_CHANNEL` is `sms` or `whatsapp` and the number is allowlisted; the Twilio number needs A2P registration
       (SMS) or a WhatsApp sender first. The new language templates need a native speaker's check.
 
+18. **Campaigns, farmer database, calendar, calls and agent pages (code done 16 Oct, branch `claude/campaigns-calendar`).**
+    A crop can have several campaigns, each with its own farmers (`farmer.campaign_id`, one campaign per farmer; farmers
+    from before belong to their crop's first campaign; `null` = farmer database only). Campaigns can be renamed, re-targeted
+    and removed. New pages: Farmers (every farmer, move between campaigns), Agent (persona and questions, moved off Setup),
+    Calls (the call client embedded as `call.html?embed`, next to the campaign's calls), Calendar (`GET /api/calendar`:
+    planning weeks, calls made and planned, Monday calls, harvests with projected rounds, deal weeks, deliveries). Setup is
+    now "Campaign". Price ranges stay per crop (campaigns of one crop share them).
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.
