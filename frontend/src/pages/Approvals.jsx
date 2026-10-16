@@ -4,8 +4,8 @@ import { Link } from "react-router-dom";
 import Messages from "../components/approvals/Messages.jsx";
 import Meter from "../components/approvals/Meter.jsx";
 import Offer from "../components/approvals/Offer.jsx";
-import { api, gapFillBody, gapFillToast, plainPrice } from "../lib.js";
-import { forCrop, useCrop } from "../campaigns.jsx";
+import { api, gapFillBody, gapFillToast, plainPrice, startUrl } from "../lib.js";
+import { forCrop, inCampaign, useCrop } from "../campaigns.jsx";
 import { useConfirm } from "../dialogs.jsx";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
@@ -28,19 +28,19 @@ export default function Approvals() {
   const { state } = useLive();
   const act = useAct();
   const confirm = useConfirm();
-  const { crop } = useCrop();
+  const { cid, crop } = useCrop();
   // What approving each waiting offer would do (weeks, cost, new gaps), fetched again when offers change.
   const [impact, setImpact] = useState(null);
   const offersKey = state ? JSON.stringify(state.offers.map((o) => [o.id, o.status, o.kg])) + JSON.stringify(state.forecast.map((r) => r.expected_kg)) : "";
   useEffect(() => {
     if (!state) return undefined;
     let live = true;
-    const t = setTimeout(() => api(`/api/approvals/impact?crop=${encodeURIComponent(crop)}`, { method: "GET" })
+    const t = setTimeout(() => api(`/api/approvals/impact?campaign=${encodeURIComponent(cid)}`, { method: "GET" })
       .then((r) => { if (live) setImpact(r); }).catch(() => {}), 300);
     return () => { live = false; clearTimeout(t); };
-  }, [offersKey, crop]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Only the picked crop's offers and quotes.
-  const view = state ? { ...state, offers: forCrop(state.offers, crop), forecast: forCrop(state.forecast, crop), rival_quotes: forCrop(state.rival_quotes, crop) } : null;
+  }, [offersKey, cid]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Only the picked campaign's offers and weeks, and its crop's rival quotes.
+  const view = state ? { ...state, offers: inCampaign(state, state.offers, cid), forecast: inCampaign(state, state.forecast, cid), rival_quotes: forCrop(state.rival_quotes, crop) } : null;
   const week = view ? focusWeek(view) : null;
   const head = (
     <div className="page-head">
@@ -114,7 +114,7 @@ export default function Approvals() {
               <div className="who"><Avatar name={q.supplier_name} cls="ink" /><div><b>{q.supplier_name}</b><span>Logged quote for week {q.deliver_week}, not used yet</span></div></div>
               <div className="fig"><span>Volume</span><b className="num">{(q.kg / 1000).toFixed(1)} t</b></div>
               <div className="fig"><span>Price, {q.currency || "IDR"}/kg</span><b className="num">{plainPrice(q.price_per_kg, q.currency || "IDR")}</b></div>
-              <div className="acts"><ActButton need="offers.decide" busy="Adding…" run={() => act(() => api(`/api/rival-quotes/${q.id}/offer`), "Rival quote added as a pending offer.")}>Add as offer</ActButton></div>
+              <div className="acts"><ActButton need="offers.decide" busy="Adding…" run={() => act(() => api(`/api/rival-quotes/${q.id}/offer`, { body: { campaign_id: cid } }), "Rival quote added as a pending offer.")}>Add as offer</ActButton></div>
             </motion.div>
           ))}
           </AnimatePresence>
@@ -128,7 +128,7 @@ export default function Approvals() {
                 <>
                   <p>No offers yet. Week {gap.week} is {(gap.gap_kg / 1000).toFixed(0)} t short: gap-fill calls ask farmers to move harvest into it, and every deal they agree lands here.</p>
                   <ActButton need="campaign.run" className="btn solid" busy="Queuing calls…"
-                    run={() => act(() => api("/api/campaign/start", { body: gapFillBody(state, crop) }), gapFillToast)}>
+                    run={() => act(() => api(startUrl(cid), { body: gapFillBody(state) }), gapFillToast)}>
                     <Icon name="phone" size={16} />Start gap-fill calls
                   </ActButton>
                 </>

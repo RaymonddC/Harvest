@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { campaignFor, forCrop, useCrop } from "../campaigns.jsx";
-import { api, followCalls, gapFillBody, gapFillToast } from "../lib.js";
+import { campaignFor, inCampaign, useCrop } from "../campaigns.jsx";
+import { api, followCalls, gapFillBody, gapFillToast, startUrl } from "../lib.js";
 import { useLive } from "../live.jsx";
 import { useAct } from "../toast.jsx";
 import { ActButton, Icon } from "../ui.jsx";
@@ -12,14 +12,14 @@ const WAITING = ["pending", "escalated"];
 // Shows nothing when there is nothing to do, or when the page itself already leads with it.
 export default function NextStep({ page }) {
   const { state } = useLive();
-  const { crop } = useCrop();
+  const { cid } = useCrop();
   const act = useAct();
   if (!state) return null;
-  const campaign = campaignFor(state, crop);
-  const waiting = forCrop(state.offers, crop).filter((o) => WAITING.includes(o.status)).length;
-  const gap = forCrop(state.forecast, crop).sort((a, b) => a.week - b.week).find((r) => r.is_gap);
-  const canFill = gap && ((gap.shortlist || []).length || forCrop(state.farmers, crop).some((f) => f.type === "supplier"));
-  const toCall = forCrop(state.farmers, crop).filter((f) => f.to_call).length;
+  const campaign = campaignFor(state, cid);
+  const waiting = inCampaign(state, state.offers, cid).filter((o) => WAITING.includes(o.status)).length;
+  const gap = inCampaign(state, state.forecast, cid).sort((a, b) => a.week - b.week).find((r) => r.is_gap);
+  const canFill = gap && ((gap.shortlist || []).length || state.farmers.some((f) => f.type === "supplier" && f.crop === campaign.crop));
+  const toCall = inCampaign(state, state.farmers, cid).filter((f) => f.to_call && f.type !== "supplier").length;
 
   let step = null;
   if (waiting && page !== "approvals") {
@@ -32,7 +32,7 @@ export default function NextStep({ page }) {
   } else if (canFill && page !== "forecast") { // the forecast page leads with this in its banner
     step = (
       <ActButton className="btn solid" need="campaign.run" busy="Queuing calls…"
-        run={() => act(() => api("/api/campaign/start", { body: gapFillBody(state, crop) }), gapFillToast)}>
+        run={() => act(() => api(startUrl(cid), { body: gapFillBody(state) }), gapFillToast)}>
         <Icon name="phone" size={16} />Fill week {gap.week}
       </ActButton>
     );

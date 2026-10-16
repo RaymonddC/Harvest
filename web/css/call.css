@@ -125,3 +125,7 @@
 .outcome .summary { border-top: 1px solid #26332D; padding-top: 12px; display: flex; flex-direction: column; gap: 4px; }
 .outcome .summary span { font-size: 12px; font-weight: 700; color: #7FE0B4; }
 .outcome .summary p { color: #FFFFFF; font-size: 15px; line-height: 1.5; }
+
+/* Inside the dashboard's Calls page (call.html?embed in an iframe). */
+.embed .call-page { min-height: 100vh; padding: 20px 16px; }
+.embed .back-link { display: none; }

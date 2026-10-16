@@ -33,7 +33,7 @@ function renderIncoming() {
       el("div", { class: "meta" }, el("b", {}, c.farmer_name),
         el("small", {}, [f.village, what, c.attempt > 1 ? "retry" : null].filter(Boolean).join(" · "))),
       el("button", { class: "btn mint", onclick: () => answer(c) }, "Answer"));
-  }) : [el("li", { class: "none" }, "No calls waiting. Start the campaign on the Setup page, or press Call now next to a farmer.")]));
+  }) : [el("li", { class: "none" }, "No calls waiting. Start calling on the Campaign page, or press Call now next to a farmer.")]));
 }
 
 // ---------- call ----------

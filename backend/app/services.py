@@ -468,8 +468,8 @@ def set_campaign_farmers(store: Store, settings: Settings, ref: str, add: list[s
         if farmer_crop(settings, f) != crop:
             problems.append(f"{f.get('name', fid)} grows {CROP_LABELS.get(farmer_crop(settings, f))}, not {CROP_LABELS.get(crop)}")
             continue
-        if farmer_campaign(settings, f, camps) != camp["id"]:
-            store.set("farmers", fid, {"campaign_id": camp["id"]}, merge=True)
+        if farmer_campaign(settings, f, camps) != camp["id"] or not f.get("to_call"):
+            store.set("farmers", fid, {"campaign_id": camp["id"], "to_call": True}, merge=True)
             added += 1
     for fid in remove or []:
         f = store.get("farmers", fid)
@@ -1143,7 +1143,7 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
 
 
 # The languages a farmer can be called in. The agent speaks whatever the name says, so a typo here
-# would make it speak the wrong thing; the dialog on the Setup page offers exactly this list.
+# would make it speak the wrong thing; the farmer form offers exactly this list.
 LANGUAGES = ("Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese", "Thai", "Vietnamese", "Filipino")
 LANGUAGE_ALIASES = {"indonesian": "Bahasa Indonesia", "indonesia": "Bahasa Indonesia",
                     "bahasa": "Bahasa Indonesia", "malay": "Bahasa Malaysia",

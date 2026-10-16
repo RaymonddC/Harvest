@@ -35,6 +35,7 @@ def test_second_palm_campaign_takes_its_own_farmers_and_forecast(client, store, 
     cid = r.json()["id"]
     assert cid.startswith("palm-") and r.json()["name"] == "Palm, Kampar"
     assert palm_ids(store, settings, cid) == {"f01", "f02"}
+    assert store.get("farmers", "f02")["to_call"] is True
     assert "f01" not in palm_ids(store, settings, "current")  # a farmer is in one campaign at a time
     rows = sorted((r for r in store.list("forecast") if r.get("campaign_id") == cid), key=lambda r: r["week"])
     assert [r["id"] for r in rows] == [f"{cid}-W1", f"{cid}-W2", f"{cid}-W3"]
@@ -45,11 +46,11 @@ def test_second_palm_campaign_takes_its_own_farmers_and_forecast(client, store, 
 
 def test_start_calls_only_the_campaigns_farmers(client, store, settings):
     cid = client.post("/api/campaigns", json={"crop": "palm", "target_kg_per_week": 2000, "weeks": 3,
-                                              "farmer_ids": ["f01", "f02"]}).json()["id"]
+                                              "farmer_ids": ["f01", "b004"]}).json()["id"]  # b004 was not called before
     r = client.post(f"/api/campaigns/{cid}/start", json={"kind": "collect"})
     assert r.status_code == 200 and r.json()["queued"] == 2 and r.json()["campaign_id"] == cid
     calls = [c for c in store.list("calls") if c["status"] == "queued"]
-    assert {c["farmer_id"] for c in calls} == {"f01", "f02"} and {c["campaign_id"] for c in calls} == {cid}
+    assert {c["farmer_id"] for c in calls} == {"f01", "b004"} and {c["campaign_id"] for c in calls} == {cid}
     assert store.get("campaigns", cid)["status"] == "running"
     assert store.get("campaigns", "current")["status"] != "running"
 

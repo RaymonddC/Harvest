@@ -11,7 +11,7 @@ const SAMPLE = "phone,date,kg\n+62 810 0000 1000,2026-10-14,1450";
 // Closing the loop: what farmers promised against what the weighbridge recorded, how many keep their word,
 // and the supply to expect given their record (next to what they said). Deliveries come in as a CSV here,
 // or one at a time on a farmer's page.
-export default function TrackRecord({ crop, rows, refreshKey }) {
+export default function TrackRecord({ cid, rows, refreshKey }) {
   const act = useAct();
   const [data, setData] = useState(null);
   const [open, setOpen] = useState(false);
@@ -19,9 +19,9 @@ export default function TrackRecord({ crop, rows, refreshKey }) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
     let live = true;
-    api(`/api/track-record?crop=${encodeURIComponent(crop)}`, { method: "GET" }).then((d) => { if (live) setData(d); }).catch(() => {});
+    api(`/api/track-record?campaign=${encodeURIComponent(cid)}`, { method: "GET" }).then((d) => { if (live) setData(d); }).catch(() => {});
     return () => { live = false; };
-  }, [crop, refreshKey, tick]);
+  }, [cid, refreshKey, tick]);
 
   const upload = async () => {
     const r = await act(() => api("/api/deliveries/upload", { body: { csv } }),
