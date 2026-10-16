@@ -13,6 +13,7 @@ from typing import Callable, Protocol
 
 COLLECTIONS = (
     "farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns", "messages",
+    "allowed_numbers",
 )
 
 Listener = Callable[[str, str], None]

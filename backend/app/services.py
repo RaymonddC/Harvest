@@ -921,7 +921,58 @@ def phone_calls_ready(settings: Settings) -> bool:
     return twilio_ready(settings) and settings.real_calls_enabled
 
 
-def phone_calls_note(settings: Settings) -> str:
+# ---------- the real-call allowlist ----------
+# A real call (and a real text) only goes to a number on the allowlist: REAL_CALL_ALLOWLIST on the server, plus the
+# numbers planners add in the dashboard (collection allowed_numbers, at most WEB_ALLOWLIST_MAX of them).
+
+def _number_id(e164: str) -> str:
+    return "n" + e164.lstrip("+")
+
+
+def allowed_numbers(store: Store | None, settings: Settings) -> set[str]:
+    nums = {n for n in settings.real_call_allowlist if n != "*"}
+    if store is not None:
+        nums |= {d["phone"] for d in store.list("allowed_numbers") if d.get("phone")}
+    return nums
+
+
+def number_allowed(store: Store | None, settings: Settings, e164: str) -> bool:
+    return "*" in settings.real_call_allowlist or e164 in allowed_numbers(store, settings)
+
+
+def allow_number(store: Store, settings: Settings, phone: str, label: str = "", farmer_id: str | None = None,
+                 actor=None) -> dict:
+    """Add a number to the real-call allowlist from the dashboard."""
+    if settings.web_allowlist_max <= 0:
+        raise ServiceError("Adding numbers from the dashboard is turned off (WEB_ALLOWLIST_MAX=0). "
+                           "Add them to REAL_CALL_ALLOWLIST on the server.")
+    e164 = normalize_phone(phone or "")
+    if not 8 <= len(e164) <= 16:
+        raise ServiceError(f"The phone number {phone!r} does not look right.")
+    nid = _number_id(e164)
+    old = store.get("allowed_numbers", nid)
+    mine = store.list("allowed_numbers")
+    if not old and len(mine) >= settings.web_allowlist_max:
+        raise ServiceError(f"The dashboard allowlist is full ({settings.web_allowlist_max} numbers). Remove one first, "
+                           "or raise WEB_ALLOWLIST_MAX on the server.")
+    if farmer_id and not store.get("farmers", farmer_id):
+        raise ServiceError("Farmer not found.")
+    if not farmer_id:  # link it to the farmer with this number, when there is one
+        farmer_id = next((f["id"] for f in store.list("farmers") if normalize_phone(f.get("phone") or "") == e164), None)
+    doc = {"phone": e164, "label": (label or "").strip()[:60] or None, "farmer_id": farmer_id,
+           "added_by": actor.name if actor else "Planner", "added_at": (old or {}).get("added_at") or now_iso()}
+    store.set("allowed_numbers", nid, doc)
+    return {"id": nid, **doc}
+
+
+def disallow_number(store: Store, number_id: str) -> dict:
+    if not store.get("allowed_numbers", number_id):
+        raise ServiceError("That number is not on the dashboard allowlist.", status=404)
+    store.delete("allowed_numbers", number_id)
+    return {"deleted": number_id}
+
+
+def phone_calls_note(settings: Settings, store: Store | None = None) -> str:
     """Why real phone calls are on or off, in words for the dashboard."""
     if not twilio_ready(settings):
         missing = [name for name, value in (("TWILIO_ACCOUNT_SID", settings.twilio_account_sid),
@@ -933,7 +984,7 @@ def phone_calls_note(settings: Settings) -> str:
         return "Real phone calls are off: REAL_CALLS_ENABLED is not true."
     if "*" in settings.real_call_allowlist:
         return "Real phone calls are on, to any number."
-    n = len(settings.real_call_allowlist)
+    n = len(allowed_numbers(store, settings))
     return (f"Real phone calls are on, only to the {n} number{'s' if n != 1 else ''} on the allowlist."
             if n else "Real phone calls are on, but the allowlist is empty, so every number is refused.")
 
@@ -978,7 +1029,7 @@ def twilio_status(store: Store, settings: Settings, call_id: str, call_status: s
     return outcome
 
 
-def _dialable_number(settings: Settings, farmer: dict) -> str:
+def _dialable_number(store: Store, settings: Settings, farmer: dict) -> str:
     """The farmer's number in E.164, after the safety gate. Raises ServiceError with the reason."""
     if not twilio_ready(settings):
         raise ServiceError("Twilio is not configured (need TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, "
@@ -993,10 +1044,10 @@ def _dialable_number(settings: Settings, farmer: dict) -> str:
     # Stored/displayed as "+62 810 0000 1000" (seed_data._phone, and whatever a planner
     # types into the upload CSV) - Twilio's Calls API wants strict E.164, no separators.
     to_number = normalize_phone(phone)
-    if "*" not in settings.real_call_allowlist and to_number not in settings.real_call_allowlist:
-        raise ServiceError(f"{to_number} is not on the real-call allowlist (REAL_CALL_ALLOWLIST). "
-                           "This is a safety gate, not a bug - add the number there, or set it to "
-                           "\"*\" to allow any number (production).")
+    if not number_allowed(store, settings, to_number):
+        raise ServiceError(f"{to_number} is not on the real-call allowlist. This is a safety gate, not a bug: "
+                           "allow the number on the farmer's page or in Phone allowlist on the Farmers page "
+                           "(or in REAL_CALL_ALLOWLIST on the server).")
     return to_number
 
 
@@ -1028,9 +1079,9 @@ def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None 
     farmer = store.get("farmers", farmer_id)
     if not farmer:
         if not twilio_ready(settings):
-            _dialable_number(settings, {})  # report the configuration problem first
+            _dialable_number(store, settings, {})  # report the configuration problem first
         raise ServiceError("Farmer not found.")
-    to_number = _dialable_number(settings, farmer)
+    to_number = _dialable_number(store, settings, farmer)
     if any(c["farmer_id"] == farmer_id and c.get("channel") == "twilio" and c["status"] == "on_call"
            for c in store.list("calls")):
         raise ServiceError("This farmer is on a phone call right now.")
@@ -1088,7 +1139,7 @@ def dial_next(store: Store, settings: Settings) -> str | None:
             try:
                 if not farmer:
                     raise ServiceError("Farmer not found.")
-                _place_twilio_call(store, settings, call["id"], _dialable_number(settings, farmer))
+                _place_twilio_call(store, settings, call["id"], _dialable_number(store, settings, farmer))
                 return call["id"]
             except ServiceError as e:
                 store.set("calls", call["id"], {"status": "dropped", "outcome": "skipped", "summary": f"Not dialled: {e}",

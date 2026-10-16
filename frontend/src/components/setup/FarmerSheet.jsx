@@ -1,6 +1,6 @@
 import * as RDialog from "@radix-ui/react-dialog";
 import { useEffect, useState } from "react";
-import { api, callChip, can, cropLabel, fmtKg, KIND_WORD, maskPhone, plainPrice } from "../../lib.js";
+import { allowedEntry, api, apiUrl, callChip, can, cropLabel, fmtKg, KIND_WORD, maskPhone, numberAllowed, offerPoUrl, plainPrice } from "../../lib.js";
 import { useConfirm } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar, Pill } from "../../ui.jsx";
@@ -168,6 +168,26 @@ function DeliveryBox({ farmer, stateKey }) {
   );
 }
 
+// Whether real phone calls may reach this farmer's number, with Allow or Remove (the allowlist).
+function PhoneAllow({ f, state }) {
+  const act = useAct();
+  if (!state?.settings?.phone_calls) return null;
+  const allowed = numberAllowed(state, f.phone);
+  const entry = allowedEntry(state, f.phone);
+  return (
+    <span className="phone-allow">
+      <Pill cls={allowed ? "mint" : ""}>{allowed ? "Real phone calls allowed" : "Real phone calls not allowed"}</Pill>
+      {!allowed && can("campaign.run") && (
+        <ActButton className="btn sm" busy="Allowing…" run={() => act(() => api("/api/allowed-numbers", { body: { phone: f.phone, label: f.name, farmer_id: f.id } }), `${f.name}'s number can now be called.`)}>Allow</ActButton>
+      )}
+      {entry && can("campaign.run") && (
+        <ActButton className="btn sm ghost" busy="Removing…" run={() => act(() => api(`/api/allowed-numbers/${entry.id}`, { method: "DELETE" }), "Number removed from the allowlist.")}>Remove</ActButton>
+      )}
+      {allowed && !entry && <span className="small muted">set on the server</span>}
+    </span>
+  );
+}
+
 // Everything about one farmer in one place: profile, next harvest (editable), every call (opens the recap),
 // offers and answers to the planner's questions (editable).
 export default function FarmerSheet({ farmer, state, onClose }) {
@@ -192,6 +212,7 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                 <RDialog.Title className="sheet-title">{f.name}</RDialog.Title>
                 <span className="sub">{[f.village, cropLabel(f.crop), f.language, maskPhone(f.phone)].filter(Boolean).join(" · ")}</span>
                 {f.do_not_call && <Pill cls="">Asked not to be called</Pill>}
+                <PhoneAllow f={f} state={state} />
               </div>
               <RDialog.Close className="sheet-x" aria-label="Close"><span aria-hidden="true">×</span></RDialog.Close>
             </header>
@@ -233,6 +254,7 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                       <li key={o.id} className="row">
                         <span className="name">{fmtKg(o.kg)} kg to week {o.deliver_week} at {plainPrice(o.price_per_kg, o.currency || "IDR")}/kg</span>
                         <Pill cls={o.status === "approved" ? "mint" : o.status === "pending" ? "amber" : ""}>{{ pending: "Waiting for you", escalated: "Above the ceiling", approved: o.confirmed_by_voice ? "Approved · confirmed" : "Approved", rejected: "Rejected" }[o.status] || o.status}</Pill>
+                        {o.status === "approved" && <a className="btn sm ghost" href={apiUrl(offerPoUrl(o.id))} download>Purchase order</a>}
                       </li>
                     ))}
                   </ul>

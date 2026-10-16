@@ -24,6 +24,19 @@ export const OLD_URLS = { "index.html": "/", "setup.html": "/setup", "approvals.
 // Gap-fill calls ring the farmers' real phones (one at a time) when the backend has phone calls on,
 // otherwise they wait in the browser call client as demo calls.
 export const gapFillBody = (state) => ({ kind: "gap_fill", channel: state?.settings?.phone_calls ? "twilio" : "browser" });
+// The real-call allowlist: the server's numbers (REAL_CALL_ALLOWLIST) plus the ones added in the dashboard.
+// Same comparison as the backend: "+" and the digits.
+export const e164 = (phone) => `+${String(phone || "").replace(/\D/g, "")}`;
+export const numberAllowed = (state, phone) => {
+  const s = state?.settings || {};
+  if (s.allow_any_number) return true;
+  const n = e164(phone);
+  return (s.server_allowlist || []).includes(n) || (state?.allowed_numbers || []).some((x) => x.phone === n);
+};
+export const allowedEntry = (state, phone) => (state?.allowed_numbers || []).find((x) => x.phone === e164(phone)) || null;
+// Purchase orders (PDF): an approved deal, or what a finished call agreed (a draft when only a harvest was saved).
+export const offerPoUrl = (id) => `/api/offers/${encodeURIComponent(id)}/purchase-order.pdf`;
+export const callPoUrl = (id) => `/api/calls/${encodeURIComponent(id)}/purchase-order.pdf`;
 // Start or stop one campaign's calls.
 export const startUrl = (cid) => `/api/campaigns/${encodeURIComponent(cid)}/start`;
 export const stopUrl = (cid) => `/api/campaigns/${encodeURIComponent(cid)}/stop`;

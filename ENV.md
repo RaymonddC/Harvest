@@ -93,6 +93,7 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | `TWILIO_FROM_NUMBER` | none | No | Real phone channel. | GitHub variable of the same name (Settings, Secrets and variables, Actions, Variables), or `deploy/deploy.env` when running `deploy.sh` by hand |
 | `PUBLIC_BASE_URL` | none | No | The service's own https URL. `deploy.sh` sets it when Twilio is configured. | Set by `deploy.sh` automatically |
 | `REAL_CALLS_ENABLED` | `false` | No | Safety gate: real calls need this on **and** the number on the allow list. | GitHub variable of the same name (Settings, Secrets and variables, Actions, Variables), or `deploy/deploy.env` when running `deploy.sh` by hand |
+| `WEB_ALLOWLIST_MAX` | `20` | No | How many numbers planners may add to the real-call allowlist from the dashboard (Phone allowlist on the Farmers page, or a farmer's page). They count on top of `REAL_CALL_ALLOWLIST`. `0` turns adding from the dashboard off. Anyone who can sign in as a planner or coordinator can add numbers, so keep it small on a public demo. | Not passed by the deploy: the default applies |
 | `REAL_CALL_ALLOWLIST` | empty | No | Numbers a real call may dial. `*` allows any number. | GitHub variable of the same name (Settings, Secrets and variables, Actions, Variables), or `deploy/deploy.env` when running `deploy.sh` by hand |
 
 Using Vertex AI instead of an API key (the cloud default): set `GOOGLE_GENAI_USE_VERTEXAI=true`,
