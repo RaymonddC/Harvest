@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { campaignFor, cropName } from "../../campaigns.jsx";
+import { campaignFor } from "../../campaigns.jsx";
 import { api, apiUrl, can } from "../../lib.js";
 import { useUnsaved } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
@@ -14,9 +14,9 @@ const fromCampaign = (c) => ({
 // The campaign's agent: how it sounds (a ready-made persona, or name, voice and style) and the
 // planner's own questions, which it asks on harvest calls after the harvest is confirmed.
 // Answers are saved with each call (shown in its recap) and downloadable as a CSV.
-export default function AgentCard({ state, crop }) {
+export default function AgentCard({ state, cid }) {
   const act = useAct();
-  const campaign = campaignFor(state, crop);
+  const campaign = campaignFor(state, cid);
   const opts = state.settings?.agent_options || { voices: {}, styles: {}, presets: {}, question_types: {}, max_questions: 5 };
   const [form, setForm] = useState(EMPTY);
   const [dirty, setDirty] = useState(false);
@@ -59,7 +59,7 @@ export default function AgentCard({ state, crop }) {
     <form className="card agent-card" aria-labelledby="agent-title" onSubmit={save}>
       <div className="step-head">
         <h2 id="agent-title">The agent</h2>
-        <span className="sub">How the AI agent sounds on {cropName(crop)} calls, and what it asks besides the harvest. It always says it is an AI first, and prices still come only from the price range.</span>
+        <span className="sub">How the AI agent sounds on {campaign.label} calls, and what it asks besides the harvest. It always says it is an AI first, and prices still come only from the price range.</span>
       </div>
 
       <div className="agent-grid">

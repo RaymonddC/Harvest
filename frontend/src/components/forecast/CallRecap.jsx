@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api, apiUrl, callChip, can, fmtT, getSession, KIND_WORD, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { useLive } from "../../live.jsx";
+import { inCampaign, useMembership } from "../../campaigns.jsx";
 import { ActButton, Avatar, Icon, Pill } from "../../ui.jsx";
 import { shortDate } from "./Chart.jsx";
 
@@ -59,11 +60,11 @@ export default function CallRecap({ call, onClose }) {
   const { state } = useLive();
   const act = useAct();
   const [english, setEnglish] = useState(true);
+  const { of } = useMembership(state);
   const c = (call && state?.calls.find((x) => x.id === call.id)) || call;
   const harvest = c && state ? state.harvests.find((h) => h.call_id === c.id) : null;
   const offer = c && state ? state.offers.find((o) => o.call_id === c.id) : null;
-  const crop = harvest?.crop || offer?.crop;
-  const rows = state ? state.forecast.filter((r) => !crop || !r.crop || r.crop === crop) : [];
+  const rows = state ? inCampaign(state, state.forecast, c ? of(c) : null) : [];
   const hw = harvest ? weekOf(rows, harvest.ready_date) : null;
   const chip = c ? callChip(c) : null;
   const lines = c?.consent && c.transcript?.length ? c.transcript : null;

@@ -178,5 +178,29 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     (`POST /api/calls/{id}/confirm-harvest`). Also: `check_offer` refuses when the farmer's harvest is not after the gap week
     (nothing to bring forward), which the run showed the agent doing. Text farmer, not speech: still check one spoken call.
 
+17. **Business loop (code done 16 Oct, branch `claude/business-loop`).** Five additions:
+    - **Deliveries, forecast accuracy, farmer reliability** (`track_record.py`): promises are snapshotted each week, deliveries
+      come in by CSV (Forecast page, "Record deliveries") or one at a time on a farmer's page; the Forecast page shows accuracy
+      and the supply likely given each farmer's record. Demo seed has 4 finished weeks for the baseline farmers.
+    - **Impact before approving** (`GET /api/approvals/impact`): each waiting offer shows the weeks after approval, its cost,
+      premium over the reference, rival comparison and any new gap.
+    - **Harvest rounds**: the agent asks how often the farmer harvests (`every_days`, 5 to 45); later rounds are projected
+      into the forecast. Offers keep calendar weeks so they stay right when the weeks roll.
+    - **Rolling weeks and the Monday job** (`PLAN_START_AUTO`, `POST /api/jobs/weekly` with `JOB_TOKEN`, Cloud Scheduler
+      `harvest-weekly` at 06:00 Jakarta): snapshots promises, sends gap alerts and the offers digest, starts campaigns with
+      "Call every Monday" on. To enable live: set the GitHub secret `JOB_TOKEN`.
+    - **Text confirmation and planner alerts** (`messaging.py`): a written deal confirmation after the voice confirmation,
+      alerts for new gaps and waiting offers, all kept in the outbox (Approvals page). Sent over Twilio only when
+      `MESSAGING_CHANNEL` is `sms` or `whatsapp` and the number is allowlisted; the Twilio number needs A2P registration
+      (SMS) or a WhatsApp sender first. The new language templates need a native speaker's check.
+
+18. **Campaigns, farmer database, calendar, calls and agent pages (code done 16 Oct, branch `claude/campaigns-calendar`).**
+    A crop can have several campaigns, each with its own farmers (`farmer.campaign_id`, one campaign per farmer; farmers
+    from before belong to their crop's first campaign; `null` = farmer database only). Campaigns can be renamed, re-targeted
+    and removed. New pages: Farmers (every farmer, move between campaigns), Agent (persona and questions, moved off Setup),
+    Calls (the call client embedded as `call.html?embed`, next to the campaign's calls), Calendar (`GET /api/calendar`:
+    planning weeks, calls made and planned, Monday calls, harvests with projected rounds, deal weeks, deliveries). Setup is
+    now "Campaign". Price ranges stay per crop (campaigns of one crop share them).
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

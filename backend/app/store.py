@@ -12,7 +12,7 @@ import uuid
 from typing import Callable, Protocol
 
 COLLECTIONS = (
-    "farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns",
+    "farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns", "messages",
 )
 
 Listener = Callable[[str, str], None]

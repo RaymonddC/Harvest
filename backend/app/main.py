@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import hmac
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -14,7 +15,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import access, agent_profile, auth, seed_data, services
+from . import access, agent_profile, auth, calendar_view, messaging, seed_data, services, track_record
 from .call_audio import make_audio_store
 from .config import Settings, get_settings
 from .live_session import BrowserChannel, run_call
@@ -41,10 +42,12 @@ class FarmerIn(BaseModel):
     village: str = ""
     usual_kg_week: float | None = None
     can_pull_forward: bool = False
+    campaign_id: str | None = None  # on add: a campaign to put the farmer in; "" for none (the database only)
 
 
 class CsvIn(BaseModel):
     csv: str
+    campaign_id: str | None = None  # farmers upload: the campaign they join ("" for none)
 
 
 class CampaignIn(BaseModel):
@@ -57,6 +60,23 @@ class NewCampaignIn(BaseModel):
     crop: str
     target_kg_per_week: float
     weeks: int
+    name: str | None = None
+    farmer_ids: list[str] | None = None
+
+
+class CampaignEditIn(BaseModel):
+    name: str | None = None
+    target_kg_per_week: float | None = None
+    weeks: int | None = None
+
+
+class CampaignFarmersIn(BaseModel):
+    add: list[str] = []
+    remove: list[str] = []
+
+
+class RivalOfferIn(BaseModel):
+    campaign_id: str | None = None
 
 
 class LoginIn(BaseModel):
@@ -85,10 +105,22 @@ class HarvestIn(BaseModel):
     kg: float
     ready_date: str
     confidence: str = "firm"
+    every_days: float | None = None  # days between harvest rounds; later rounds are projected from it
 
 
 class AnswerIn(BaseModel):
     answer: str
+
+
+class ScheduleIn(BaseModel):
+    enabled: bool = False
+    channel: str = "browser"
+
+
+class DeliveryIn(BaseModel):
+    farmer_id: str
+    kg: float
+    date: str
 
 
 class DialIn(BaseModel):
@@ -112,6 +144,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     app.state.store = store
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"],
                        allow_headers=["*"])
+
+    @app.middleware("http")
+    async def roll_planning_weeks(request: Request, call_next):
+        """Week 1 is next week: on the first request of a new week, every handler (they all read the
+        `settings` of this closure) moves to the new weeks. Off when PLAN_START pins the dates."""
+        nonlocal settings
+        rolled = services.roll_weeks(store, settings)
+        if rolled is not settings:
+            settings = rolled
+            app.state.settings = rolled
+        return await call_next(request)
 
     def need(capability: str):
         return auth.require(settings, store, capability)
@@ -217,7 +260,9 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop,
                             "phone_calls": services.phone_calls_ready(settings),
                             "phone_calls_note": services.phone_calls_note(settings),
-                            "agent_options": agent_profile.options()}
+                            "agent_options": agent_profile.options(),
+                            "messaging_note": messaging.channel_note(settings),
+                            "weekly_job": bool(settings.job_token)}
         return data
 
     @app.get("/api/state")
@@ -251,15 +296,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     @app.get("/api/forecast.csv")
-    def forecast_csv(crop: str = ""):
-        return PlainTextResponse(services.forecast_csv(store, crop or None), media_type="text/csv",
+    def forecast_csv(crop: str = "", campaign: str = ""):
+        return PlainTextResponse(services.forecast_csv(store, campaign or crop or None), media_type="text/csv",
                                  headers={"Content-Disposition": "attachment; filename=forecast.csv"})
 
     @app.get("/api/forecast/summary")
-    async def forecast_summary(crop: str = ""):
+    async def forecast_summary(crop: str = "", campaign: str = ""):
         """Plain summary plus the gap note; Gemini rewrites the note when a key is configured."""
-        text = services.forecast_summary_text(store, settings, crop or None)
-        gap = services.first_gap_week(store, crop or services.default_crop(settings))
+        ref = campaign or crop or None
+        text = services.forecast_summary_text(store, settings, ref)
+        gap = services.first_gap_week(store, ref or (services.resolve_campaign(store, settings) or {}).get("id")
+                                      or services.default_crop(settings))
         note, by = (None, None)
         if gap and gap.get("note"):
             polished = await asyncio.to_thread(
@@ -282,12 +329,16 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def add_farmer(body: FarmerIn):
         row = body.model_dump()
         row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
-        return {"id": services.add_farmer(store, row)}
+        cid = row.pop("campaign_id", None)
+        fid = services.add_farmer(store, row, cid, settings)
+        services.recompute_forecast(store, settings)
+        return {"id": fid}
 
     @app.put("/api/farmers/{farmer_id}", dependencies=[Depends(need("farmers.manage"))])
     def edit_farmer(farmer_id: str, body: FarmerIn):
         row = body.model_dump()
         row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
+        row.pop("campaign_id", None)  # moving between campaigns: PUT /api/campaigns/{id}/farmers
         return services.update_farmer(store, farmer_id, row)
 
     @app.delete("/api/farmers/{farmer_id}", dependencies=[Depends(need("farmers.manage"))])
@@ -296,7 +347,9 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.post("/api/farmers/upload", dependencies=[Depends(need("farmers.manage"))])
     def upload(body: CsvIn):
-        return services.upload_farmers(store, settings, body.csv)
+        r = services.upload_farmers(store, settings, body.csv, body.campaign_id)
+        services.recompute_forecast(store, settings)
+        return r
 
     # The first two stay for older screens: they act on the crop in the body, or the default crop.
     @app.get("/api/calls/{call_id}/audio", dependencies=[Depends(need("calls.listen"))])
@@ -325,19 +378,41 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.post("/api/campaigns", dependencies=[Depends(need("campaign.run"))])
     def campaign_create(body: NewCampaignIn):
-        return services.create_campaign(store, settings, body.crop, body.target_kg_per_week, body.weeks)
+        return services.create_campaign(store, settings, body.crop, body.target_kg_per_week, body.weeks,
+                                        body.name, body.farmer_ids)
+
+    @app.put("/api/campaigns/{campaign_id}", dependencies=[Depends(need("campaign.run"))])
+    def campaign_edit(campaign_id: str, body: CampaignEditIn):
+        """Rename a campaign or change its weekly target or weeks to plan."""
+        return services.update_campaign(store, settings, campaign_id, body.name, body.target_kg_per_week, body.weeks)
+
+    @app.delete("/api/campaigns/{campaign_id}", dependencies=[Depends(need("campaign.run"))])
+    def campaign_delete(campaign_id: str):
+        return services.delete_campaign(store, settings, campaign_id)
+
+    @app.put("/api/campaigns/{campaign_id}/farmers", dependencies=[Depends(need("farmers.manage"))])
+    def campaign_farmers(campaign_id: str, body: CampaignFarmersIn):
+        """Move farmers from the database into this campaign, or out of it."""
+        return services.set_campaign_farmers(store, settings, campaign_id, body.add, body.remove)
+
+    @app.get("/api/calendar")
+    def calendar(start: str, end: str, campaign: str = ""):
+        """Calls, harvests, deals, deliveries and planning weeks by day, for the calendar page."""
+        try:
+            a, b = dt.date.fromisoformat(start), dt.date.fromisoformat(end)
+        except ValueError:
+            raise HTTPException(400, "Dates must look like 2026-10-19.") from None
+        return calendar_view.events(store, settings, a, b, campaign or None)
 
     @app.post("/api/campaigns/{campaign_id}/start", dependencies=[Depends(need("campaign.run"))])
     def campaign_start_one(campaign_id: str, body: CampaignIn | None = None):
-        crop = services.crop_of_campaign_id(settings, campaign_id)
-        return services.start_campaign(store, settings, body.kind if body else "collect", crop,
+        return services.start_campaign(store, settings, body.kind if body else "collect", campaign_id,
                                        body.channel if body else "browser")
 
     @app.put("/api/campaigns/{campaign_id}/agent", dependencies=[Depends(need("campaign.run"))])
     def campaign_agent(campaign_id: str, body: AgentProfileIn):
         """The campaign's persona (name, voice, speaking style) and the planner's own questions."""
-        crop = services.crop_of_campaign_id(settings, campaign_id)
-        return services.set_agent_profile(store, settings, crop, body.persona, body.questions)
+        return services.set_agent_profile(store, settings, campaign_id, body.persona, body.questions)
 
     @app.post("/api/calls/{call_id}/confirm-harvest")
     def confirm_harvest(call_id: str, actor: auth.Actor = Depends(need("farmers.manage"))):
@@ -347,7 +422,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     @app.put("/api/farmers/{farmer_id}/harvest")
     def put_harvest(farmer_id: str, body: HarvestIn, actor: auth.Actor = Depends(need("farmers.manage"))):
         """Correct or add a farmer's harvest by hand (marked as edited; the call's values are kept)."""
-        return services.edit_harvest(store, settings, farmer_id, body.kg, body.ready_date, body.confidence, actor)
+        return services.edit_harvest(store, settings, farmer_id, body.kg, body.ready_date, body.confidence, actor,
+                                     body.every_days)
 
     @app.delete("/api/farmers/{farmer_id}/harvest", dependencies=[Depends(need("farmers.manage"))])
     def remove_harvest(farmer_id: str):
@@ -358,6 +434,59 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         """Correct the answer to one of the planner's questions (the agent's version is kept)."""
         return services.edit_answer(store, call_id, question_id, body.answer, actor)
 
+    @app.put("/api/campaigns/{campaign_id}/schedule", dependencies=[Depends(need("campaign.run"))])
+    def campaign_schedule(campaign_id: str, body: ScheduleIn):
+        """Start this campaign by itself every Monday morning (Cloud Scheduler calls /api/jobs/weekly)."""
+        return services.set_weekly_schedule(store, settings, campaign_id, body.enabled, body.channel)
+
+    @app.post("/api/jobs/weekly", include_in_schema=False)
+    def jobs_weekly(x_job_token: str | None = Header(default=None)):
+        """Monday morning job: roll the weeks, snapshot promises, start the weekly campaigns."""
+        if not settings.job_token:
+            raise HTTPException(404, "The weekly job is not set up (JOB_TOKEN).")
+        if not hmac.compare_digest(x_job_token or "", settings.job_token):
+            raise HTTPException(403, "Wrong job token.")
+        return services.weekly_job(store, settings)
+
+    @app.post("/api/offers/{offer_id}/send-confirmation", dependencies=[Depends(need("offers.decide"))])
+    def send_confirmation(offer_id: str):
+        """Send (again) the written copy of an approved deal to the farmer."""
+        offer = store.get("offers", offer_id)
+        if not offer or offer.get("status") != "approved":
+            raise HTTPException(400, "Only an approved offer can be confirmed in writing.")
+        return messaging.send_deal_confirmation(store, settings, offer)
+
+    @app.get("/api/approvals/impact")
+    def get_approval_impact(crop: str = "", campaign: str = ""):
+        """What approving each waiting offer would do to the weeks, and what it costs."""
+        return services.approval_impact(store, settings, campaign or crop or None)
+
+    # ----- track record: deliveries against promises -----
+
+    @app.get("/api/track-record")
+    def get_track_record(crop: str = "", campaign: str = ""):
+        """Forecast accuracy per week, reliability counts and the likely supply for the coming weeks."""
+        return track_record.summary(store, settings, campaign or crop or None)
+
+    @app.get("/api/farmers/{farmer_id}/track-record")
+    def get_farmer_record(farmer_id: str):
+        return track_record.farmer_record(store, farmer_id)
+
+    @app.post("/api/deliveries")
+    def post_delivery(body: DeliveryIn, actor: auth.Actor = Depends(need("farmers.manage"))):
+        return track_record.record_delivery(store, settings, body.farmer_id, body.kg, body.date, actor.name)
+
+    @app.post("/api/deliveries/upload")
+    def upload_deliveries(body: CsvIn, actor: auth.Actor = Depends(need("farmers.manage"))):
+        return track_record.upload_deliveries(store, settings, body.csv, actor.name)
+
+    @app.delete("/api/deliveries/{delivery_id}", dependencies=[Depends(need("farmers.manage"))])
+    def delete_delivery(delivery_id: str):
+        if not store.get("deliveries", delivery_id):
+            raise HTTPException(404, "Delivery not found.")
+        store.delete("deliveries", delivery_id)
+        return {"deleted": delivery_id}
+
     @app.get("/api/answers.csv")
     def answers_csv():
         return PlainTextResponse(services.answers_csv(store, settings), media_type="text/csv",
@@ -365,7 +494,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.post("/api/campaigns/{campaign_id}/stop", dependencies=[Depends(need("campaign.run"))])
     def campaign_stop_one(campaign_id: str):
-        return services.stop_campaign(store, settings, services.crop_of_campaign_id(settings, campaign_id))
+        return services.stop_campaign(store, settings, campaign_id)
 
     @app.post("/api/farmers/{farmer_id}/call", dependencies=[Depends(need("campaign.run"))])
     def farmer_call(farmer_id: str, body: CallNowIn | None = None):
@@ -389,8 +518,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return services.undo_offer(store, settings, offer_id)
 
     @app.post("/api/rival-quotes/{quote_id}/offer", dependencies=[Depends(need("offers.decide"))])
-    def rival_offer(quote_id: str):
-        return services.offer_from_rival_quote(store, settings, quote_id)
+    def rival_offer(quote_id: str, body: RivalOfferIn | None = None):
+        return services.offer_from_rival_quote(store, settings, quote_id, body.campaign_id if body else None)
 
     @app.post("/api/forecast/recompute", dependencies=[Depends(need("campaign.run"))])
     def recompute():

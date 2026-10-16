@@ -39,6 +39,35 @@ def harvest_weight(harvest: dict) -> float:
     return UNSURE_WEIGHT if is_unsure(harvest) else 1.0
 
 
+MIN_EVERY_DAYS, MAX_EVERY_DAYS = 5, 45  # a harvest cycle outside this is a mistake, not a cycle
+
+
+def harvest_rounds(harvest: dict, until: dt.date) -> list[tuple[dt.date, bool]]:
+    """The harvest's dates up to `until`: the next round the farmer gave, then (when they said how often they
+    harvest) the later rounds projected from it. Each item is (date, projected)."""
+    try:
+        first = dt.date.fromisoformat(str(harvest.get("ready_date", ""))[:10])
+    except ValueError:
+        return []
+    rounds = [(first, False)]
+    every = harvest.get("every_days")
+    if isinstance(every, (int, float)) and MIN_EVERY_DAYS <= every <= MAX_EVERY_DAYS:
+        d = first + dt.timedelta(days=int(every))
+        while d <= until:
+            rounds.append((d, True))
+            d += dt.timedelta(days=int(every))
+    return rounds
+
+
+def week_of_offer(offer: dict, key: str, plan_start: dt.date, weeks: int) -> int | None:
+    """Offers keep the calendar week (deliver_week_start, from_week_start), so they stay right when the weeks
+    roll forward; older offers only have the index (deliver_week, from_week)."""
+    start = offer.get(f"{key}_start")
+    if start:
+        return week_index(start, plan_start, weeks)
+    return offer.get(key)
+
+
 def compute_forecast(
     harvests: Iterable[dict],
     offers: Iterable[dict],
@@ -54,23 +83,30 @@ def compute_forecast(
     farmers = {i: 0 for i in span}
     moved = {i: 0.0 for i in span}  # approved offers in (+) and out (-)
     pending = {i: 0.0 for i in span}
+    projected = {i: 0.0 for i in span}  # later harvest rounds, from how often the farmer harvests (weighted)
+    horizon_end = week_start(weeks, plan_start) + dt.timedelta(days=6)
 
     for h in harvests:
-        w = week_index(h.get("ready_date", ""), plan_start, weeks)
-        if not w:
-            continue
         kg = float(h.get("kg", 0))
-        farmers[w] += 1
-        if is_unsure(h):
-            unsure[w] += kg * UNSURE_WEIGHT
-            unsure_count[w] += 1
-        else:
-            firm[w] += kg
+        for date, is_projected in harvest_rounds(h, horizon_end):
+            w = week_index(date, plan_start, weeks)
+            if not w:
+                continue
+            weighted = kg * (UNSURE_WEIGHT if is_unsure(h) else 1.0)
+            if is_projected:
+                projected[w] += weighted
+                continue
+            farmers[w] += 1
+            if is_unsure(h):
+                unsure[w] += weighted
+                unsure_count[w] += 1
+            else:
+                firm[w] += kg
 
     for o in offers:
         status = o.get("status")
         kg = float(o.get("kg", 0))
-        to_w, from_w = o.get("deliver_week"), o.get("from_week")
+        to_w, from_w = week_of_offer(o, "deliver_week", plan_start, weeks), week_of_offer(o, "from_week", plan_start, weeks)
         if status == "approved":
             if to_w in moved:
                 moved[to_w] += kg
@@ -81,7 +117,7 @@ def compute_forecast(
 
     rows = []
     for i in span:
-        exp = max(firm[i] + unsure[i] + moved[i], 0.0)
+        exp = max(firm[i] + unsure[i] + projected[i] + moved[i], 0.0)
         rows.append({
             "id": week_label(i),
             "week": i,
@@ -91,6 +127,7 @@ def compute_forecast(
             "firm_kg": round(firm[i]),
             "unsure_weighted_kg": round(unsure[i]),
             "unsure_count": unsure_count[i],
+            "projected_kg": round(projected[i]),
             "approved_in_kg": round(max(moved[i], 0)),
             "pending_kg": round(pending[i]),
             "target_kg": target_kg,

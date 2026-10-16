@@ -6,7 +6,7 @@
 export const cfg = Object.assign({ apiBase: "", firebase: null, millName: "the cooperative" },
   window.HARVEST_CONFIG || {});
 
-const COLLECTIONS = ["farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns"];
+const COLLECTIONS = ["farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns", "messages"];
 
 export function apiUrl(path) {
   return (cfg.apiBase || "").replace(/\/$/, "") + path;
@@ -135,7 +135,9 @@ export const CROP_LABEL = { palm: "Palm FFB", rubber: "Rubber", coffee: "Coffee"
 export const cropLabel = (c) => CROP_LABEL[c] || (c ? c[0].toUpperCase() + c.slice(1) : "");
 export function maskPhone(phone = "") {
   const parts = phone.split(" ");
-  return parts.length >= 3 ? [...parts.slice(0, 2), "••••", parts[parts.length - 1]].join(" ") : phone;
+  if (parts.length >= 3) return [...parts.slice(0, 2), "••••", parts[parts.length - 1]].join(" ");
+  // A number without spaces (+628114617000): keep the country code and the last four digits.
+  return phone.length > 8 ? `${phone.slice(0, 3)} •••• ${phone.slice(-4)}` : phone;
 }
 export const KIND_WORD = { collect: "Harvest call", gap_fill: "Gap-fill call", confirm: "Confirmation call" };
 export const STATUS_WORD = {
@@ -233,6 +235,11 @@ export const ICON_PATHS = {
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+  farmers: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  calls: '<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>',
+  agent: '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><path d="M9 13h.01M15 13h.01"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
 };
 export function icon(name, size = 18) {
   const span = el("span", { class: "icon", "aria-hidden": "true", style: "display:inline-grid;place-items:center" });

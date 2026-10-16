@@ -36,12 +36,13 @@ def test_state_says_multi_crop_and_the_old_campaign_gets_its_crop(client, store,
 def test_create_a_campaign_and_refuse_bad_ones(client):
     r = make_rubber(client)
     assert r.status_code == 200 and r.json()["id"] == "rubber" and r.json()["weeks"] == 3
-    assert make_rubber(client).status_code == 409  # one campaign per crop
-    assert client.post("/api/campaigns", json={"crop": "palm", "target_kg_per_week": 5000, "weeks": 5}).status_code == 409
+    second = make_rubber(client)  # a crop can have several campaigns: the next one gets its own id
+    assert second.status_code == 200 and second.json()["id"].startswith("rubber-")
     assert client.post("/api/campaigns", json={"crop": "tea", "target_kg_per_week": 5000, "weeks": 5}).status_code == 400
     assert client.post("/api/campaigns", json={"crop": "coffee", "target_kg_per_week": 0, "weeks": 5}).status_code == 400
     assert client.post("/api/campaigns", json={"crop": "coffee", "target_kg_per_week": 5000, "weeks": 13}).status_code == 400
-    assert client.post("/api/campaigns", json={"crop": "karet", "target_kg_per_week": 1, "weeks": 1}).status_code == 409
+    assert client.post("/api/campaigns", json={"crop": "palm", "target_kg_per_week": 5000, "weeks": 5,
+                                               "name": "x" * 61}).status_code == 400
 
 
 def test_new_crop_has_its_own_forecast_and_palm_keeps_its_ids(client, store):
@@ -87,7 +88,7 @@ def test_start_with_nobody_to_call_says_so(client):
     make_rubber(client)
     r = client.post("/api/campaigns/rubber/start", json={"kind": "collect"})
     assert r.status_code == 400 and "Rubber farmers" in r.json()["detail"]
-    assert client.post("/api/campaigns/coffee/start", json={}).status_code == 400  # no such campaign
+    assert client.post("/api/campaigns/coffee/start", json={}).status_code == 404  # no such campaign
 
 
 def test_gap_fill_for_a_crop_needs_a_gap_and_price_limits(client, store, settings):
@@ -103,8 +104,8 @@ def test_legacy_endpoints_still_run_the_default_crop(client, store):
     r = client.post("/api/campaign/start", json={"kind": "collect"})
     assert r.status_code == 200 and r.json()["crop"] == "palm" and r.json()["queued"] > 0
     assert store.get("campaigns", "current")["status"] == "running"
-    assert client.post("/api/campaign/stop").json() == {"status": "stopped", "crop": "palm"}
-    assert client.post("/api/campaign/stop", json={"crop": "rubber"}).status_code == 400  # no rubber campaign yet
+    assert client.post("/api/campaign/stop").json() == {"status": "stopped", "crop": "palm", "campaign_id": "current"}
+    assert client.post("/api/campaign/stop", json={"crop": "rubber"}).status_code == 404  # no rubber campaign yet
     make_rubber(client)
     assert client.post("/api/campaign/stop", json={"crop": "rubber"}).json()["crop"] == "rubber"
     assert store.get("campaigns", "rubber")["status"] == "stopped"

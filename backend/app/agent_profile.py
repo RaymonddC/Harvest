@@ -56,7 +56,7 @@ class AgentProfileError(ValueError):
 
 
 def options() -> dict:
-    """Everything the Setup page offers, so the dashboard and the server use the same lists."""
+    """Everything the Agent page offers, so the dashboard and the server use the same lists."""
     return {"voices": VOICES, "styles": {k: v["label"] for k, v in STYLES.items()}, "presets": PRESETS,
             "question_types": QUESTION_TYPES, "max_questions": MAX_QUESTIONS}
 

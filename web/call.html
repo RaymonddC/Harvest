@@ -11,6 +11,8 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/call.css">
   <script src="config.js"></script>
+  <!-- Inside the dashboard's Calls page (an iframe with ?embed): no own links back, fits the frame. -->
+  <script>if (new URLSearchParams(location.search).has("embed")) document.documentElement.classList.add("embed");</script>
 </head>
 <body class="call-page">
   <div class="phone">

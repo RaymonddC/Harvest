@@ -1,6 +1,6 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { campaignFor, cropName, useCrop } from "../../campaigns.jsx";
-import { api, cfg } from "../../lib.js";
+import { api, can, cfg, startUrl, stopUrl } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Icon } from "../../ui.jsx";
 import StepTop from "./StepTop.jsx";
@@ -9,8 +9,8 @@ import StepTop from "./StepTop.jsx";
 export default function StartCalling({ state, toCall }) {
   const act = useAct();
   const navigate = useNavigate();
-  const { crop } = useCrop();
-  const campaign = campaignFor(state, crop);
+  const { cid, crop } = useCrop();
+  const campaign = campaignFor(state, cid);
   const running = campaign.status === "running";
   const s = state.settings || {};
   const minutes = Math.round((s.max_call_seconds || 360) / 60);
@@ -19,15 +19,15 @@ export default function StartCalling({ state, toCall }) {
   const byPhone = campaign.channel === "twilio";
   // channel "twilio" rings the farmers' real phones, one at a time; "browser" queues demo calls for the call client.
   const start = async (channel) => {
-    const r = await act(() => api("/api/campaign/start", { body: { kind: "collect", crop, channel } }),
+    const r = await act(() => api(startUrl(cid), { body: { kind: "collect", channel } }),
       channel === "twilio" ? (x) => `Calling phones: ${x.queued} farmers, one at a time.` : null);
-    if (r) navigate("/");
+    if (r) navigate(channel === "twilio" ? "/" : "/calls");
   };
   return (
     <section className="card dark" aria-labelledby="campaign-title">
       <StepTop n={3} done={false} word={running ? "Calling" : toCall ? "Ready" : "Waiting"} cls={running ? "leaf" : ""} />
       <div className="step-head"><h2 id="campaign-title">Start calling</h2>
-        <span className="sub">The agent asks every farmer about weeks 1 to {s.weeks || 5}, in {s.language || cfg.language || "the configured language"}.</span></div>
+        <span className="sub">The agent asks this campaign's farmers about weeks 1 to {campaign.weeks || s.weeks || 5}, each in their own language ({s.language || cfg.language || "the configured language"} when not set).</span></div>
       <div className="stats" id="campaign-lines">
         <div><b>{toCall}</b><span>{toCall === 1 ? "farmer" : "farmers"}</span></div>
         <div><b>≤ {minutes} min</b><span>per call</span></div>
@@ -35,15 +35,22 @@ export default function StartCalling({ state, toCall }) {
       </div>
       <span className="small" style={{ color: "var(--on-ink-muted)" }}>Nothing is agreed without your approval.</span>
       <span className="small" style={{ color: "var(--on-ink-muted)" }}>
-        {phoneCalls ? s.phone_calls_note : "Demo mode: calls are answered in the browser call page."}
+        {phoneCalls ? s.phone_calls_note : "Demo mode: calls are answered on the Calls page."}
       </span>
+      <label className="weekly-toggle">
+        <input type="checkbox" checked={!!campaign.weekly?.enabled} disabled={!can("campaign.run")}
+          onChange={(e) => act(() => api(`/api/campaigns/${campaign.id}/schedule`, { method: "PUT", body: { enabled: e.target.checked, channel: phoneCalls ? "twilio" : "browser" } }),
+            e.target.checked ? `Every Monday at 06:00 the agent calls these farmers${phoneCalls ? " on their phones" : ""}.` : "Weekly calls turned off.")} />
+        <span>Call every Monday at 06:00{phoneCalls ? " (phones)" : ""}
+          {campaign.weekly?.enabled && !s.weekly_job && <small> · the Monday job is not set up yet (JOB_TOKEN)</small>}</span>
+      </label>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: "auto" }}>
         {running ? <>
           <span className="pill lg dot running" style={{ alignSelf: "flex-start", background: "var(--ink-2)", color: "var(--on-ink)" }}>{byPhone ? "Calling phones, one at a time" : campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Calling farmers now"}</span>
           {byPhone
             ? <a className="btn mint big block" href="/">Watch the calls</a>
-            : <a className="btn mint big block" href="/call.html" target="_blank" rel="noopener">Open call client</a>}
-          <ActButton need="campaign.run" className="btn on-ink block" busy="Stopping…" run={() => act(() => api("/api/campaign/stop", { body: { crop } }), "Calling stopped.")}>Stop calling</ActButton>
+            : <Link className="btn mint big block" to="/calls">Answer the calls</Link>}
+          <ActButton need="campaign.run" className="btn on-ink block" busy="Stopping…" run={() => act(() => api(stopUrl(cid), { body: {} }), "Calling stopped.")}>Stop calling</ActButton>
         </> : phoneCalls ? <>
           <ActButton need="campaign.run" className="btn mint big block" busy="Starting…" disabled={!toCall} run={() => start("twilio")}>
             <Icon name="phone" />{toCall ? `Call ${toCall} ${cropName(crop)} ${toCall === 1 ? "farmer's phone" : "farmers' phones"}` : "Add farmers to start"}

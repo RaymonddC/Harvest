@@ -275,9 +275,10 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
 
     offer = store.get("offers", call["offer_id"]) if call.get("offer_id") else None
     harvest = store.get("harvests", f"h-{farmer['id']}-{farmer.get('crop', '')}")
-    # The weeks and weekly target of the crop this call is about (each campaign has its own).
-    settings = services.settings_for_crop(store, settings, farmer.get("crop"))
-    campaign = services.get_campaign(store, settings, farmer.get("crop"))  # its persona and extra questions
+    # The campaign this call is for (the call's, else the farmer's): its weeks, weekly target, persona and questions.
+    campaign = ((services.resolve_campaign(store, settings, call["campaign_id"]) if call.get("campaign_id") else None)
+                or services.campaign_of_farmer(store, settings, farmer))
+    settings = services.settings_for_campaign(settings, campaign or {})
     session = CallSession(call_id=call_id, farmer=farmer, kind=call["kind"],
                           gap_week=call.get("gap_week"), offer=offer,
                           questions=list((campaign or {}).get("questions") or []) if call["kind"] == "collect" else [])

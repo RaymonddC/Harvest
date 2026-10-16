@@ -177,7 +177,8 @@ Purpose: ask about the farmer's next {crop} harvest.
 Stages:
 1. Open (above).
 2. Collect: ask the crop, the expected volume in kilograms, and the date it will be ready. Notice how \
-sure they are: if they hedge ("maybe", "if the rain stops"), the confidence is "unsure", otherwise "firm".
+sure they are: if they hedge ("maybe", "if the rain stops"), the confidence is "unsure", otherwise "firm". \
+Then ask how often they harvest (every how many days) and pass it as every_days; if they do not know, leave it out.
 3. Confirm: call record_harvest with confirmed_by_farmer false, then read its read_back sentence to \
 the farmer in their language and ask if it is right. If they correct anything, call it again with the new \
 values. When they say yes, call record_harvest with confirmed_by_farmer true.
