@@ -6,6 +6,7 @@ from __future__ import annotations
 import datetime as dt
 
 from . import forecast as fc
+from .call_audio import recording_enabled
 from .config import Settings
 from .agent_profile import persona_rules, profile_of, questions_stage
 from .rules_engine import crop_label, normalize_crop
@@ -248,7 +249,7 @@ def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_we
 
     profile = profile_of(campaign)  # the campaign's persona and the planner's own questions
     agent = profile["persona"].get("name", "")
-    notice = notice_for(language, settings.mill_name, fmt["name"], recording=bool(settings.call_audio_dir),
+    notice = notice_for(language, settings.mill_name, fmt["name"], recording=recording_enabled(settings),
                         days=settings.call_audio_retention_days, agent=agent)
     opening = OPENING_FIXED.format(**fmt, **notice) if notice else OPENING_TRANSLATED.format(**fmt)
     if agent and not notice:

@@ -294,7 +294,11 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
         target = None  # captions are already in the target language
     translate = translate or (make_translator(settings) if target else None)
     pending_translations: set[asyncio.Task] = set()
-    audio_store = make_audio_store(settings)
+    try:
+        audio_store = make_audio_store(settings)
+    except Exception:  # noqa: BLE001  (e.g. no cloud credentials): the call goes on without a recording
+        log.exception("call %s: recording is on but the store could not be opened", call_id)
+        audio_store = None
     recorder = CallRecorder() if audio_store else None  # kept only if the farmer agreed, decided at the end
 
     async def send(payload: dict) -> None:

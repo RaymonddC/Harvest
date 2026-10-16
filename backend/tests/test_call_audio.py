@@ -13,7 +13,7 @@ import soundfile as sf
 from fastapi.testclient import TestClient
 
 from app import access, live_session
-from app.call_audio import AGENT_RATE, CallRecorder, LocalAudioStore
+from app.call_audio import AGENT_RATE, CallRecorder, GcsAudioStore, LocalAudioStore, make_audio_store, recording_enabled
 from app.main import create_app
 from app.prompt import build_system_instruction
 
@@ -184,3 +184,72 @@ def test_the_built_in_planner_role_gets_the_new_permission_once(store):
     access.ensure_defaults(store)
     assert "calls.listen" not in store.get("roles", "planner")["capabilities"]                                # and it is not given back
     assert "calls.listen" not in access.DEFAULT_ROLES["coordinator"]["capabilities"]
+
+
+# ---------- the cloud bucket ----------
+
+class FakeBlob:
+    def __init__(self, bucket, name):
+        self.bucket, self.name = bucket, name
+
+    def upload_from_string(self, data, content_type=None):
+        self.bucket.files[self.name] = (data, content_type)
+
+    def exists(self):
+        return self.name in self.bucket.files
+
+    def download_as_bytes(self):
+        return self.bucket.files[self.name][0]
+
+    def delete(self):
+        del self.bucket.files[self.name]
+
+
+class FakeBucket:
+    def __init__(self):
+        self.files = {}
+
+    def blob(self, name):
+        return FakeBlob(self, name)
+
+
+class FakeClient:
+    def __init__(self):
+        self.b = FakeBucket()
+
+    def bucket(self, name):
+        return self.b
+
+
+def test_the_bucket_store_saves_reads_and_deletes_and_never_escapes_its_name():
+    client = FakeClient()
+    st = GcsAudioStore("b", client=client)
+    assert st.save("call/../x", b"mp3") == "callx.mp3"
+    assert client.b.files["callx.mp3"] == (b"mp3", "audio/mpeg")
+    assert st.read("call/../x") == b"mp3" and st.read("nope") is None
+    assert st.delete("call/../x") is True and st.delete("call/../x") is False
+    assert st.purge(90) == 0  # the bucket's own rule deletes old files
+
+
+def test_a_bucket_setting_turns_recording_on_and_beats_the_folder(settings, tmp_path, monkeypatch):
+    assert not recording_enabled(settings)
+    s = dataclasses.replace(settings, call_audio_bucket="my-bucket")
+    assert recording_enabled(s)
+    made = []
+    monkeypatch.setattr("app.call_audio.GcsAudioStore", lambda name: made.append(name) or "gcs")
+    assert make_audio_store(dataclasses.replace(s, call_audio_dir=tmp_path)) == "gcs" and made == ["my-bucket"]
+
+
+def test_a_planner_can_delete_a_recording_now_and_the_transcript_stays(settings, store, tmp_path):
+    s = dataclasses.replace(settings, auth_required=True, jwt_secret="t" * 32, demo_password=DEMO, call_audio_dir=tmp_path / "rec")
+    LocalAudioStore(tmp_path / "rec").save("call-x", b"fake")
+    store.set("calls", "call-x", {"audio": {"name": "call-x.mp3"}, "transcript": [{"who": "farmer", "text": "hi"}]}, merge=True)
+    with TestClient(create_app(s, store)) as c:
+        assert c.delete("/api/calls/call-x/audio", headers=login(c, "viewer")).status_code == 403
+        assert (tmp_path / "rec" / "call-x.mp3").exists()
+        assert c.delete("/api/calls/call-x/audio", headers=login(c, "planner")).status_code == 200
+        assert not (tmp_path / "rec" / "call-x.mp3").exists()
+        call = store.get("calls", "call-x")
+        assert not call["audio"] and call["audio_deleted"]["at"] and call["transcript"]
+        assert c.get("/api/calls/call-x/audio", headers=login(c, "planner")).status_code == 404
+        assert c.delete("/api/calls/call-x/audio", headers=login(c, "planner")).status_code == 404

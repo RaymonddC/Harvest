@@ -84,5 +84,6 @@ else
 fi
 
 say ""
-say "Done. Bucket: gs://$BUCKET. The app will use it once the bucket store is added (TODO item 14, step 2);"
-say "until then Cloud Run still does not record calls."
+say "Done. Bucket: gs://$BUCKET."
+say "Next: set the GitHub Actions variable CALL_AUDIO_BUCKET=$BUCKET (and CALL_AUDIO_RETENTION_DAYS=$RETENTION_DAYS if not 90),"
+say "then redeploy. Until that variable is set, Cloud Run does not record calls."

@@ -142,6 +142,13 @@ export default function CallRecap({ call, onClose }) {
                     {rec.state === "loading" && <p className="muted">Loading the recording…</p>}
                     {rec.state === "error" && <p className="muted">{rec.message}</p>}
                     {rec.state === "ready" && <p className="muted small">Farmer on the left, agent on the right. Click a time to hear that line.</p>}
+                    {can("calls.listen") && (
+                      <ActButton className="btn ghost small" busy="Deleting…"
+                        run={async () => {
+                          if (!window.confirm("Delete this recording for good? The written transcript stays.")) return;
+                          await act(() => api(`/api/calls/${c.id}/audio`, { method: "DELETE" }), "Recording deleted. The transcript stays.");
+                        }}>Delete recording</ActButton>
+                    )}
                   </div>
                 )}
                 {lines ? (

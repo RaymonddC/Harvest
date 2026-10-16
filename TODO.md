@@ -153,11 +153,10 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     sides on the call's clock, a stereo MP3 encoder, a local-folder store with the 90-day clean-up), wired into `run_call` (kept only
     when the farmer consented; a failure never stops a call finishing), `GET /api/calls/{id}/audio` (capability `calls.listen`, planner
     only, 410 after the retention period), a start time (`t`) on every transcript line, the consent notice switching to the recording
-    wording when a folder is set, and an audio player with click-to-jump times in the call recap. **Not built yet:** (2) the Cloud
-    Storage bucket (script written: `deploy/setup-call-audio.sh`, Jakarta, private, delete after 91 days, soft delete off, only the Cloud Run account
-    may use it; its logic was tested against a stand-in `gcloud`, not against Google Cloud, so run it with `--check` first) and a bucket store
-    behind the same `CallAudioStore` interface (`CALL_AUDIO_BUCKET`), so recording can be switched on in the cloud (until then Cloud Run does not record: `deploy.sh` does not pass `CALL_AUDIO_DIR`); (3) a way for a
-    planner to delete a farmer's recordings by hand; (4) a check of the real thing on a live call (the tests use fake calls). Before real use:
+    wording when a folder is set, and an audio player with click-to-jump times in the call recap. **Step 2 built 16 Oct (untested against real Google Cloud):** `GcsAudioStore` (`CALL_AUDIO_BUCKET`, passed by `deploy.sh` and the workflow),
+    the bucket script `deploy/setup-call-audio.sh` (Jakarta, private, delete after 91 days, soft delete off, only the Cloud Run account may use it; run it
+    with `--check` first), and a planner's "Delete recording" button (`DELETE /api/calls/{id}/audio`; the transcript stays). **Still to do:** run the
+    script, set the `CALL_AUDIO_BUCKET` variable, and check the real thing on a live call (the tests use fake calls and a fake bucket). Before real use:
     a lawyer checks the consent wording, and a native speaker checks the Javanese and Sundanese notices.
     **Consent wording now follows the call's language** (done 15 Oct, `prompt.NOTICES`): fixed sentences for the greeting (says it is an
     AI), the identity question and the consent question in each of the five languages, instead of English for the model to translate.

@@ -368,6 +368,19 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             raise HTTPException(404, "The recording file is missing.")
         return Response(data, media_type="audio/mpeg", headers={"Cache-Control": "private, no-store"})
 
+    @app.delete("/api/calls/{call_id}/audio")
+    def call_audio_delete(call_id: str, actor=Depends(need("calls.listen"))):
+        """Delete the recording of a call now (the transcript stays). Planners only."""
+        call = store.get("calls", call_id)
+        if not call or not call.get("audio"):
+            raise HTTPException(404, "There is no recording of this call.")
+        audio_store = make_audio_store(settings)
+        if audio_store:
+            audio_store.delete(call_id)
+        store.set("calls", call_id, {"audio": None, "audio_deleted": {"by": getattr(actor, "name", None) or getattr(actor, "id", None),
+                                                                        "at": services.now_iso()}}, merge=True)
+        return {"ok": True}
+
     @app.post("/api/campaign/start", dependencies=[Depends(need("campaign.run"))])
     def campaign_start(body: CampaignIn):
         return services.start_campaign(store, settings, body.kind, body.crop or None, body.channel)

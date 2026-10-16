@@ -67,6 +67,8 @@ jobs:
           GOOGLE_CLOUD_LOCATION: ${{ vars.GOOGLE_CLOUD_LOCATION }}
           LIVE_MODEL: ${{ vars.LIVE_MODEL }}
           MULTI_CROP: ${{ vars.MULTI_CROP }}
+          CALL_AUDIO_BUCKET: ${{ vars.CALL_AUDIO_BUCKET }} # optional: records calls (with consent) into this bucket
+          CALL_AUDIO_RETENTION_DAYS: ${{ vars.CALL_AUDIO_RETENTION_DAYS }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JOB_TOKEN: ${{ secrets.JOB_TOKEN }} # optional: turns on the Monday job (Cloud Scheduler)
           # Real phone calls (Twilio). Leave the variables unset to keep them off. The auth token is

@@ -54,6 +54,7 @@ class Settings:
     seed_on_start: bool
     multi_crop: bool  # more than one crop campaign at a time (the dashboard's New campaign)
     call_audio_dir: Path | None  # where call recordings are kept; None = calls are not recorded
+    call_audio_bucket: str | None  # Cloud Storage bucket for recordings (used instead of the folder when set)
     call_audio_retention_days: int  # recordings older than this are deleted
     static_dir: Path | None
     cors_origins: tuple[str, ...]
@@ -136,6 +137,7 @@ def get_settings() -> Settings:
         seed_on_start=_bool("SEED_ON_START", store_backend == "memory"),
         multi_crop=_bool("MULTI_CROP", True),
         call_audio_dir=Path(os.environ["CALL_AUDIO_DIR"]) if os.environ.get("CALL_AUDIO_DIR") else None,
+        call_audio_bucket=os.environ.get("CALL_AUDIO_BUCKET") or None,
         call_audio_retention_days=int(os.environ.get("CALL_AUDIO_RETENTION_DAYS", "90")),
         static_dir=static_dir,
         cors_origins=tuple(

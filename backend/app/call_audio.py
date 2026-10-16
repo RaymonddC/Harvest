@@ -112,6 +112,7 @@ class CallAudioStore(Protocol):
     def save(self, call_id: str, data: bytes) -> str: ...
     def read(self, call_id: str) -> bytes | None: ...
     def purge(self, older_than_days: int) -> int: ...
+    def delete(self, call_id: str) -> bool: ...
 
 
 class LocalAudioStore:
@@ -134,6 +135,13 @@ class LocalAudioStore:
         path = self._path(call_id)
         return path.read_bytes() if path.is_file() else None
 
+    def delete(self, call_id: str) -> bool:
+        path = self._path(call_id)
+        if path.is_file():
+            path.unlink()
+            return True
+        return False
+
     def purge(self, older_than_days: int) -> int:
         """Delete recordings older than the retention period. Returns how many were removed."""
         if not self.folder.is_dir():
@@ -147,5 +155,45 @@ class LocalAudioStore:
         return gone
 
 
+class GcsAudioStore:
+    """Files in a private Cloud Storage bucket. The bucket's own lifecycle rule deletes old files (deploy/setup-call-audio.sh),
+    so purge has nothing to do; the app also refuses to play a recording past its expiry."""
+
+    def __init__(self, bucket: str, client=None) -> None:
+        if client is None:
+            from google.cloud import storage  # imported here so local runs without a bucket never need it
+            client = storage.Client()
+        self.bucket = client.bucket(bucket)
+
+    def _blob(self, call_id: str):
+        safe = "".join(ch for ch in call_id if ch.isalnum() or ch in "-_")
+        return self.bucket.blob(f"{safe}.mp3")
+
+    def save(self, call_id: str, data: bytes) -> str:
+        blob = self._blob(call_id)
+        blob.upload_from_string(data, content_type="audio/mpeg")
+        return blob.name
+
+    def read(self, call_id: str) -> bytes | None:
+        blob = self._blob(call_id)
+        return blob.download_as_bytes() if blob.exists() else None
+
+    def delete(self, call_id: str) -> bool:
+        blob = self._blob(call_id)
+        if not blob.exists():
+            return False
+        blob.delete()
+        return True
+
+    def purge(self, older_than_days: int) -> int:
+        return 0
+
+
+def recording_enabled(settings) -> bool:
+    return bool(getattr(settings, "call_audio_bucket", None) or getattr(settings, "call_audio_dir", None))
+
+
 def make_audio_store(settings) -> CallAudioStore | None:
+    if getattr(settings, "call_audio_bucket", None):
+        return GcsAudioStore(settings.call_audio_bucket)
     return LocalAudioStore(settings.call_audio_dir) if getattr(settings, "call_audio_dir", None) else None
