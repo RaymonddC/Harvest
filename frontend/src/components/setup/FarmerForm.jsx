@@ -6,7 +6,7 @@ import { useAct } from "../../toast.jsx";
 import { Dialog, DialogClose, SubmitButton } from "../../ui.jsx";
 
 const LANGUAGES = ["Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese", "Thai", "Vietnamese", "Filipino"];
-const EMPTY = { name: "", phone: "", crop: "palm", language: "Bahasa Indonesia", village: "", usual_kg_week: "", can_pull_forward: false, campaign_id: "", allow_calls: false,
+const EMPTY = { name: "", phone: "", crop: "palm", language: "Bahasa Indonesia", village: "", usual_kg_week: "", can_pull_forward: false, by_hand: false, campaign_id: "", allow_calls: false,
   plot_lat: "", plot_lng: "", plot_ha: "", certification: "" };
 
 // Add a farmer (farmer = {}, or { crop, campaign_id } to start in a campaign) or edit one (farmer = the record);
@@ -21,7 +21,7 @@ export default function FarmerForm({ farmer, onClose }) {
     setF(editing ? {
       name: farmer.name || "", phone: farmer.phone || "", crop: farmer.crop || "palm",
       language: farmer.language || "Bahasa Indonesia", village: farmer.village || "",
-      usual_kg_week: farmer.usual_kg_week || "", can_pull_forward: !!farmer.can_pull_forward,
+      usual_kg_week: farmer.usual_kg_week || "", can_pull_forward: !!farmer.can_pull_forward, by_hand: !!farmer.by_hand,
       plot_lat: farmer.plot_lat ?? "", plot_lng: farmer.plot_lng ?? "", plot_ha: farmer.plot_ha ?? "", certification: farmer.certification || "",
     } : { ...EMPTY, crop: farmer.crop || EMPTY.crop, campaign_id: farmer.campaign_id || "" });
   }, [farmer, editing]);
@@ -66,6 +66,9 @@ export default function FarmerForm({ farmer, onClose }) {
             onChange={(e) => setF({ ...f, usual_kg_week: e.target.value.replace(/[^0-9]/g, "") })} /></label>
           <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
             <input type="checkbox" checked={f.can_pull_forward} onChange={set("can_pull_forward")} /> Can bring the harvest forward
+          </label>
+          <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
+            <input type="checkbox" checked={!!f.by_hand} onChange={set("by_hand")} /> I call this farmer myself (the agent skips them)
           </label>
           {!editing && state?.settings?.phone_calls && can("campaign.run") && !state.settings.allow_any_number && (
             <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>

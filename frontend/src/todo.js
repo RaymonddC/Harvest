@@ -12,7 +12,7 @@ export function todoItems(state, cid) {
   const gap = rows.find((r) => r.is_gap);
   const over = rows.find((r) => r.is_surplus);
   const waiting = inCampaign(state, state.offers, cid).filter((o) => ["pending", "escalated"].includes(o.status)).length;
-  const { toCall, unknown, usualKg } = toCallOf(state, cid);
+  const { toCall, byHand, unknown, usualKg } = toCallOf(state, cid);
   const confirming = inCampaign(state, state.calls, cid).filter((c) => c.kind === "confirm" && ["queued", "on_call"].includes(c.status)).length;
   const items = [];
   if (running) {
@@ -24,6 +24,11 @@ export function todoItems(state, cid) {
   if (!running && toCall.length) {
     items.push({ key: "call", verb: "Call them", to: "/setup#farmer-list", tone: "amber", what: `${toCall.length} farmers need a harvest call`,
       next: unknown.length ? `Call them: about ${fmtT(usualKg)} t a week is still unknown` : "Call them: their answers were unsure" });
+  }
+  if (byHand.length) {
+    items.push({ key: "byhand", verb: "See them", to: "/setup#farmer-list", tone: "amber",
+      what: `${byHand.length} farmer${byHand.length > 1 ? "s" : ""} to call yourself`,
+      next: "Marked to call by hand: call them and enter their harvest on their card" });
   }
   if (gap) {
     const forward = (gap.shortlist || []).length;

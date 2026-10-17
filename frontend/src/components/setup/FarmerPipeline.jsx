@@ -69,7 +69,7 @@ export default function FarmerPipeline({ state, cid, title, filter, onClearFilte
   const sub = (x) => (x.stage === "offer" && x.pending ? `Offer ${fmtT(x.pending.kg)} t at ${x.pending.price_per_kg}/kg`
     : (x.stage === "deal" || x.stage === "delivered") && x.deal ? `Deal ${fmtT(x.deal.kg)} t${x.deal.delivered_kg ? `, ${fmtT(x.deal.delivered_kg)} t in` : ""}`
     : x.stage === "calling" ? "Call waiting or on now"
-    : x.reason ? REASONS[x.reason]
+    : x.reason ? (x.byHand ? `You call · ${REASONS[x.reason]}` : REASONS[x.reason])
     : x.harvest ? `${fmtT(x.harvest.kg)} t on ${new Date(`${x.harvest.ready_date}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : "");
   return (
     <section className="card pipeline" id="farmer-list" aria-labelledby="pipe-title">

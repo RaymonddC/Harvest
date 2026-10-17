@@ -1075,7 +1075,12 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
     else:
         raise ServiceError("Campaign kind must be collect or gap_fill.")
     targets = [f for f in targets if not f.get("do_not_call")]
+    by_hand = [f for f in targets if f.get("by_hand")]
+    targets = [f for f in targets if not f.get("by_hand")]  # the planner calls these personally
     if not targets:
+        if by_hand:
+            raise ServiceError(f"Every {label} farmer to call is marked to call by hand ({len(by_hand)}). "
+                               "Call them yourself and enter their harvest, or let the agent call some of them.")
         raise ServiceError(f"No {label} farmers are ready to call. Add farmers to this campaign first.")
     queued = 0
     for farmer in sorted(targets, key=lambda f: f["id"]):
@@ -1086,7 +1091,7 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
                                         "gap_week": gap_week, "crop": crop, "channel": channel}, merge=True)
     dialled = dial_next(store, settings) if channel == "twilio" else None
     return {"queued": queued, "kind": kind, "gap_week": gap_week, "crop": crop, "campaign_id": camp["id"],
-            "channel": channel, "dialled": dialled}
+            "channel": channel, "dialled": dialled, "by_hand": len(by_hand)}
 
 
 def stop_campaign(store: Store, settings: Settings, crop: str | None = None) -> dict:
@@ -1506,6 +1511,8 @@ def _farmer_fields(row: dict) -> tuple[str, dict]:
         "name": row["name"], "phone": row["phone"], "crop": crop,
         "language": language, "village": row.get("village", ""), "usual_kg_week": usual,
         "can_pull_forward": row.get("can_pull_forward", "").lower() in ("1", "yes", "true"),
+        # by_hand: the planner calls this farmer personally; the agent's campaigns skip them.
+        "by_hand": row.get("by_hand", "").lower() in ("1", "yes", "true"),
         **mill_ops.plot_fields(row),
     }
 

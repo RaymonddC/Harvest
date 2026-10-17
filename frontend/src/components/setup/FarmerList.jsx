@@ -159,6 +159,10 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
                     <Menu.Portal>
                       <Menu.Content className="hc-menu" align="end" sideOffset={4}>
                         <Menu.Item className="hc-menu-item" disabled={!can("farmers.manage")} onSelect={() => onEdit(f)}>Edit</Menu.Item>
+                        <Menu.Item className="hc-menu-item" disabled={!can("farmers.manage")}
+                          onSelect={() => act(() => api(`/api/farmers/${f.id}/by-hand`, { method: "PUT", body: { by_hand: !f.by_hand } }),
+                            f.by_hand ? `The agent will call ${f.name} again.` : `${f.name} is yours to call: the agent skips them.`)}>
+                          {f.by_hand ? "Let the agent call" : "I'll call this farmer myself"}</Menu.Item>
                         {state.calls.some((c) => c.farmer_id === f.id && c.status === "queued" && !c.dialed_at && c.kind !== "confirm") && (
                           <Menu.Item className="hc-menu-item" disabled={!can("campaign.run")}
                             onSelect={() => act(() => api(`/api/farmers/${f.id}/withdraw-calls`, { body: {} }), (r) => `${r.calls_withdrawn} waiting call${r.calls_withdrawn === 1 ? "" : "s"} for ${f.name} cancelled.`)}>Cancel waiting calls</Menu.Item>

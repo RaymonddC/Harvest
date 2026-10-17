@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { fmtT, plainPrice } from "../../lib.js";
 
 const Stat = ({ label, children, cls = "" }) => <div className={`ws-stat ${cls}`}><span>{label}</span><b className="num">{children}</b></div>;
@@ -34,10 +33,7 @@ export default function Meter({ state, week, offers }) {
         <Stat label="Approved value">{approved.length ? `${cur === "IDR" ? "Rp " : ""}${plainPrice(value, cur)}` : "–"}</Stat>
       </div>
       {remaining < 50 && original > 0 ? (
-        <div className="meter-done">
-          <span>{awaiting ? "Confirmation calls are ready to go out." : "Confirmations are done."}</span>
-          <Link className="btn leaf" to="/calls">Hear a confirmation call</Link>
-        </div>
+        <p className="sub">{awaiting ? "The agent calls each farmer to confirm their approved deal." : "Every approved deal is confirmed."}</p>
       ) : !row.is_gap && closed > 0 ? (
         <p className="sub">Week {week} is no longer flagged as a gap. {fmtT(remaining)} t is still below the target.</p>
       ) : null}

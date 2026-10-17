@@ -95,6 +95,10 @@ class ToCallIn(BaseModel):
     to_call: bool
 
 
+class ByHandIn(BaseModel):
+    by_hand: bool
+
+
 class AllowNumberIn(BaseModel):
     phone: str
     label: str = ""
@@ -475,6 +479,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def farmer_withdraw_calls(farmer_id: str):
         """Cancel the farmer's calls that have not started (demo calls not answered, retries not dialled)."""
         return services.withdraw_farmer_calls(store, settings, farmer_id)
+
+    @app.put("/api/farmers/{farmer_id}/by-hand", dependencies=[Depends(need("farmers.manage"))])
+    def put_by_hand(farmer_id: str, body: ByHandIn):
+        """Call this farmer by hand (the agent's campaigns skip them), or let the agent call them again."""
+        if not store.get("farmers", farmer_id):
+            raise HTTPException(404, "Farmer not found.")
+        store.set("farmers", farmer_id, {"by_hand": body.by_hand}, merge=True)
+        return {"farmer_id": farmer_id, "by_hand": body.by_hand}
 
     @app.put("/api/farmers/{farmer_id}/to-call", dependencies=[Depends(need("farmers.manage"))])
     def put_to_call(farmer_id: str, body: ToCallIn):

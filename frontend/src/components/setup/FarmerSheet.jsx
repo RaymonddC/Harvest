@@ -113,7 +113,7 @@ function AnswerRow({ call, qid, a }) {
 }
 
 // What the farmer promised against what they delivered, and adding or removing a delivery.
-function DeliveryBox({ farmer, stateKey }) {
+export function DeliveryBox({ farmer, stateKey }) {
   const act = useAct();
   const confirm = useConfirm();
   const [rec, setRec] = useState(null);

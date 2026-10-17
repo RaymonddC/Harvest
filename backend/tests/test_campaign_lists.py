@@ -177,3 +177,23 @@ def test_a_call_left_on_after_its_time_limit_or_on_a_removed_channel_is_ended(st
     assert store.get("calls", fresh)["status"] == "on_call"
     assert not [c for c in store.list("calls") if c.get("attempt") == 2]  # no retry for a healed call
     assert services.withdraw_farmer_calls(store, settings, f["id"])["calls_withdrawn"] == 0
+
+
+
+def test_farmers_marked_by_hand_are_left_out_of_the_agents_calls(store, settings):
+    from app import services
+    members = services.campaign_members(store, settings, "current")
+    reasons = services.call_list(store, settings, members)
+    mine = sorted(reasons)[:3]
+    for fid in mine:
+        store.set("farmers", fid, {"by_hand": True}, merge=True)
+    r = services.start_campaign(store, settings, "collect", "current")
+    called = {c["farmer_id"] for c in store.list("calls") if c["status"] == "queued"}
+    assert r["by_hand"] == 3 and not called & set(mine) and r["queued"] == len(reasons) - 3
+
+
+def test_by_hand_is_kept_from_the_farmer_form(store, settings):
+    from app import services
+    fid = services.add_farmer(store, {"name": "Pak Uji", "phone": "+62 811 0000 9999", "crop": "palm",
+                                      "language": "English", "by_hand": "yes"}, settings=settings)
+    assert store.get("farmers", fid)["by_hand"] is True
