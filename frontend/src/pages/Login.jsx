@@ -127,7 +127,6 @@ export default function Login() {
             </button>
           ))}
         </motion.div>
-        <motion.p className="small muted" {...rise(2)}>No microphone, or nobody to play the farmer? <a href="/call.html?sample=1">Watch a sample call</a>.</motion.p>
         <details className="own-account" open={!!params.get("expired") && !people?.length}>
           <summary>Sign in with a username</summary>
           <SignInForm onSignedIn={done} noDemo autoFocus={false} initialError={params.get("expired") && !people?.length ? "Your session ended. Sign in again." : ""} />

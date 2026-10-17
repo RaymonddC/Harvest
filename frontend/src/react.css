@@ -1199,6 +1199,8 @@ table.answers tr:focus-visible td { background: var(--leaf-soft); outline: none;
 
 /* Sign-in: Wilbert's person picker on the right (tile styles from app.css), one column of people */
 .login-pick.picker { max-width: 560px; gap: 20px; }
+.login-pick.picker .lp-head h1 { font-size: 26px; letter-spacing: -0.01em; }
+.login-pick.picker .lp-head p { font-size: 14.5px; }
 .login-pick.picker .roles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .login-pick.picker .role-tile { padding: 18px; }
 .login-pick.picker .role-tile .role-name { font-size: 18px; }

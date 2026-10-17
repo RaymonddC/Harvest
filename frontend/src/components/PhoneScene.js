@@ -146,6 +146,11 @@ export function startPhone(canvas, { still = false } = {}) {
     const secs = Math.floor(callT);
     header(`On the call · 00:${String(secs).padStart(2, "0")}`, true);
     const shown = Math.min(LINES.length, Math.floor(callT / PER_LINE) + 1);
+    // The chat lives below the header: older lines slide under it, never over Pak Wahyu's name.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 224, W, H - 224);
+    ctx.clip();
     // Bubbles from the newest upwards, so the latest line is always in view.
     let y = H - 40;
     const saved = callT >= LINES.length * PER_LINE;
@@ -163,7 +168,7 @@ export function startPhone(canvas, { still = false } = {}) {
       ctx.globalAlpha = 1;
       y = H - 280;
     }
-    for (let i = shown - 1; i >= 0 && y > 240; i--) {
+    for (let i = shown - 1; i >= 0 && y > 224; i--) {
       const l = LINES[i];
       const maxW = W - 130;
       const textLines = wrap(l.text, maxW, `700 36px ${FONT}`);
@@ -179,6 +184,7 @@ export function startPhone(canvas, { still = false } = {}) {
       ctx.globalAlpha = 1;
       y -= 18;
     }
+    ctx.restore();
   }
 
   // ---------- sizing and the loop ----------
