@@ -31,11 +31,13 @@ export default function Approvals() {
   // What approving each waiting offer would do (weeks, cost, new gaps), fetched again when offers change.
   const impactUrl = `/api/approvals/impact?campaign=${encodeURIComponent(cid)}`;
   const [impact, setImpact] = useState(() => peekGet(impactUrl) || null);
+  const [impactFailed, setImpactFailed] = useState(false);
   const offersKey = state ? JSON.stringify(state.offers.map((o) => [o.id, o.status, o.kg])) + JSON.stringify(state.forecast.map((r) => r.expected_kg)) : "";
   useEffect(() => {
     if (!state) return undefined;
     let live = true;
-    const t = setTimeout(() => cachedGet(impactUrl).then((r) => { if (live) setImpact(r); }).catch(() => {}), peekGet(impactUrl) ? 300 : 0);
+    const t = setTimeout(() => cachedGet(impactUrl).then((r) => { if (live) { setImpact(r); setImpactFailed(false); } })
+      .catch(() => { if (live) setImpactFailed(true); }), peekGet(impactUrl) ? 300 : 0);
     return () => { live = false; clearTimeout(t); };
   }, [offersKey, cid]); // eslint-disable-line react-hooks/exhaustive-deps
   // Only the picked campaign's offers and weeks, and its crop's rival quotes.
@@ -79,13 +81,27 @@ export default function Approvals() {
       confirm: `Approve ${easy.length} offers` });
     if (!ok) return;
     const ids = easy.map((o) => o.id);
-    await act(async () => { for (const id of ids) await api(`/api/offers/${id}/approve`); },
-      `${ids.length} offers approved. Confirmation calls are queued.`,
+    // Keep going when one fails: count both, and undo only what was approved.
+    const done = [];
+    let failed = 0, firstError = "", filled = 0;
+    await act(async () => {
+      for (const id of ids) {
+        try { await api(`/api/offers/${id}/approve`); done.push(id); } catch (err) {
+          if (err.status === 401) throw err;
+          if (err.status === 409) { filled += 1; continue; } // its week is already filled: left for the planner to decide one by one
+          failed += 1; firstError = firstError || err.message;
+        }
+      }
+      if (!done.length) throw new Error(filled && !failed ? `None approved: ${filled === 1 ? "its week is" : "their weeks are"} already filled. Open ${filled === 1 ? "it" : "them"} one by one to approve anyway.` : `None of the ${ids.length} offers could be approved: ${firstError || "their weeks are already filled"}`);
+    },
+      () => failed || filled
+        ? `Approved ${done.length} of ${ids.length}.${filled ? ` ${filled} left waiting: the week is already filled (open them to approve anyway).` : ""}${failed ? ` ${failed} failed: ${firstError}` : ""}`
+        : `${ids.length} offers approved. Confirmation calls are queued.`,
       { fn: async () => {
         // An offer whose confirmation call already started cannot be undone; undo the rest and say how many stayed.
         let locked = 0;
-        for (const id of ids) { try { await api(`/api/offers/${id}/undo`); } catch { locked += 1; } }
-        if (locked) throw new Error(`${locked} of ${ids.length} could not be undone: the confirmation call has started or finished.`);
+        for (const id of done) { try { await api(`/api/offers/${id}/undo`); } catch { locked += 1; } }
+        if (locked) throw new Error(`${locked} of ${done.length} could not be undone: the confirmation call has started or finished.`);
       }, ok: "Back to pending." });
   };
   const gap = [...view.forecast].sort((a, b) => a.week - b.week).find((r) => r.is_gap);
@@ -103,6 +119,7 @@ export default function Approvals() {
               <Icon name="approvals" size={15} />Approve {easy.length} within the price range
             </ActButton>
           ))}
+          {toDecide.length > 0 && impactFailed && <p className="small muted">The impact numbers (weeks, cost, new gaps) are unavailable right now, so they are not shown. Try again.</p>}
           <AnimatePresence initial={false}>
           {toDecide.map((o) => <Offer key={o.id} o={o} l={limits[o.crop]} row={rowFor(o)} quote={quoteFor(o)} imp={impact?.offers?.[o.id]} />)}
           </AnimatePresence>

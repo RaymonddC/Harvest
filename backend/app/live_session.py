@@ -194,9 +194,10 @@ async def open_live(stack: contextlib.AsyncExitStack, connect, model: str, confi
     so a hint can never stop a call from connecting."""
     try:
         return await stack.enter_async_context(connect(model, config))
-    except Exception:  # noqa: BLE001
-        if plain_config is None:
-            raise
+    except Exception as e:  # noqa: BLE001
+        text = str(e).lower()
+        if plain_config is None or any(w in text for w in ("1011", "resource exhausted", "resource_exhausted", "quota", "429", "unauthenticated", "permission")):
+            raise  # a second try would use more quota (or fail the same way); only a setup rejection is worth retrying
         log.warning("Live setup with a speech-to-text language hint failed; retrying without it", exc_info=True)
         return await stack.enter_async_context(connect(model, plain_config))
 
@@ -292,11 +293,11 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                 or services.campaign_of_farmer(store, settings, farmer))
     settings = services.settings_for_campaign(settings, campaign or {})
     session = CallSession(call_id=call_id, farmer=farmer, kind=call["kind"],
-                          gap_week=call.get("gap_week"), offer=offer,
+                          gap_week=services.call_gap_week(call, settings), offer=offer,
                           questions=list((campaign or {}).get("questions") or []) if call["kind"] == "collect" else [])
     handlers = ToolHandlers(store, settings, session)
     transcript = Transcript()
-    instruction = build_system_instruction(settings, farmer, call["kind"], call.get("gap_week"),
+    instruction = build_system_instruction(settings, farmer, call["kind"], services.call_gap_week(call, settings),
                                            harvest=harvest, offer=offer, campaign=campaign)
     store.set("calls", call_id, {"status": "on_call", "started_at": services.now_iso()}, merge=True)
     connect = connect or default_connect
@@ -370,7 +371,7 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
             live = await open_live(stack, connect, settings.live_model, hinted, plain)
             await send({"type": "connected", "farmer": farmer.get("name"), "village": farmer.get("village"),
                         "language": call_lang, "kind": call["kind"],
-                        "mill": settings.mill_name, "gap_week": call.get("gap_week")})
+                        "mill": settings.mill_name, "gap_week": services.call_gap_week(call, settings)})
             await live.send_client_content(
                 turns=types.Content(role="user", parts=[types.Part(text=KICKOFF)]), turn_complete=True)
 
@@ -395,11 +396,15 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                 spoke_after_end = False
                 post_end_seconds = 0.0
                 while True:
+                    got_any = False
                     async for msg in live.receive():
+                        got_any = True
                         if msg.tool_call:
                             responses = []
                             for fn in msg.tool_call.function_calls or []:
-                                result = handlers.dispatch(fn.name, fn.args)
+                                # Off the event loop: a tool saves to the store and may recompute the forecast or send an alert,
+                                # which would otherwise stall the audio of every call running on this server.
+                                result = await asyncio.to_thread(handlers.dispatch, fn.name, fn.args)
                                 ui = handlers.last_ui or {}
                                 noted = {k: ui[k] for k in ("captured", "rail", "offer_saved") if k in ui}
                                 if noted:
@@ -443,6 +448,8 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                                 close_line(len(transcript.lines) - 1)
                             if session.ended and spoke_after_end:
                                 return
+                    if not got_any:  # the Live session closed without an error: do not spin on it
+                        raise ConnectionError("The voice session closed.")
 
             async def goodbye_watchdog() -> None:
                 while not session.ended:
@@ -469,7 +476,7 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                     raise t.exception()
     except Exception as e:  # noqa: BLE001 - report any relay failure to the caller and keep data
         log.exception("call %s failed", call_id)
-        await send({"type": "error", "message": f"Voice session failed: {e}"})
+        await send({"type": "error", "message": "The voice service stopped the call. Please try again in a moment."})
     finally:
         # A peak near 0 with many chunks means the browser sent silence (microphone problem, not Gemini).
         log.info("call %s microphone input: %d chunks, %d bytes, peak %d of 32767",
@@ -482,9 +489,12 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
         if live_view["pending"] is not None:
             with contextlib.suppress(Exception):
                 await asyncio.wait_for(live_view["pending"], 3)
-        services.finish_call(store, settings, call_id, ended_cleanly=session.ended,
-                             outcome=session.outcome, summary=session.summary,
-                             consent=session.consent, transcript=transcript.cleaned())
+        try:
+            services.finish_call(store, settings, call_id, ended_cleanly=session.ended,
+                                 outcome=session.outcome, summary=session.summary,
+                                 consent=session.consent, transcript=transcript.cleaned())
+        except Exception:  # noqa: BLE001  the browser still has to be told, and the socket closed
+            log.exception("call %s: finishing the call failed", call_id)
         if recorder and session.consent:
             await keep_recording(recorder, audio_store, store, settings, call_id)
         final = store.get("calls", call_id) or {}

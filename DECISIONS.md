@@ -109,13 +109,14 @@ Why: the speech-to-text transcript can be wrong, so a planner needs to hear what
 - **Farmer deletion:** deleting a farmer does not delete their recordings straight away; they go when the 90 days end.
   Note: the Indonesian PDP Law gives data subjects a right to have processing ended and data deleted, and to withdraw consent
   (our reading of Articles 8 and 9, not verified against the official text). If a farmer asks, a planner needs a way to delete
-  that farmer's recordings by hand: build one with the recorder.
+  that farmer's recordings by hand. Built (16 Oct): the "Delete recording" button in the call recap (`DELETE /api/calls/{id}/audio`; the transcript stays).
 - **Consent wording** is fixed text per language (`prompt.NOTICES`), said in the call's language (the farmer's, or `DEMO_LANGUAGE`).
-  Today the notice says only that a written transcript is kept. When recording ships, switch `notice_for(..., recording=True)`:
-  it says the call is recorded and kept, with the recording and the transcript, for 90 days, so planners can check what was agreed.
+  With recording on (`CALL_AUDIO_BUCKET` or `CALL_AUDIO_DIR`) the notice says the call is recorded and kept, with the recording and
+  the transcript, for 90 days (`notice_for(..., recording=True)`). With recording off it still says only that a written transcript
+  is kept, with no days: an open gap (see AUDIT.md A5).
   Javanese and Sundanese wording has no native review yet.
-- **Storage:** a private Cloud Storage bucket, preferably in Jakarta (`asia-southeast2`), audio as Opus (about 1 to 2 MB a call), a
-  link made by the backend for planners. Not set up yet.
+- **Storage:** a private Cloud Storage bucket, preferably in Jakarta (`asia-southeast2`), audio as stereo MP3 (farmer left, agent right; a few
+  MB a call), streamed through the backend to planners. Built and set up 16 Oct (`deploy/setup-call-audio.sh`, `CALL_AUDIO_BUCKET`).
 - **What the law check found (not legal advice; have a lawyer confirm):** Law 27/2022 (PDP Law) lets personal data be processed with
   the data subject's consent; consent may be written or recorded, electronic or not, with equal legal force (Article 22); the person must be told
   first the purpose, the kind of data, the retention period and their rights (Article 21); and the controller must be able to prove

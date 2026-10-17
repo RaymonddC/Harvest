@@ -16,7 +16,7 @@ import datetime as dt
 
 from . import forecast as fc
 from . import services
-from .config import Settings
+from .config import Settings, today_local
 from .store import Store
 
 MAX_DAYS = 120
@@ -39,7 +39,7 @@ def events(store: Store, settings: Settings, start: dt.date, end: dt.date, campa
         raise CalendarError("The end date is before the start date.")
     if (end - start).days > MAX_DAYS:
         raise CalendarError(f"Ask for at most {MAX_DAYS} days at a time.")
-    today = today or dt.date.today()
+    today = today or today_local()
     camps = services.list_campaigns(store, settings)
     if campaign:
         camp = services.need_campaign(store, settings, campaign)

@@ -5,6 +5,7 @@ import { DeliveryBox } from "../setup/FarmerSheet.jsx";
 import { Dialog, DialogClose } from "../../ui.jsx";
 import { api, apiUrl, offerPoUrl, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
+import { useConfirm } from "../../dialogs.jsx";
 import { ActButton, Avatar, Pill } from "../../ui.jsx";
 import PriceSpot from "./PriceSpot.jsx";
 
@@ -80,6 +81,15 @@ function RecordDelivery({ o }) {
 
 export default function Offer({ o, l, row, quote, confirming = false, imp = null }) {
   const act = useAct();
+  const confirm = useConfirm();
+  // The delivery week may have filled while the offer waited: the server answers 409, and the planner decides.
+  const approve = async () => {
+    try { return await api(`/api/offers/${o.id}/approve`); } catch (err) {
+      if (err.status !== 409) throw err;
+      const anyway = await confirm({ title: "That week is already filled", body: err.message.replace(/ Reject this offer, or approve it anyway\.$/, "") + " Approving adds this fruit on top of what the mill already has for the week.", confirm: "Approve anyway", cancel: "Keep waiting" });
+      return anyway ? api(`/api/offers/${o.id}/approve?allow_full=true`) : null;
+    }
+  };
   // An escalated offer is approved at the farmer's requested price, so that is what must fit.
   const price = o.status === "escalated" && o.requested_price != null ? o.requested_price : o.price_per_kg;
   const inLimits = l && price >= l.floor_price && price <= l.ceiling_price;
@@ -100,7 +110,7 @@ export default function Offer({ o, l, row, quote, confirming = false, imp = null
             {o.status === "pending" ? <Pill cls="amber">Pending</Pill> : <Pill cls="danger">Needs planner</Pill>}
             <ActButton need="offers.decide" busy="Rejecting…" run={() => act(() => api(`/api/offers/${o.id}/reject`), `Rejected. ${o.farmer_name} will not be confirmed.`, { fn: () => api(`/api/offers/${o.id}/undo`), ok: "Back to pending." })}>Reject</ActButton>
             <ActButton need="offers.decide" className="btn leaf" busy="Approving…" disabled={!inLimits} title={inLimits ? undefined : "Outside the current floor and ceiling"}
-              run={() => act(() => api(`/api/offers/${o.id}/approve`), `Approved. A confirmation call to ${o.farmer_name} is queued.`, { fn: () => api(`/api/offers/${o.id}/undo`), ok: "Back to pending." })}>Approve</ActButton>
+              run={() => act(approve, (r) => (r ? `Approved. A confirmation call to ${o.farmer_name} is queued.` : null), { fn: () => api(`/api/offers/${o.id}/undo`), ok: "Back to pending." })}>Approve</ActButton>
           </>
         ) : (
           <>

@@ -35,15 +35,19 @@ function useRecording(c) {
   useEffect(() => {
     if (!id || !can("calls.listen")) { setRec({ state: "none" }); return undefined; }
     let url = null, live = true;
+    const ctl = new AbortController();
     setRec({ state: "loading" });
-    fetch(apiUrl(`/api/calls/${id}/audio`), { headers: { Authorization: `Bearer ${getSession()?.token || ""}` } })
+    fetch(apiUrl(`/api/calls/${id}/audio`), { headers: { Authorization: `Bearer ${getSession()?.token || ""}` }, signal: ctl.signal })
       .then(async (r) => {
-        if (!r.ok) throw new Error(r.status === 410 ? "This recording was kept for its full retention period and has been deleted." : "The recording could not be loaded.");
-        url = URL.createObjectURL(await r.blob());
-        if (live) setRec({ state: "ready", url });
+        if (!r.ok) throw new Error(r.status === 410 ? "This recording was kept for its full retention period and has been deleted."
+          : r.status === 401 ? "Your session ended. Sign in again." : "The recording could not be loaded.");
+        const blob = await r.blob();
+        if (!live) return;
+        url = URL.createObjectURL(blob);
+        setRec({ state: "ready", url });
       })
       .catch((e) => { if (live) setRec({ state: "error", message: e.message }); });
-    return () => { live = false; if (url) URL.revokeObjectURL(url); };
+    return () => { live = false; ctl.abort(); if (url) URL.revokeObjectURL(url); };
   }, [id]);
   return rec;
 }

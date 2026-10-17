@@ -10,8 +10,17 @@ from functools import lru_cache
 from pathlib import Path
 
 
+LOCAL_TZ = dt.timezone(dt.timedelta(hours=7), "WIB")  # the mill's clock: Indonesian western time, as the weekly schedule uses
+
+
+def today_local() -> dt.date:
+    """Today's date on the mill's clock. The server runs on UTC, which is still "yesterday" until 07:00 WIB, and
+    the planning weeks (they roll on Monday) and the agent's "today" must follow the mill, not the server."""
+    return dt.datetime.now(LOCAL_TZ).date()
+
+
 def next_monday(today: dt.date | None = None) -> dt.date:
-    today = today or dt.date.today()
+    today = today or today_local()
     days = (7 - today.weekday()) % 7 or 7
     return today + dt.timedelta(days=days)
 

@@ -126,6 +126,9 @@ options of that one script, not of the service, and need no entry elsewhere.
 | `JOB_TOKEN` | none | Passed to the service; when set, `deploy.sh` also creates or updates the Cloud Scheduler job `harvest-weekly`. |
 | `DEMO_PASSWORD` | `harvest-demo` | Passed to the service; also used to sign in as `dewi` when seeding. |
 | `SEED_DEMO_DATA` | `true` | Replace everything in Firestore with the demo data after deploying. Use `true` on the first deploy only. |
+| `MAX_INSTANCES` | `10` | Most Cloud Run servers `deploy.sh` allows (caps cost under a flood of calls). |
+| `CONCURRENCY` | `20` | Calls one Cloud Run server handles at once. |
+| `MEMORY` | `1Gi` | Memory per Cloud Run server (a live call keeps its audio in memory until it ends). |
 | `SKIP_API_ENABLE` | `false` | Skip enabling Google Cloud APIs. Automatic deploys set `true`. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | none | If the SID and the number are set, `deploy.sh` wires up the phone channel on every deploy. The token is never passed: it is read from the Secret Manager secret `twilio-auth-token`, which must exist first. |
 | `REAL_CALLS_ENABLED`, `REAL_CALL_ALLOWLIST` | `false`, empty | The real-call gate, passed to the service. |

@@ -7,7 +7,7 @@ import datetime as dt
 
 from . import forecast as fc
 from .call_audio import recording_enabled
-from .config import Settings
+from .config import Settings, today_local
 from .agent_profile import call_language, language_rule, persona_rules, profile_of, questions_stage, switch_languages
 from .rules_engine import crop_label, normalize_crop
 
@@ -63,6 +63,9 @@ in kilograms.
 sentence to read back), then, only after the farmer says yes to that read-back, again with confirmed_by_farmer \
 true. Never send true first. If a tool answers "read_back_required", that is a normal step, not an error: read \
 the sentence it returns to the farmer, wait for their yes, then call again with true.
+- If record_harvest answers "week_full", nothing is saved yet: the mill already has enough fruit for that week. Say so \
+kindly, offer the later week it suggests, and follow its "say" text. Never refuse the farmer: if they keep their date, \
+call record_harvest again with the same date.
 - Always finish with end_call. Call end_call before your goodbye sentence.
 
 Ending the call:
@@ -287,7 +290,7 @@ def calendar(settings: Settings) -> str:
 def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_week: int | None,
                              harvest: dict | None = None, offer: dict | None = None,
                              today: dt.date | None = None, campaign: dict | None = None) -> str:
-    today = today or dt.date.today()
+    today = today or today_local()
     profile = profile_of(campaign)  # the campaign's persona (and its languages) and the planner's own questions
     language = call_language(profile["persona"], farmer.get("language"), settings.demo_language)
     crop = crop_label(normalize_crop(farmer.get("crop") or settings.demo_crop))

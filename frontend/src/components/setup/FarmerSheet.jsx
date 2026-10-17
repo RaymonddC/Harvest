@@ -4,7 +4,7 @@ import { api, apiUrl, callChip, can, cropLabel, fmtKg, KIND_WORD, maskPhone, off
 import { AgentToggle, Notes, Standing, useCrmOf } from "./Relationship.jsx";
 import { useConfirm } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
-import { ActButton, Avatar, Pill } from "../../ui.jsx";
+import { ActButton, Avatar, needs, Pill } from "../../ui.jsx";
 import CallRecap from "../forecast/CallRecap.jsx";
 import { campaignsOf, farmerCampaign } from "../../campaigns.jsx";
 import { crmOf, REASONS, STAGES } from "../../crm.js";
@@ -99,7 +99,7 @@ function AnswerRow({ call, qid, a }) {
         <div className="a">
           <b>{a.answer === "skipped" ? "Did not answer" : a.answer}</b>
           {a.edited_by && <span className="small muted">, edited by {a.edited_by} (agent heard “{a.original}”)</span>}
-          <button type="button" className="btn sm ghost" disabled={!can("farmers.manage")} onClick={() => setValue(a.answer === "skipped" ? "" : a.answer)}>Edit</button>
+          <button type="button" className="btn sm ghost" {...needs("farmers.manage")} onClick={() => setValue(a.answer === "skipped" ? "" : a.answer)}>Edit</button>
         </div>
       ) : (
         <div className="a">

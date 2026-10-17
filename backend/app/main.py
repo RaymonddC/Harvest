@@ -726,8 +726,9 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         return {"call_id": services.dial_now(store, settings, farmer_id, body.kind if body else None)}
 
     @app.post("/api/offers/{offer_id}/approve")
-    def approve(offer_id: str, actor: auth.Actor = Depends(need("offers.decide"))):
-        return services.decide_offer(store, settings, offer_id, approve=True, actor=actor)
+    def approve(offer_id: str, allow_full: bool = False, actor: auth.Actor = Depends(need("offers.decide"))):
+        """allow_full: approve although the delivery week is already filled (the planner chose to, after the 409 warning)."""
+        return services.decide_offer(store, settings, offer_id, approve=True, actor=actor, allow_full=allow_full)
 
     @app.post("/api/offers/{offer_id}/reject")
     def reject(offer_id: str, actor: auth.Actor = Depends(need("offers.decide"))):

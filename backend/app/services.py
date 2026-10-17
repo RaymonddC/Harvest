@@ -5,16 +5,20 @@ from __future__ import annotations
 import csv
 import dataclasses
 import hashlib
+import math
 import hmac
 import datetime as dt
 import io
+import logging
 import threading
 
 from . import agent_profile
 from . import forecast as fc
-from .config import Settings, normalize_phone
-from .rules_engine import CROP_LABELS, Limits, LimitsError, normalize_crop, premium_pct
+from .config import Settings, normalize_phone, today_local
+from .rules_engine import CROP_LABELS, MAX_OFFER_KG, Limits, LimitsError, normalize_crop, premium_pct
 from .store import Store
+
+log = logging.getLogger(__name__)
 
 CALL_STATUSES = ("queued", "on_call", "done", "dropped", "declined")
 
@@ -172,9 +176,42 @@ def ensure_default_campaign(store: Store, settings: Settings) -> None:
         store.set("campaigns", "current", fill, merge=True)
 
 
+STALE_QUEUED_HOURS = 12  # a browser call nobody answered in this long is dropped
+
+
+def _parse_time(iso: str | None) -> dt.datetime | None:
+    try:
+        t = dt.datetime.fromisoformat(iso) if iso else None
+    except ValueError:
+        return None
+    return t if t is None or t.tzinfo else t.replace(tzinfo=dt.timezone.utc)
+
+
+def reap_stale_calls(store: Store, settings: Settings) -> int:
+    """Close browser calls that a restart or a lost connection left "on_call" or "queued" for good: they would keep
+    a campaign "running" for ever and block the farmer from being called again. Phone calls are handled by Twilio's status callback."""
+    now = dt.datetime.now(dt.timezone.utc)
+    gone = 0
+    for c in store.list("calls"):
+        if c.get("channel", "browser") != "browser" or c.get("status") not in ("on_call", "queued"):
+            continue
+        if c["status"] == "on_call":
+            since, limit = _parse_time(c.get("started_at")), dt.timedelta(seconds=settings.max_call_seconds + 180)
+        else:
+            since, limit = _parse_time(c.get("created_at")), dt.timedelta(hours=STALE_QUEUED_HOURS)
+        if since is None or now - since <= limit:
+            continue
+        store.set("calls", c["id"], {"status": "dropped", "outcome": "dropped", "ended_at": now_iso(),
+                                     "summary": c.get("summary") or "The call ended without a result (the connection was lost or nobody answered).",
+                                     "reaped": True}, merge=True)
+        gone += 1
+    return gone
+
+
 def refresh_campaign_status(store: Store, settings: Settings) -> None:
     """A campaign that is "running" with no call of its crop still waiting or on the phone has finished:
     mark it "done" (Start calling is offered again). Confirmation calls belong to approvals, not to the campaign."""
+    reap_stale_calls(store, settings)
     camps = store.list("campaigns")
     running = [c for c in camps if c.get("status") == "running"]
     if not running:
@@ -727,6 +764,39 @@ def first_gap_week(store: Store, crop: str | None = None) -> dict | None:
     return next((r for r in rows if r.get("is_gap")), None)
 
 
+FULL_WEEK_LOOKAHEAD = 3  # fruit cannot wait more than three weeks (see mill_ops.reschedule_harvest)
+
+
+def week_fill(store: Store, settings: Settings, camp_id: str | None, week: int, *,
+              own_kg: float = 0.0, own_pending_kg: float = 0.0) -> dict | None:
+    """How full one forecast week of a campaign is. A week is full when the supply already counted for it (expected, plus
+    offers waiting for approval) has reached the week's target, or the mill's weekly capacity.
+    own_kg / own_pending_kg: this farmer's or offer's own part of that week, taken out first so that confirming
+    one's own date or approving one's own offer is not judged against itself. None when the week is not in the forecast."""
+    row = next((r for r in store.list("forecast") if r.get("week") == week and camp_id and _row_matches(r, camp_id)), None)
+    if not row:
+        return None
+    target = float(row.get("target_kg") or 0)
+    base = max(float(row.get("expected_kg", 0)) - own_kg, 0) + max(float(row.get("pending_kg", 0)) - own_pending_kg, 0)
+    capacity = float(row.get("capacity_kg") or 0)
+    full = bool(target) and base >= target
+    room = max(target - base, 0)
+    if capacity:
+        full = full or base >= capacity
+        room = min(room, max(capacity - base, 0))
+    return {"week": week, "label": fc.week_label(week), "week_start": row.get("week_start"), "full": full,
+            "room_kg": 0 if full else round(room)}
+
+
+def next_week_with_room(store: Store, settings: Settings, camp_id: str | None, after_week: int) -> dict | None:
+    """The nearest later week (within three weeks) that still has room."""
+    for week in range(after_week + 1, after_week + FULL_WEEK_LOOKAHEAD + 1):
+        fill = week_fill(store, settings, camp_id, week)
+        if fill and not fill["full"]:
+            return fill
+    return None
+
+
 def gap_week_for_farmer(store: Store, settings: Settings, farmer: dict) -> dict | None:
     camp = campaign_of_farmer(store, settings, farmer)
     return first_gap_week(store, camp["id"] if camp else farmer_crop(settings, farmer))
@@ -817,6 +887,8 @@ def create_offer(store: Store, settings: Settings, *, farmer: dict, crop: str, k
                  status: str = "pending", requested_price: float | None = None,
                  source: str = "call", negotiation: dict | None = None, campaign: str | None = None) -> dict:
     crop = normalize_crop(crop)
+    if not math.isfinite(kg) or kg <= 0 or kg > MAX_OFFER_KG:
+        raise ServiceError(f"Volume must be between 1 and {MAX_OFFER_KG:,} kg.")
     limits = get_limits(store, crop)
     if status == "pending" and not limits.within(price):
         raise ServiceError("Price is outside the floor and ceiling.")
@@ -868,7 +940,28 @@ def create_offer(store: Store, settings: Settings, *, farmer: dict, crop: str, k
     return {**doc, "id": offer_id}
 
 
-def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool, actor=None) -> dict:
+class WeekFull(ServiceError):
+    """The offer's delivery week no longer has room. The planner may still approve it on purpose (allow_full)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status=409)
+
+
+def _refuse_if_week_full(store: Store, settings: Settings, offer: dict) -> None:
+    week = fc.week_of_offer(offer, "deliver_week", settings.plan_start, settings.weeks)
+    if not week:
+        return
+    farmers = {f["id"]: f for f in store.list("farmers")}
+    camp_id = doc_campaign(settings, offer, farmers, list_campaigns(store, settings))
+    own = float(offer.get("kg", 0)) if offer.get("status") == "pending" else 0.0
+    fill = week_fill(store, settings, camp_id, week, own_pending_kg=own)
+    if fill and fill["full"]:
+        later = next_week_with_room(store, settings, camp_id, week)
+        hint = f" {later['label']} (from {later['week_start']}) still has room." if later else ""
+        raise WeekFull(f"{fill['label']} is already filled by other supply and offers.{hint} Reject this offer, or approve it anyway.")
+
+
+def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool, actor=None, allow_full: bool = False) -> dict:
     offer = store.get("offers", offer_id)
     if not offer:
         raise ServiceError("Offer not found.")
@@ -876,6 +969,8 @@ def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool,
         raise ServiceError(f"Offer is already {offer['status']}.")
     changes = {}
     if approve:
+        if not allow_full:
+            _refuse_if_week_full(store, settings, offer)
         # An escalated offer is approved at the price the farmer asked for, not the ceiling
         # the agent quoted, so the limits must cover that request.
         escalated = offer["status"] == "escalated" and offer.get("requested_price") is not None
@@ -989,16 +1084,29 @@ def offer_from_rival_quote(store: Store, settings: Settings, quote_id: str, camp
 
 def queue_call(store: Store, farmer: dict, kind: str, gap_week: int | None = None,
                offer_id: str | None = None, attempt: int = 1, channel: str = "browser",
-               campaign_id: str | None = None) -> str:
+               campaign_id: str | None = None, gap_start: str | None = None) -> str:
+    # gap_start: the date the short week starts. The week number changes when the planning weeks roll on Monday,
+    # so a call queued on Sunday must find its week again by date (see call_gap_week).
     # "channel" names what carries the call's audio: "browser" (the only one built) today,
     # "twilio" once a real-phone adapter exists. See live_session.Channel for the seam.
     return store.add("calls", {
         "farmer_id": farmer["id"], "farmer_name": farmer.get("name", farmer["id"]),
-        "kind": kind, "status": "queued", "attempt": attempt, "gap_week": gap_week,
+        "kind": kind, "status": "queued", "attempt": attempt, "gap_week": gap_week, "gap_week_start": gap_start,
         "offer_id": offer_id, "channel": channel, "campaign_id": campaign_id,
         "created_at": now_iso(), "started_at": None,
         "ended_at": None, "summary": None, "outcome": None, "transcript": None, "consent": None,
     })
+
+
+def call_gap_week(call: dict, settings: Settings) -> int | None:
+    """The short week a call is about, as a week number in today's planning weeks. A call queued before the weeks
+    rolled (Monday) keeps the date of its week, so it still names the right week."""
+    start = call.get("gap_week_start")
+    if start:
+        index = fc.week_index(start, settings.plan_start, settings.weeks)
+        if index:
+            return index
+    return call.get("gap_week")
 
 
 def _open_call_for(store: Store, farmer_id: str, kind: str) -> bool:
@@ -1022,7 +1130,7 @@ CALL_REASONS = {
 def call_reason(farmer: dict, harvest: dict | None, today: dt.date | None = None) -> str | None:
     if farmer.get("type") == "supplier" or farmer.get("do_not_call"):
         return None
-    today = today or dt.date.today()
+    today = today or today_local()
     if not harvest:
         return "no_answer"
     ready = _date(harvest.get("ready_date"))
@@ -1039,7 +1147,7 @@ def call_list(store: Store, settings: Settings, members: list[dict], today: dt.d
     """The campaign's farmers who need a harvest call, with the reason for each."""
     harvests = {h["farmer_id"]: h for h in store.list("harvests")}
     # A harvest dated inside the planning weeks is current, even when the weeks are pinned to the past (PLAN_START).
-    cutoff = min(today or dt.date.today(), settings.plan_start)
+    cutoff = min(today or today_local(), settings.plan_start)
     out = {}
     for f in members:
         r = call_reason(f, harvests.get(f["id"]), cutoff)
@@ -1108,7 +1216,8 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
                               and (c.get("campaign_id") != camp["id"] or (c.get("attempt") or 1) > 1))
     for farmer in sorted(targets, key=lambda f: f["id"]):
         if not _open_call_for(store, farmer["id"], kind):
-            queue_call(store, farmer, kind, gap_week=gap_week, channel=channel, campaign_id=camp["id"])
+            queue_call(store, farmer, kind, gap_week=gap_week, channel=channel, campaign_id=camp["id"],
+                       gap_start=gap.get("week_start") if gap else None)
             queued += 1
     store.set("campaigns", camp["id"], {"status": "running", "kind": kind, "started_at": now_iso(),
                                         "gap_week": gap_week, "crop": crop, "channel": channel}, merge=True)
@@ -1196,7 +1305,7 @@ def call_now(store: Store, farmer_id: str, kind: str | None = None, settings: Se
         gap = first_gap_week(store, camp["id"]) if camp else None
     kind = kind or "collect"
     return queue_call(store, farmer, kind, gap_week=gap["week"] if gap else None,
-                      campaign_id=camp["id"] if camp else None)
+                      campaign_id=camp["id"] if camp else None, gap_start=gap.get("week_start") if gap else None)
 
 
 def twilio_ready(settings: Settings) -> bool:
@@ -1440,7 +1549,10 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
 
         offer = store.get("offers", call["offer_id"])
         if offer:
-            messaging.send_deal_confirmation(store, settings, offer)
+            try:  # a text that cannot be sent must not stop the call from finishing (retry, campaign status)
+                messaging.send_deal_confirmation(store, settings, offer)
+            except Exception:  # noqa: BLE001
+                log.exception("call %s: the deal confirmation text failed", call_id)
     if outcome == "stopped":
         # The farmer explicitly asked not to be called again; honour it for every future campaign.
         store.set("farmers", call["farmer_id"], {"do_not_call": True}, merge=True)
@@ -1450,7 +1562,8 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
             store.set("calls", call_id, {"retry_queued": True}, merge=True)
             queue_call(store, farmer, call["kind"], gap_week=call.get("gap_week"),
                        offer_id=call.get("offer_id"), attempt=call.get("attempt", 1) + 1,
-                       channel=call.get("channel", "browser"), campaign_id=call.get("campaign_id"))
+                       channel=call.get("channel", "browser"), campaign_id=call.get("campaign_id"),
+                       gap_start=call.get("gap_week_start"))
     refresh_campaign_status(store, settings)  # after any retry was queued: the last call ending ends the campaign
     if call.get("channel") == "twilio" and call.get("kind") in ("collect", "gap_fill"):
         _after_phone_call(store, settings)
@@ -1529,6 +1642,9 @@ def add_farmer(store: Store, row: dict, campaign_id: str | None = None, settings
         doc["campaign_id"] = campaign_id or None
     elif "campaign_id" in old:
         doc["campaign_id"] = old["campaign_id"]
+    if old.get("do_not_call"):  # a farmer who asked not to be called stays that way when the same phone is added again
+        doc["do_not_call"] = True
+        doc["to_call"] = False
     store.set("farmers", fid, doc)
     return fid
 

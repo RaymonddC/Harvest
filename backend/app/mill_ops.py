@@ -20,7 +20,7 @@ from collections import defaultdict
 
 from . import forecast as fc
 from . import services
-from .config import Settings
+from .config import Settings, today_local
 from .rules_engine import CROP_LABELS, normalize_crop
 from .store import Store
 
@@ -159,7 +159,7 @@ def supply_series(store: Store, settings: Settings, campaign: str | None, period
         raise MillOpsError("The end date is before the start date.")
     if (end - start).days > MAX_DAYS * (10 if period == "year" else 1):
         raise MillOpsError("That range is too long for this view.")
-    today = today or dt.date.today()
+    today = today or today_local()
     camp = services.need_campaign(store, settings, campaign)
     target_week = int(camp.get("target_kg_per_week") or settings.target_kg_per_week)
     wd = working_days(camp)
@@ -290,7 +290,7 @@ def add_official_price(store: Store, settings: Settings, crop: str, province: st
 def latest_official(store: Store, crop: str, province: str | None = None) -> dict | None:
     rows = [p for p in store.list("official_prices") if p.get("crop") == crop
             and (not province or p.get("province", "").lower() == province.lower())
-            and (_day(p.get("valid_from")) or dt.date.max) <= dt.date.today()]
+            and (_day(p.get("valid_from")) or dt.date.max) <= today_local()]
     return max(rows, key=lambda p: p["valid_from"], default=None)
 
 
@@ -360,7 +360,7 @@ def plot_fields(row: dict) -> dict:
 
 def plausibility(store: Store, settings: Settings, farmer: dict, today: dt.date | None = None) -> dict | None:
     """Net kg delivered by a farmer over the last 365 days against what their plot can grow."""
-    today = today or dt.date.today()
+    today = today or today_local()
     ha = farmer.get("plot_ha")
     since = today - dt.timedelta(days=365)
     net = sum(float(d.get("net_kg", d.get("kg", 0))) for d in store.list("deliveries")

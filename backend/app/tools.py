@@ -9,6 +9,8 @@ for the call screen (captured answers, the check_offer price rail).
 from __future__ import annotations
 
 import datetime as dt
+import re
+import math
 import logging
 from dataclasses import dataclass, field
 
@@ -157,11 +159,31 @@ class CallSession:
     end_refused: bool = False  # end_call was refused once because a read-back was never saved
     saved_kg: dict[str, float] = field(default_factory=dict)  # per crop: the volume saved on this call
     price_warned: set[tuple[str, float]] = field(default_factory=set)  # (crop, number) already refused as a price
+    checked_kg: dict[str, float] = field(default_factory=dict)  # per crop: the volume check_offer last priced
+    full_warned: set[tuple[str, str]] = field(default_factory=set)  # (crop, date) the farmer was already told is a full week
 
 
 def _weekday_label(date: dt.date, settings: Settings) -> str:
     w = fc.week_index(date, settings.plan_start, settings.weeks)
     return f"{fc.week_label(w) if w else 'Later'} · {date:%a}"
+
+
+_CROP_ID = re.compile(r"^[a-z0-9][a-z0-9 -]{0,39}$")
+
+
+def _crop_id(crop: str) -> str:
+    """The crop id a tool may use: normalized, and plain words only (it becomes part of stored document ids)."""
+    crop_id = normalize_crop(crop)
+    if not _CROP_ID.match(crop_id):
+        raise ValueError(f"{crop!r} is not a crop name")
+    return crop_id
+
+
+def _volume(kg) -> float:
+    kg = float(kg)
+    if not math.isfinite(kg) or kg <= 0:
+        raise ValueError("kg must be a positive number")
+    return kg
 
 
 class ToolHandlers:
@@ -183,6 +205,10 @@ class ToolHandlers:
             result = {"error": str(e)}
         except (TypeError, ValueError) as e:
             result = {"error": f"Bad arguments for {name}: {e}"}
+        except Exception as e:  # noqa: BLE001  a store or network failure must not end the call
+            log.exception("tool %s failed", name, extra={"call_id": self.session.call_id})
+            result = {"error": f"{name} could not be done right now ({type(e).__name__}). Carry on with the call and tell "
+                               "the farmer the planner will follow up if it matters."}
         log.info("tool %s(%s) -> %s", name, args, result, extra={"call_id": self.session.call_id})
         return result
 
@@ -216,8 +242,8 @@ class ToolHandlers:
     def _tool_record_harvest(self, crop: str, kg: float, ready_date: str,
                              confirmed_by_farmer: bool, confidence: str = "firm",
                              every_days: float | None = None) -> dict:
-        crop_id = normalize_crop(crop)
-        kg = float(kg)
+        crop_id = _crop_id(crop)
+        kg = _volume(kg)
         try:
             date = dt.date.fromisoformat(str(ready_date)[:10])
         except ValueError:
@@ -232,6 +258,9 @@ class ToolHandlers:
                              "Do not change the harvest. If the farmer named a price, use it as farmer_counter_price "
                              "in check_offer. Only if they clearly said a NEW volume in kilograms, ask them to "
                              "confirm it and call this again."}
+        full = self._full_week_warning(crop_id, kg, date)
+        if full:
+            return full
         self.last_ui = {"captured": {"crop": crop_label(crop_id), "kg": round(kg),
                                      "ready": _weekday_label(date, self.settings),
                                      "confidence": confidence.title(),
@@ -275,7 +304,47 @@ class ToolHandlers:
                                          kg, date.isoformat(), self.session.call_id, confidence, every)
         self.session.saved_kg[crop_id] = kg
         self.store.set("calls", self.session.call_id, {"harvest_read_back": None}, merge=True)
+        if (crop_id, date.isoformat()) in self.session.full_warned and result.get("harvest_id"):
+            # The farmer was told the week is full and kept the date: the planner sees it on the harvest.
+            self.store.set("harvests", result["harvest_id"], {"week_full": {"week": result.get("week_label"),
+                                                                           "kept_by_farmer": True}}, merge=True)
         return {"saved": True, **result}
+
+    def _full_week_warning(self, crop_id: str, kg: float, date: dt.date) -> dict | None:
+        """First time the farmer names a week the mill already has enough for, nothing is saved: the agent tells the
+        farmer and offers the nearest later week with room. If the farmer keeps the date, the second try saves it
+        (flagged for the planner), so a farmer can never be refused."""
+        key = (crop_id, date.isoformat())
+        if key in self.session.full_warned or self.session.farmer.get("type") == "supplier":
+            return None
+        camp = services.campaign_of_farmer(self.store, self.settings, self.session.farmer)
+        if not camp:
+            return None
+        weeks = services.campaign_weeks(self.settings, camp)
+        week = fc.week_index(date, self.settings.plan_start, weeks)
+        if not week:
+            return None
+        old = self.store.get("harvests", f"h-{self.session.farmer['id']}-{crop_id}")
+        own = 0.0
+        if old and fc.week_index(old["ready_date"], self.settings.plan_start, weeks) == week:
+            own = float(old.get("kg", 0)) * fc.harvest_weight(old)  # the farmer's current record is not "other supply"
+        fill = services.week_fill(self.store, self.settings, camp["id"], week, own_kg=own)
+        if not fill or not fill["full"]:
+            return None
+        self.session.full_warned.add(key)
+        later = services.next_week_with_room(self.store, self.settings, camp["id"], week)
+        if later:
+            ask = (f"Tell the farmer, kindly, that the mill already has enough fruit for {fill['label']} and ask whether they "
+                   f"could deliver around {later['week_start']} ({later['label']}) instead; fruit can wait a few days but not "
+                   "longer than three weeks. If they agree, call record_harvest with that new date. If they want to keep "
+                   "their date, call record_harvest again with the same date and it will be saved for the planner to sort out.")
+        else:
+            ask = (f"Tell the farmer that the mill already has enough fruit for {fill['label']} and no later week within three "
+                   "weeks has room right now. Ask what they prefer; if they keep their date, call record_harvest again "
+                   "with the same date and it will be saved for the planner to sort out. Do not promise anything.")
+        return {"saved": False, "status": "week_full", "week": fill["label"],
+                "suggested_week": later["label"] if later else None,
+                "suggested_from": later["week_start"] if later else None, "say": ask}
 
     def _note_read_back(self, crop_id: str, kg: float, date: dt.date, confidence: str) -> None:
         self.store.set("calls", self.session.call_id, {"harvest_read_back": {
@@ -331,6 +400,8 @@ class ToolHandlers:
         rung = self.session.rung_index.get(crop_id, -1)
         decision = rules_engine.check_offer(limits, rung, float(kg), counter)
         self.session.rung_index[crop_id] = decision.rung_index
+        if decision.decision != "invalid":
+            self.session.checked_kg[crop_id] = float(kg)
         if decision.price is not None and decision.decision != "invalid":
             # The escalate decision hands back the ceiling as the best price the agent may still say.
             self.session.quoted_prices.setdefault(crop_id, set()).add(decision.price)
@@ -356,7 +427,8 @@ class ToolHandlers:
                          farmer_requested_price: float | None = None) -> dict:
         if self.session.kind == "confirm":
             return {"error": "This is a confirmation call. Do not save new offers."}
-        crop_id = normalize_crop(crop)
+        crop_id = _crop_id(crop)
+        kg = _volume(kg)
         price = round(float(price_per_kg), 2)
         quoted = self.session.quoted_prices.get(crop_id, set())
         negotiation = {"first_offer": self.session.first_offer.get(crop_id),
@@ -377,6 +449,9 @@ class ToolHandlers:
         if price not in quoted:
             return {"error": "That price was not returned by check_offer on this call. "
                              "Call check_offer and use its price."}
+        if kg > self.session.checked_kg.get(crop_id, 0) + 0.5:
+            return {"error": "You are saving more kilograms than the volume check_offer priced. Call check_offer "
+                             "again with this volume, then save."}
         offer = services.create_offer(self.store, self.settings, farmer=self.session.farmer, crop=crop_id,
                                       kg=float(kg), price=price, deliver_week=self.session.gap_week,
                                       call_id=self.session.call_id, negotiation=negotiation)

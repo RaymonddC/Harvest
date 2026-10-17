@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { api, cachedGet, can, peekGet } from "../../lib.js";
+import { api, cachedGet, peekGet } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
-import { ActButton } from "../../ui.jsx";
+import { ActButton, needs } from "../../ui.jsx";
 
 const t = (kg) => `${(kg / 1000).toFixed(1)} t`;
 const pct = (x) => `${Math.round(x * 100)}%`;
@@ -18,9 +18,10 @@ export default function TrackRecord({ cid, rows, refreshKey }) {
   const [open, setOpen] = useState(false);
   const [csv, setCsv] = useState(SAMPLE);
   const [tick, setTick] = useState(0);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     let live = true;
-    cachedGet(url).then((d) => { if (live) setData(d); }).catch(() => {});
+    cachedGet(url).then((d) => { if (live) { setData(d); setFailed(false); } }).catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
   }, [cid, refreshKey, tick]);
 
@@ -31,14 +32,21 @@ export default function TrackRecord({ cid, rows, refreshKey }) {
   };
   const readFile = async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); };
 
-  if (!data) return null;
+  if (!data) {
+    return failed ? (
+      <section className="card track-card" aria-labelledby="track-title">
+        <div className="card-head"><h2 id="track-title">Track record</h2></div>
+        <p className="small muted">Could not load this. Try again.</p>
+      </section>
+    ) : null;
+  }
   const max = Math.max(1, ...data.weeks.flatMap((w) => [w.promised, w.delivered]));
   const likely = data.likely || {};
   return (
     <section className="card track-card" aria-labelledby="track-title">
       <div className="card-head">
         <h2 id="track-title">Track record</h2>
-        <button type="button" className="btn sm" disabled={!can("farmers.manage")} onClick={() => setOpen(!open)}>{open ? "Close" : "Record deliveries"}</button>
+        <button type="button" className="btn sm" {...needs("farmers.manage")} onClick={() => setOpen(!open)}>{open ? "Close" : "Record deliveries"}</button>
       </div>
       {open && (
         <div className="track-upload">
