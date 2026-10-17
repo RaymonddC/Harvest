@@ -31,12 +31,13 @@ export default function Approvals() {
   const { cid, crop } = useCrop();
   // What approving each waiting offer would do (weeks, cost, new gaps), fetched again when offers change.
   const [impact, setImpact] = useState(null);
+  const [impactFailed, setImpactFailed] = useState(false);
   const offersKey = state ? JSON.stringify(state.offers.map((o) => [o.id, o.status, o.kg])) + JSON.stringify(state.forecast.map((r) => r.expected_kg)) : "";
   useEffect(() => {
     if (!state) return undefined;
     let live = true;
     const t = setTimeout(() => api(`/api/approvals/impact?campaign=${encodeURIComponent(cid)}`, { method: "GET" })
-      .then((r) => { if (live) setImpact(r); }).catch(() => {}), 300);
+      .then((r) => { if (live) { setImpact(r); setImpactFailed(false); } }).catch(() => { if (live) setImpactFailed(true); }), 300);
     return () => { live = false; clearTimeout(t); };
   }, [offersKey, cid]); // eslint-disable-line react-hooks/exhaustive-deps
   // Only the picked campaign's offers and weeks, and its crop's rival quotes.
@@ -80,13 +81,26 @@ export default function Approvals() {
       confirm: `Approve ${easy.length} offers` });
     if (!ok) return;
     const ids = easy.map((o) => o.id);
-    await act(async () => { for (const id of ids) await api(`/api/offers/${id}/approve`); },
-      `${ids.length} offers approved. Confirmation calls are queued.`,
+    // Keep going when one fails: count both, and undo only what was approved.
+    const done = [];
+    let failed = 0, firstError = "";
+    await act(async () => {
+      for (const id of ids) {
+        try { await api(`/api/offers/${id}/approve`); done.push(id); } catch (err) {
+          if (err.status === 401) throw err;
+          failed += 1; firstError = firstError || err.message;
+        }
+      }
+      if (!done.length) throw new Error(`None of the ${ids.length} offers could be approved: ${firstError}`);
+    },
+      () => failed
+        ? `Approved ${done.length} of ${ids.length}. ${failed} failed: ${firstError}`
+        : `${ids.length} offers approved. Confirmation calls are queued.`,
       { fn: async () => {
         // An offer whose confirmation call already started cannot be undone; undo the rest and say how many stayed.
         let locked = 0;
-        for (const id of ids) { try { await api(`/api/offers/${id}/undo`); } catch { locked += 1; } }
-        if (locked) throw new Error(`${locked} of ${ids.length} could not be undone: the confirmation call has started or finished.`);
+        for (const id of done) { try { await api(`/api/offers/${id}/undo`); } catch { locked += 1; } }
+        if (locked) throw new Error(`${locked} of ${done.length} could not be undone: the confirmation call has started or finished.`);
       }, ok: "Back to pending." });
   };
   const gap = [...view.forecast].sort((a, b) => a.week - b.week).find((r) => r.is_gap);
@@ -104,6 +118,7 @@ export default function Approvals() {
               <Icon name="approvals" size={15} />Approve {easy.length} within the price range
             </ActButton>
           ))}
+          {toDecide.length > 0 && impactFailed && <p className="small muted">The impact numbers (weeks, cost, new gaps) are unavailable right now, so they are not shown. Try again.</p>}
           <AnimatePresence initial={false}>
           {toDecide.map((o) => <Offer key={o.id} o={o} l={limits[o.crop]} row={rowFor(o)} quote={quoteFor(o)} imp={impact?.offers?.[o.id]} />)}
           </AnimatePresence>

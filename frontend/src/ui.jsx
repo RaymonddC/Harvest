@@ -1,5 +1,6 @@
 import * as RDialog from "@radix-ui/react-dialog";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { can, getSession, ICON_PATHS, initials, roleLabel } from "./lib.js";
 
 // Props that switch a control off, with the reason, when the signed-in role lacks the right.
@@ -53,7 +54,10 @@ export function ActButton({ run, busy: busyText, children, className = "btn", di
   useEffect(() => () => { alive.current = false; }, []);
   const click = async (e) => {
     setBusy(true);
-    try { await run(e); } finally { if (alive.current) setBusy(false); }
+    try { await run(e); } catch (err) {
+      // act() already reports its own failures and does not rethrow; this is for unexpected throws.
+      toast.error(err?.message || "Something went wrong.");
+    } finally { if (alive.current) setBusy(false); }
   };
   return (
     <button type="button" className={className} disabled={disabled || busy || gate.disabled} aria-busy={busy || undefined} onClick={click} {...rest} title={gate.title || rest.title}>

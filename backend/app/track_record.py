@@ -21,7 +21,7 @@ import io
 from collections import defaultdict
 
 from . import forecast as fc
-from .config import Settings, normalize_phone
+from .config import Settings, normalize_phone, today_local
 from .rules_engine import normalize_crop
 from .services import ServiceError
 from .store import Store
@@ -145,7 +145,7 @@ def record_delivery(store: Store, settings: Settings, farmer_id: str, kg: float,
         day = dt.date.fromisoformat(str(date)[:10])
     except ValueError as e:
         raise TrackRecordError("The delivery date must be YYYY-MM-DD.") from e
-    if day > dt.date.today() + dt.timedelta(days=1):
+    if day > today_local() + dt.timedelta(days=1):
         raise TrackRecordError("A delivery cannot be in the future.")
     if not 0 < float(kg) <= 200_000:
         raise TrackRecordError("Delivered kg must be between 1 and 200000.")

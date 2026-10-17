@@ -9,6 +9,8 @@ for the call screen (captured answers, the check_offer price rail).
 from __future__ import annotations
 
 import datetime as dt
+import re
+import math
 import logging
 from dataclasses import dataclass, field
 
@@ -157,11 +159,30 @@ class CallSession:
     end_refused: bool = False  # end_call was refused once because a read-back was never saved
     saved_kg: dict[str, float] = field(default_factory=dict)  # per crop: the volume saved on this call
     price_warned: set[tuple[str, float]] = field(default_factory=set)  # (crop, number) already refused as a price
+    checked_kg: dict[str, float] = field(default_factory=dict)  # per crop: the volume check_offer last priced
 
 
 def _weekday_label(date: dt.date, settings: Settings) -> str:
     w = fc.week_index(date, settings.plan_start, settings.weeks)
     return f"{fc.week_label(w) if w else 'Later'} · {date:%a}"
+
+
+_CROP_ID = re.compile(r"^[a-z0-9][a-z0-9 -]{0,39}$")
+
+
+def _crop_id(crop: str) -> str:
+    """The crop id a tool may use: normalized, and plain words only (it becomes part of stored document ids)."""
+    crop_id = normalize_crop(crop)
+    if not _CROP_ID.match(crop_id):
+        raise ValueError(f"{crop!r} is not a crop name")
+    return crop_id
+
+
+def _volume(kg) -> float:
+    kg = float(kg)
+    if not math.isfinite(kg) or kg <= 0:
+        raise ValueError("kg must be a positive number")
+    return kg
 
 
 class ToolHandlers:
@@ -183,6 +204,10 @@ class ToolHandlers:
             result = {"error": str(e)}
         except (TypeError, ValueError) as e:
             result = {"error": f"Bad arguments for {name}: {e}"}
+        except Exception as e:  # noqa: BLE001  a store or network failure must not end the call
+            log.exception("tool %s failed", name, extra={"call_id": self.session.call_id})
+            result = {"error": f"{name} could not be done right now ({type(e).__name__}). Carry on with the call and tell "
+                               "the farmer the planner will follow up if it matters."}
         log.info("tool %s(%s) -> %s", name, args, result, extra={"call_id": self.session.call_id})
         return result
 
@@ -216,8 +241,8 @@ class ToolHandlers:
     def _tool_record_harvest(self, crop: str, kg: float, ready_date: str,
                              confirmed_by_farmer: bool, confidence: str = "firm",
                              every_days: float | None = None) -> dict:
-        crop_id = normalize_crop(crop)
-        kg = float(kg)
+        crop_id = _crop_id(crop)
+        kg = _volume(kg)
         try:
             date = dt.date.fromisoformat(str(ready_date)[:10])
         except ValueError:
@@ -328,6 +353,8 @@ class ToolHandlers:
         rung = self.session.rung_index.get(crop_id, -1)
         decision = rules_engine.check_offer(limits, rung, float(kg), counter)
         self.session.rung_index[crop_id] = decision.rung_index
+        if decision.decision != "invalid":
+            self.session.checked_kg[crop_id] = float(kg)
         if decision.price is not None and decision.decision != "invalid":
             # The escalate decision hands back the ceiling as the best price the agent may still say.
             self.session.quoted_prices.setdefault(crop_id, set()).add(decision.price)
@@ -353,7 +380,8 @@ class ToolHandlers:
                          farmer_requested_price: float | None = None) -> dict:
         if self.session.kind == "confirm":
             return {"error": "This is a confirmation call. Do not save new offers."}
-        crop_id = normalize_crop(crop)
+        crop_id = _crop_id(crop)
+        kg = _volume(kg)
         price = round(float(price_per_kg), 2)
         quoted = self.session.quoted_prices.get(crop_id, set())
         negotiation = {"first_offer": self.session.first_offer.get(crop_id),
@@ -374,6 +402,9 @@ class ToolHandlers:
         if price not in quoted:
             return {"error": "That price was not returned by check_offer on this call. "
                              "Call check_offer and use its price."}
+        if kg > self.session.checked_kg.get(crop_id, 0) + 0.5:
+            return {"error": "You are saving more kilograms than the volume check_offer priced. Call check_offer "
+                             "again with this volume, then save."}
         offer = services.create_offer(self.store, self.settings, farmer=self.session.farmer, crop=crop_id,
                                       kg=float(kg), price=price, deliver_week=self.session.gap_week,
                                       call_id=self.session.call_id, negotiation=negotiation)

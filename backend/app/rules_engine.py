@@ -6,6 +6,7 @@ price it may say next. save_offer then refuses any price check_offer did not han
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass
 
 MAX_OFFER_KG = 200_000
@@ -139,7 +140,7 @@ def check_offer(
     ladder = offer_ladder(limits)
     last = len(ladder) - 1
 
-    if kg is None or kg <= 0 or kg > MAX_OFFER_KG:
+    if kg is None or not math.isfinite(kg) or kg <= 0 or kg > MAX_OFFER_KG:
         return OfferDecision("invalid", False, None, rung_index, False, None,
                              f"Volume must be between 1 and {MAX_OFFER_KG} kg.")
 

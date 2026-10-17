@@ -131,6 +131,7 @@ export default function Shell({ title, head, children }) {
     const onKey = (e) => {
       const t = e.target;
       if (e.ctrlKey || e.metaKey || e.altKey || t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName)) return;
+      if (document.querySelector("[role=dialog]")) return; // a modal is open: leave the keys alone
       if (e.key === "?") { e.preventDefault(); setHelp(true); return; }
       if (e.key === "/") {
         const box = document.querySelector('input[type="search"]');

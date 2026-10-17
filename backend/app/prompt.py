@@ -7,7 +7,7 @@ import datetime as dt
 
 from . import forecast as fc
 from .call_audio import recording_enabled
-from .config import Settings
+from .config import Settings, today_local
 from .agent_profile import call_language, language_rule, persona_rules, profile_of, questions_stage, switch_languages
 from .rules_engine import crop_label, normalize_crop
 
@@ -242,7 +242,7 @@ def calendar(settings: Settings) -> str:
 def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_week: int | None,
                              harvest: dict | None = None, offer: dict | None = None,
                              today: dt.date | None = None, campaign: dict | None = None) -> str:
-    today = today or dt.date.today()
+    today = today or today_local()
     profile = profile_of(campaign)  # the campaign's persona (and its languages) and the planner's own questions
     language = call_language(profile["persona"], farmer.get("language"), settings.demo_language)
     crop = crop_label(normalize_crop(farmer.get("crop") or settings.demo_crop))

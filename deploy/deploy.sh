@@ -89,9 +89,14 @@ case "$GEMINI_BACKEND" in
   *) echo "GEMINI_BACKEND must be vertex or api_key (got: $GEMINI_BACKEND)" >&2; exit 1 ;;
 esac
 
-# WebSocket calls: long timeout, session affinity, one warm instance for the demo.
+# WebSocket calls: long timeout, session affinity, one warm instance for the demo. The caps keep a flood of calls from
+# running up Vertex cost or running a server out of memory (each live call holds its audio in memory until it ends).
+MAX_INSTANCES="${MAX_INSTANCES:-10}"
+CONCURRENCY="${CONCURRENCY:-20}"
+MEMORY="${MEMORY:-1Gi}"
 gcloud run deploy "$SERVICE" --source "$ROOT/backend" --region "$REGION" \
   --allow-unauthenticated --timeout 3600 --session-affinity --min-instances 1 \
+  --max-instances "$MAX_INSTANCES" --concurrency "$CONCURRENCY" --memory "$MEMORY" --cpu-boost \
   --set-env-vars "$ENV_VARS" "${GEMINI_SECRET_FLAGS[@]}"
 
 gcloud run jobs deploy "$JOB" --source "$ROOT/backend" --region "$REGION" \
