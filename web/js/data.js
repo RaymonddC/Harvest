@@ -156,6 +156,13 @@ export function elapsed(iso) {
 const PHONE_OUTCOME = { no_answer: "No answer", busy: "Busy", failed: "Call failed", canceled: "Cancelled",
   not_connected: "Not connected", skipped: "Skipped" };
 export function callChip(c) {
+  if (c.channel === "whatsapp") {  // a WhatsApp chat with the agent (backend whatsapp.py)
+    if (c.status === "on_call") return { cls: "leaf", text: c.whatsapp_live ? "WhatsApp · chat open" : "WhatsApp · demo chat open" };
+    if (c.status === "done") return { cls: "mint", text: "WhatsApp · done" };
+    if (c.status === "declined") return { cls: "", text: "WhatsApp · declined" };
+    if (c.status === "dropped") return { cls: "", text: c.outcome === "no_reply" ? "WhatsApp · no reply" : "WhatsApp · ended" };
+    return { cls: "", text: "WhatsApp · waiting" };
+  }
   const phone = c.channel === "twilio";
   const tag = phone ? "Phone · " : "";
   if (c.status === "on_call") return { cls: "leaf", text: `${tag}On call · ${elapsed(c.started_at)}` };
@@ -241,6 +248,7 @@ export const ICON_PATHS = {
   agent: '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><path d="M9 13h.01M15 13h.01"/>',
   overview: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
 };
 export function icon(name, size = 18) {
   const span = el("span", { class: "icon", "aria-hidden": "true", style: "display:inline-grid;place-items:center" });

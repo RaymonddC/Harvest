@@ -79,7 +79,8 @@ class Settings:
     plan_start_auto: bool = False
     job_token: str | None = None  # protects POST /api/jobs/weekly (Cloud Scheduler sends it as X-Job-Token)
     messaging_channel: str = "off"  # "sms" or "whatsapp" sends texts over Twilio; "off" only records them
-    twilio_whatsapp_from: str | None = None  # the WhatsApp sender, when messaging_channel is "whatsapp"
+    twilio_whatsapp_from: str | None = None  # the WhatsApp sender: texts (messaging_channel "whatsapp") and the chat agent
+    twilio_whatsapp_opening_sid: str | None = None  # Content SID of the approved template that opens a WhatsApp chat
     planner_alert_to: tuple[str, ...] = ()  # numbers that get the planner's alerts (gaps, waiting offers)
     web_allowlist_max: int = 20  # numbers planners may add to the real-call allowlist from the dashboard; 0 turns it off
 
@@ -149,6 +150,7 @@ def get_settings() -> Settings:
         job_token=os.environ.get("JOB_TOKEN") or None,
         messaging_channel=(os.environ.get("MESSAGING_CHANNEL") or "off").strip().lower(),
         twilio_whatsapp_from=os.environ.get("TWILIO_WHATSAPP_FROM") or None,
+        twilio_whatsapp_opening_sid=os.environ.get("TWILIO_WHATSAPP_OPENING_SID") or None,
         planner_alert_to=tuple(normalize_phone(n) for n in (os.environ.get("PLANNER_ALERT_TO") or "").split(",")
                                if n.strip()),
         web_allowlist_max=max(0, int(os.environ.get("WEB_ALLOWLIST_MAX") or "20")),

@@ -417,6 +417,9 @@ def scheduled_calls(store: Store, settings: Settings, now: dt.datetime | None = 
     local = (now or dt.datetime.now(dt.timezone.utc)).astimezone(SCHEDULE_TZ)
     camps = list_campaigns(store, settings)
     out: dict = {"now": local.isoformat(timespec="minutes"), "started": [], "skipped": []}
+    from . import whatsapp
+
+    out["chats_closed"] = whatsapp.close_stale_chats(store, settings, now)
     week = (local.date() - dt.timedelta(days=local.weekday())).isoformat()
     marker = next((c for c in camps if c["id"] == "current"), camps[0] if camps else None)
     if marker is not None and (local.weekday() > 0 or local.hour >= 6) and marker.get("bookkeeping_week") != week:
@@ -1044,9 +1047,10 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
     """Queue the calls of one campaign (by id, or a crop's first campaign; the default campaign when none is named).
 
     channel "browser": the calls wait in the call client (the demo). channel "twilio": real phone
-    calls, dialled one at a time by dial_next (each finished call starts the next)."""
-    if channel not in ("browser", "twilio"):
-        raise ServiceError("Channel must be browser or twilio.")
+    calls, dialled one at a time by dial_next (each finished call starts the next). channel "whatsapp": every
+    farmer on the list gets the agent's opening WhatsApp message (whatsapp.py)."""
+    if channel not in ("browser", "twilio", "whatsapp"):
+        raise ServiceError("Channel must be browser, twilio or whatsapp.")
     if channel == "twilio" and not phone_calls_ready(settings):
         raise ServiceError(phone_calls_note(settings))
     camp = need_campaign(store, settings, crop)
@@ -1078,7 +1082,20 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
     if not targets:
         raise ServiceError(f"No {label} farmers are ready to call. Add farmers to this campaign first.")
     queued = 0
+    chats: dict = {"live": 0, "demo": 0, "failed": []}
     for farmer in sorted(targets, key=lambda f: f["id"]):
+        if channel == "whatsapp":
+            from . import whatsapp
+
+            if whatsapp.open_chat_for(store, farmer["id"]):
+                continue
+            try:
+                r = whatsapp.open_chat(store, settings, farmer["id"], kind, campaign_id=camp["id"])
+                chats["live" if r["live"] else "demo"] += 1
+                queued += 1
+            except ServiceError as e:
+                chats["failed"].append({"farmer": farmer.get("name"), "reason": str(e)})
+            continue
         if not _open_call_for(store, farmer["id"], kind):
             queue_call(store, farmer, kind, gap_week=gap_week, channel=channel, campaign_id=camp["id"])
             queued += 1
@@ -1086,7 +1103,7 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
                                         "gap_week": gap_week, "crop": crop, "channel": channel}, merge=True)
     dialled = dial_next(store, settings) if channel == "twilio" else None
     return {"queued": queued, "kind": kind, "gap_week": gap_week, "crop": crop, "campaign_id": camp["id"],
-            "channel": channel, "dialled": dialled}
+            "channel": channel, "dialled": dialled, **({"chats": chats} if channel == "whatsapp" else {})}
 
 
 def stop_campaign(store: Store, settings: Settings, crop: str | None = None) -> dict:
@@ -1382,7 +1399,7 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
     if outcome == "stopped":
         # The farmer explicitly asked not to be called again; honour it for every future campaign.
         store.set("farmers", call["farmer_id"], {"do_not_call": True}, merge=True)
-    if status == "dropped" and call.get("attempt", 1) < settings.max_call_attempts:
+    if status == "dropped" and call.get("attempt", 1) < settings.max_call_attempts and call.get("channel") != "whatsapp":
         farmer = store.get("farmers", call["farmer_id"])
         if farmer:
             store.set("calls", call_id, {"retry_queued": True}, merge=True)

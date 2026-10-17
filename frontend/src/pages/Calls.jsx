@@ -119,7 +119,7 @@ export default function Calls() {
                       </td>
                       <td>
                         <Pill cls={chip.cls}>{chip.text}</Pill>
-                        <small className="cell-sub">{KIND_WORD[c.kind] || c.kind} · {fmtWhen(when(c)) || "waiting"}{c.channel === "twilio" ? " · phone" : c.channel === "browser" ? " · demo" : ""}</small>
+                        <small className="cell-sub">{KIND_WORD[c.kind] || c.kind} · {fmtWhen(when(c)) || "waiting"}{c.channel === "twilio" ? " · phone" : c.channel === "whatsapp" ? " · WhatsApp" : c.channel === "browser" ? " · demo" : ""}</small>
                       </td>
                       <td>
                         {h ? (

@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import (access, agent_profile, auth, calendar_view, messaging, mill_ops, purchase_order, seed_data, services,
-               track_record)
+               track_record, whatsapp)
 from .call_audio import make_audio_store
 from .config import Settings, get_settings
 from .live_session import BrowserChannel, run_call
@@ -177,6 +177,10 @@ class DialIn(BaseModel):
     kind: str | None = None
 
 
+class ChatReplyIn(BaseModel):
+    text: str
+
+
 def create_app(settings: Settings | None = None, store: Store | None = None) -> FastAPI:
     settings = settings or get_settings()
     store = store or make_store(settings.store_backend, settings.gcp_project)
@@ -315,6 +319,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "server_allowlist": sorted(n for n in settings.real_call_allowlist if n != "*"),
                             "agent_options": agent_profile.options(),
                             "messaging_note": messaging.channel_note(settings),
+                            "whatsapp": whatsapp.whatsapp_ready(settings),
+                            "whatsapp_note": whatsapp.note(settings),
                             "weekly_job": bool(settings.job_token)}
         return data
 
@@ -671,6 +677,24 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def farmer_call(farmer_id: str, body: CallNowIn | None = None):
         return {"call_id": services.call_now(store, farmer_id, body.kind if body else None, settings)}
 
+    @app.post("/api/farmers/{farmer_id}/whatsapp", dependencies=[Depends(need("campaign.run"))])
+    def farmer_whatsapp(farmer_id: str, body: DialIn | None = None):
+        """Start a WhatsApp chat with the agent (a demo chat in the dashboard when the number cannot get WhatsApp)."""
+        return whatsapp.open_chat(store, settings, farmer_id, body.kind if body else None)
+
+    @app.post("/api/chats/{call_id}/reply", dependencies=[Depends(need("campaign.run"))])
+    async def chat_reply(call_id: str, body: ChatReplyIn):
+        """Demo chat: type what the farmer would write; the agent answers."""
+        return {"reply": await whatsapp.reply_as_farmer(store, settings, call_id, body.text)}
+
+    @app.post("/api/chats/{call_id}/end", dependencies=[Depends(need("campaign.run"))])
+    def chat_end(call_id: str):
+        call = store.get("calls", call_id)
+        if not call or call.get("channel") != whatsapp.CHANNEL:
+            raise HTTPException(404, "WhatsApp chat not found.")
+        whatsapp.finish_chat(store, settings, call_id, outcome="stopped_by_planner", summary="Chat ended by the planner.")
+        return {"ended": call_id}
+
     @app.post("/api/farmers/{farmer_id}/dial", dependencies=[Depends(need("campaign.run"))])
     def farmer_dial(farmer_id: str, body: DialIn | None = None):
         """VA-8: place a real outbound call over Twilio instead of waiting for a browser answer."""
@@ -709,9 +733,9 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     # ----- Twilio (VA-8): the real phone leg -----
 
-    async def twilio_form(request: Request, path: str) -> dict:
+    async def twilio_form(request: Request, path: str, ready=None) -> dict:
         """The webhook's form, after checking Twilio signed it. Fails closed."""
-        if not services.twilio_ready(settings):
+        if not (ready or services.twilio_ready)(settings) or not settings.public_base_url:
             raise HTTPException(404, "Twilio is not configured.")
         form = dict(await request.form())
         # Validate against the configured public URL, never the request Cloud Run
@@ -743,6 +767,18 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                  f'<Parameter name="token" value="{token}" />'
                  '</Stream></Connect></Response>')
         return Response(content=twiml, media_type="text/xml")
+
+    @app.post("/twilio/whatsapp", include_in_schema=False)
+    async def twilio_whatsapp(request: Request):
+        """A farmer's WhatsApp message (set as the sender's "message comes in" webhook in Twilio). The agent's answer
+        goes back as the webhook's reply."""
+        form = await twilio_form(request, "/twilio/whatsapp", ready=whatsapp.whatsapp_ready)
+        reply = await whatsapp.handle_incoming(store, settings, form)
+        from xml.sax.saxutils import escape
+
+        body = f"<Message>{escape(reply)}</Message>" if reply else ""
+        return Response(content=f'<?xml version="1.0" encoding="UTF-8"?><Response>{body}</Response>',
+                        media_type="text/xml")
 
     @app.post("/twilio/status", include_in_schema=False)
     async def twilio_status(request: Request, call_id: str):

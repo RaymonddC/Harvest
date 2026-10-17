@@ -11,7 +11,7 @@ from .config import Settings
 from .agent_profile import call_language, language_rule, persona_rules, profile_of, questions_stage, switch_languages
 from .rules_engine import crop_label, normalize_crop
 
-PERSONA = """\
+VOICE_HEAD = """\
 You are a polite phone assistant calling on behalf of {mill}. You are an AI, and you never claim or imply \
 that you are a person.
 
@@ -29,6 +29,9 @@ never mention other farmers' or suppliers' prices.
 outcome "stopped" or "declined", and say goodbye.
 - Never give agronomy, legal or financial advice. Offer to have the planner call back instead.
 
+"""
+
+TOOL_RULES = """\
 Tool rules:
 - Prices come only from tools. Never say a price per kg that a tool did not return on this call.
 - Call check_offer before every offer and every reply to a counter. Say exactly the price it returns.
@@ -47,6 +50,9 @@ true. Never send true first. If a tool answers "read_back_required", that is a n
 the sentence it returns to the farmer, wait for their yes, then call again with true.
 - Always finish with end_call. Call end_call before your goodbye sentence.
 
+"""
+
+VOICE_END = """\
 Ending the call:
 - After the farmer agrees to the deal (or declines it), repeat the terms once, ask at most once whether they \
 have any other question, and stop asking.
@@ -57,6 +63,42 @@ add a second sentence.
 - If the farmer has already said goodbye, call end_call before you say anything else. Never leave a finished \
 call open and never start a new topic after the deal is saved.
 """
+
+PERSONA = VOICE_HEAD + TOOL_RULES + VOICE_END
+
+# The same agent in a WhatsApp chat (whatsapp.py): written messages, answered whenever the farmer has time.
+CHAT_HEAD = """\
+You are a polite WhatsApp assistant writing on behalf of {mill}. You are an AI, and you never claim or imply \
+that you are a person.
+
+Chat rules:
+{language_rule}
+- This is a written WhatsApp chat, not a phone call. Wherever these instructions say "call", read "chat"; \
+wherever they say "say" or "read back", write it.
+- Keep every message short: one to three short sentences, and one question at a time. Plain text only: no \
+lists, no headings, no markdown, no emoji.
+- The farmer may answer hours later, and may send a voice note or a photo instead of text. A voice note counts \
+as what they said; answer it in writing.
+- Ask the consent question once, in your opening. When the farmer has answered it, never ask it again, \
+whatever they answered.
+- Write the numbers back before you save them: crop, kilograms and date. Write the price back before any deal.
+- Give today's market reference price before you make any offer. Never pressure, never invent urgency, \
+never mention other farmers' or suppliers' prices.
+- If the farmer asks you to stop, or does not want to chat, apologise, call end_call with outcome "stopped" \
+or "declined", and write one short goodbye.
+- Never give agronomy, legal or financial advice. Offer to have the planner call back instead.
+
+"""
+
+CHAT_END = """\
+Ending the chat:
+- When the harvest is saved (and any deal or extra questions are done), thank the farmer, call end_call, and \
+write one short closing message. end_call closes the chat.
+- If the farmer says no, thank you or goodbye, call end_call at once and write a short goodbye.
+- Never leave a finished chat open and never start a new topic after the deal is saved.
+"""
+
+CHAT_PERSONA = CHAT_HEAD + TOOL_RULES + CHAT_END
 
 # The opening and the consent notice, said word for word in the call's language. Fixed wording (not translated by
 # the model on the fly) so the notice says the same thing in every call and every language, and can be checked.
@@ -140,6 +182,77 @@ NOTICE_ALIASES = {"indonesian": "Bahasa Indonesia", "indonesia": "Bahasa Indones
                   "tagalog": "Filipino", "filipino": "Filipino", "pilipino": "Filipino"}
 RETENTION_DAYS = 90  # how long a call recording is kept (said in the recording notice)
 
+# The WhatsApp chat's opening and consent notice (whatsapp.py), word for word in the chat's language. Same rules as the
+# voice NOTICES above (LEGAL, PDP Law Art. 21, 22 and 24): it names the sender as an AI, says what is kept, and asks
+# for consent before anything is kept. Do not remove or shorten them without asking. Only Bahasa Indonesia and English
+# were checked; the others were adapted from the voice notices without a native reviewer: check before real use.
+CHAT_NOTICES = {
+    "Bahasa Indonesia": {
+        "hello": "Halo, ini asisten AI yang menghubungi Bapak/Ibu untuk {mill}.",
+        "hello_named": "Halo, saya {agent}, asisten AI yang menghubungi Bapak/Ibu untuk {mill}.",
+        "ask": "Apakah ini benar {name}?",
+        "consent": "Dengan izin Bapak/Ibu, {mill} menyimpan catatan tertulis dari percakapan ini. Apakah Bapak/Ibu setuju?",
+    },
+    "Bahasa Malaysia": {
+        "hello": "Helo, ini pembantu AI yang menghubungi anda bagi pihak {mill}.",
+        "hello_named": "Helo, saya {agent}, pembantu AI yang menghubungi anda bagi pihak {mill}.",
+        "ask": "Adakah ini {name}?",
+        "consent": "Dengan kebenaran anda, {mill} menyimpan rekod bertulis perbualan ini. Adakah anda bersetuju?",
+    },
+    "English": {
+        "hello": "Hello, this is an AI assistant writing for {mill}.",
+        "hello_named": "Hello, this is {agent}, an AI assistant writing for {mill}.",
+        "ask": "Am I chatting with {name}?",
+        "consent": "With your permission, {mill} keeps a written record of this chat. Is that all right?",
+    },
+    "Javanese": {
+        "hello": "Halo, iki asisten AI sing ngubungi Panjenengan kanggo {mill}.",
+        "hello_named": "Halo, kula {agent}, asisten AI sing ngubungi Panjenengan kanggo {mill}.",
+        "ask": "Apa leres punika {name}?",
+        "consent": "Kanthi idin Panjenengan, {mill} nyimpen cathetan tertulis saka obrolan iki. Apa Panjenengan setuju?",
+    },
+    "Sundanese": {
+        "hello": "Halo, ieu asisten AI nu ngahubungi Bapa/Ibu pikeun {mill}.",
+        "hello_named": "Halo, abdi {agent}, asisten AI nu ngahubungi Bapa/Ibu pikeun {mill}.",
+        "ask": "Naha leres ieu {name}?",
+        "consent": "Kalayan widi Bapa/Ibu, {mill} nyimpen catetan tinulis tina obrolan ieu. Naha Bapa/Ibu satuju?",
+    },
+    "Thai": {
+        "hello": "สวัสดี นี่คือผู้ช่วย AI ที่ติดต่อมาในนามของ {mill}",
+        "hello_named": "สวัสดี ฉันชื่อ {agent} เป็นผู้ช่วย AI ที่ติดต่อมาในนามของ {mill}",
+        "ask": "ไม่ทราบว่าใช่คุณ{name}หรือเปล่า?",
+        "consent": "หากคุณอนุญาต {mill} จะเก็บบันทึกข้อความของการแชทนี้ไว้ คุณยินยอมไหม?",
+    },
+    "Vietnamese": {
+        "hello": "Xin chào, đây là trợ lý AI nhắn tin thay mặt cho {mill}.",
+        "hello_named": "Xin chào, tôi là {agent}, trợ lý AI nhắn tin thay mặt cho {mill}.",
+        "ask": "Có phải tôi đang trò chuyện với {name} không ạ?",
+        "consent": "Nếu anh/chị đồng ý, {mill} sẽ lưu bản ghi chép cuộc trò chuyện này. Anh/chị có đồng ý không ạ?",
+    },
+    "Filipino": {
+        "hello": "Magandang araw, ito ay isang AI assistant na sumusulat para sa {mill}.",
+        "hello_named": "Magandang araw, ako si {agent}, isang AI assistant na sumusulat para sa {mill}.",
+        "ask": "Si {name} po ba ito?",
+        "consent": "Kung papayag po kayo, itatago ng {mill} ang nakasulat na kopya ng chat na ito. Pumapayag po ba kayo?",
+    },
+}
+
+
+def chat_notice_for(language: str, mill: str, name: str, agent: str = "") -> dict:
+    """The chat's opening sentences in this language (English when the language has no fixed wording)."""
+    key = " ".join((language or "").strip().lower().split())
+    lang = next((n for n in CHAT_NOTICES if n.lower() == key), None) or NOTICE_ALIASES.get(key) or "English"
+    n = CHAT_NOTICES.get(lang, CHAT_NOTICES["English"])
+    fill = {"mill": mill, "name": name, "agent": agent}
+    hello = n["hello_named"] if agent else n["hello"]
+    return {"hello": hello.format(**fill), "ask": n["ask"].format(**fill), "consent": n["consent"].format(**fill),
+            "language": lang}
+
+
+def chat_opening(notice: dict) -> str:
+    """The first WhatsApp message: who is writing (an AI), who it is for, and the consent question."""
+    return f"{notice['hello']} {notice['ask']}\n\n{notice['consent']}"
+
 
 def notice_for(language: str, mill: str, name: str, recording: bool = False, days: int = RETENTION_DAYS,
                agent: str = "") -> dict | None:
@@ -172,6 +285,19 @@ Opening, word for word in {language}, as your first sentence: "Hello, this is an
 {mill} keeps a written transcript of this call. Is that all right?" Say all of it in {language}. As soon as \
 the farmer answers, call record_consent with their answer (and give the same answer to end_call later); carry \
 on with the call either way.
+"""
+
+CHAT_OPENING_SENT = """\
+Opening: your first message was already sent, in {language}: "{opening}"
+It asked the consent question. As soon as the farmer answers it, call record_consent with their answer (and give \
+the same answer to end_call later); carry on with the chat either way. Do not send the opening again.
+"""
+
+CHAT_OPENING_FIRST = """\
+Opening: the farmer wrote first. Begin your first reply with exactly these sentences, in this order, without \
+changing a word: "{hello}" "{ask}" "{consent}" Then, if they asked something, answer it in one short sentence. \
+As soon as they answer the consent question, call record_consent with their answer (and give the same answer to \
+end_call later); carry on with the chat either way.
 """
 
 COLLECT = """\
@@ -241,7 +367,10 @@ def calendar(settings: Settings) -> str:
 
 def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_week: int | None,
                              harvest: dict | None = None, offer: dict | None = None,
-                             today: dt.date | None = None, campaign: dict | None = None) -> str:
+                             today: dt.date | None = None, campaign: dict | None = None,
+                             chat_opening_sent: str | None = None, chat: bool = False) -> str:
+    """The voice call's instruction, or with chat=True the WhatsApp chat's (chat_opening_sent: the first message
+    already sent; None when the farmer wrote first)."""
     today = today or dt.date.today()
     profile = profile_of(campaign)  # the campaign's persona (and its languages) and the planner's own questions
     language = call_language(profile["persona"], farmer.get("language"), settings.demo_language)
@@ -250,12 +379,18 @@ def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_we
            "crop": crop, "language_rule": language_rule(language, switch_languages(profile["persona"], language))}
 
     agent = profile["persona"].get("name", "")
-    notice = notice_for(language, settings.mill_name, fmt["name"], recording=recording_enabled(settings),
-                        days=settings.call_audio_retention_days, agent=agent)
-    opening = OPENING_FIXED.format(**fmt, **notice) if notice else OPENING_TRANSLATED.format(**fmt)
-    if agent and not notice:
-        opening += f"In that first sentence, say your name, {agent}, too.\n"
-    parts = [PERSONA.format(**fmt), persona_rules(profile["persona"]), opening]
+    if chat:
+        cn = chat_notice_for(language, settings.mill_name, fmt["name"], agent=agent)
+        opening = (CHAT_OPENING_SENT.format(language=language, opening=chat_opening_sent) if chat_opening_sent
+                   else CHAT_OPENING_FIRST.format(**cn))
+        parts = [CHAT_PERSONA.format(**fmt), persona_rules(profile["persona"]), opening]
+    else:
+        notice = notice_for(language, settings.mill_name, fmt["name"], recording=recording_enabled(settings),
+                            days=settings.call_audio_retention_days, agent=agent)
+        opening = OPENING_FIXED.format(**fmt, **notice) if notice else OPENING_TRANSLATED.format(**fmt)
+        if agent and not notice:
+            opening += f"In that first sentence, say your name, {agent}, too.\n"
+        parts = [PERSONA.format(**fmt), persona_rules(profile["persona"]), opening]
 
     gap_fmt = {}
     if gap_week:
@@ -280,7 +415,7 @@ def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_we
         parts.append(COLLECT.format(**fmt, offer_stage=offer_stage))
         parts.append(questions_stage(profile["questions"]))
 
-    parts.append(f"Today is {today:%A %d %B %Y}. Convert spoken dates to YYYY-MM-DD. "
+    parts.append(f"Today is {today:%A %d %B %Y}. Convert {'written' if chat else 'spoken'} dates to YYYY-MM-DD. "
                  f"The mill plans in these weeks:\n{calendar(settings)}")
     return "\n".join(parts)
 
