@@ -1529,3 +1529,23 @@ body.app input:focus-visible, body.app select:focus-visible, body.app textarea:f
 body.app table.farmers td:nth-child(2), body.app table.farmers td:nth-child(3), body.app table.farmers td:nth-child(4),
 body.app table.farmers td:nth-child(6) { white-space: nowrap; }
 body.app table.farmers .who-cell span { white-space: nowrap; }
+
+/* ---------- Motion that answers an action (see DESIGN.md) ---------- */
+.seg-toggle button { position: relative; }
+.seg-toggle button.on { background: none; color: var(--on-ink); }
+.seg-toggle .seg-pill { position: absolute; inset: 0; border-radius: 999px; background: var(--g-deep, var(--ink)); z-index: 0; }
+.seg-toggle .seg-text { position: relative; z-index: 1; }
+.seg-toggle button:not(.on):hover { color: var(--ink); }
+.todo-list li { overflow: hidden; }
+/* bars grow to their new size when the numbers change */
+.chain-bar span, .have-bar i { transition: flex-grow .5s cubic-bezier(.2, .8, .2, 1); }
+.tbd-bar > * { transition: width .5s cubic-bezier(.2, .8, .2, 1); }
+.meter i, .trace-rows .meter i { transition: width .5s cubic-bezier(.2, .8, .2, 1); }
+/* cards and rows answer the pointer */
+body.app .board .pcard { transition: background-color .15s ease, transform .15s ease; }
+body.app .board .pcard:active { transform: scale(.98); }
+body.app .note-list li, body.app .fs-list li { animation: hc-fade .2s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .chain-bar span, .have-bar i, .tbd-bar > *, .meter i { transition: none; }
+  body.app .board .pcard:active { transform: none; }
+}

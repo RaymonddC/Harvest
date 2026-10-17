@@ -2,6 +2,7 @@ import * as RDialog from "@radix-ui/react-dialog";
 import { useEffect, useRef, useState } from "react";
 import { can, getSession, ICON_PATHS, initials, roleLabel } from "./lib.js";
 import FarmerFace from "./components/FarmerFace.jsx";
+import { motion } from "motion/react";
 
 // Props that switch a control off, with the reason, when the signed-in role lacks the right.
 // The server still checks every request.
@@ -26,6 +27,22 @@ export const Avatar = ({ name, id, cls = "", person = false }) => {
   }
   return <span className={`avatar ${cls} ${person ? `person-tint t${tintOf(name)}` : ""}`.replace(/\s+/g, " ").trim()} aria-hidden="true">{initials(name)}</span>;
 };
+
+// Two to four options in a row (Board / List, Day / Week / Month / Year): the dark pill slides to the one picked.
+let segIds = 0;
+export function SegToggle({ options, value, onChange, label }) {
+  const [id] = useState(() => `seg-${++segIds}`);
+  return (
+    <div className="seg-toggle" role="group" aria-label={label}>
+      {options.map(([k, text]) => (
+        <button key={k} type="button" className={value === k ? "on" : ""} aria-pressed={value === k} onClick={() => onChange(k)}>
+          {value === k && <motion.span layoutId={id} className="seg-pill" transition={{ type: "spring", stiffness: 520, damping: 40 }} aria-hidden="true" />}
+          <span className="seg-text">{text}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export const Pill = ({ children, cls = "" }) => <span className={`pill ${cls}`.trim()}>{children}</span>;
 

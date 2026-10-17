@@ -16,6 +16,7 @@ import { apiUrl, fmtT } from "../lib.js";
 import { campaignFor, forCrop, inCampaign, useCrop } from "../campaigns.jsx";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
+import { SegToggle } from "../ui.jsx";
 
 const PERIODS = [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]];
 const PERIOD_KEY = "harvestPeriod";
@@ -74,9 +75,7 @@ export default function Forecast() {
           <section className="card" aria-labelledby="chart-title">
             <div className="card-head">
               <h2 id="chart-title">Expected supply vs target, tonnes per {period}</h2>
-              <div className="seg-toggle" role="group" aria-label="Show by">
-                {PERIODS.map(([k, label]) => <button key={k} type="button" className={period === k ? "on" : ""} aria-pressed={period === k} onClick={() => setPeriod(k)}>{label}</button>)}
-              </div>
+              <SegToggle label="Show by" options={PERIODS} value={period} onChange={setPeriod} />
             </div>
             {period !== "week" ? (state && <SupplyChart cid={cid} period={period} refreshKey={JSON.stringify(rows.map((r) => r.expected_kg))} />) : <>
             <div className="card-head" style={{ marginTop: -6 }}>

@@ -1,5 +1,5 @@
 import { MotionConfig } from "motion/react";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Alerts from "./alerts.jsx";
 import { CropProvider } from "./campaigns.jsx";
@@ -8,17 +8,40 @@ import { LiveProvider } from "./live.jsx";
 import { OLD_URLS } from "./lib.js";
 import { Toasts } from "./toast.jsx";
 
-// Each page is its own chunk, loaded the first time it is opened.
-const Forecast = lazy(() => import("./pages/Forecast.jsx"));
-const Overview = lazy(() => import("./pages/Overview.jsx"));
-const Setup = lazy(() => import("./pages/Setup.jsx"));
-const Approvals = lazy(() => import("./pages/Approvals.jsx"));
-const Users = lazy(() => import("./pages/Users.jsx"));
-const Farmers = lazy(() => import("./pages/Farmers.jsx"));
-const Agent = lazy(() => import("./pages/Agent.jsx"));
-const Calls = lazy(() => import("./pages/Calls.jsx"));
-const Calendar = lazy(() => import("./pages/Calendar.jsx"));
-const Login = lazy(() => import("./pages/Login.jsx"));
+// Each page is its own chunk. They load in the background once the app is up (see Preload), so moving between pages
+// never waits for code, and the screen never blanks while a page loads.
+const PAGE_CODE = {
+  Forecast: () => import("./pages/Forecast.jsx"),
+  Overview: () => import("./pages/Overview.jsx"),
+  Setup: () => import("./pages/Setup.jsx"),
+  Approvals: () => import("./pages/Approvals.jsx"),
+  Users: () => import("./pages/Users.jsx"),
+  Farmers: () => import("./pages/Farmers.jsx"),
+  Agent: () => import("./pages/Agent.jsx"),
+  Calls: () => import("./pages/Calls.jsx"),
+  Calendar: () => import("./pages/Calendar.jsx"),
+  Login: () => import("./pages/Login.jsx"),
+};
+const Forecast = lazy(PAGE_CODE.Forecast);
+const Overview = lazy(PAGE_CODE.Overview);
+const Setup = lazy(PAGE_CODE.Setup);
+const Approvals = lazy(PAGE_CODE.Approvals);
+const Users = lazy(PAGE_CODE.Users);
+const Farmers = lazy(PAGE_CODE.Farmers);
+const Agent = lazy(PAGE_CODE.Agent);
+const Calls = lazy(PAGE_CODE.Calls);
+const Calendar = lazy(PAGE_CODE.Calendar);
+const Login = lazy(PAGE_CODE.Login);
+
+function Preload() {
+  useEffect(() => {
+    const load = () => Object.values(PAGE_CODE).forEach((get) => get().catch(() => {}));
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200));
+    const id = idle(load);
+    return () => (window.cancelIdleCallback ? window.cancelIdleCallback(id) : clearTimeout(id));
+  }, []);
+  return null;
+}
 
 // An old .html address goes to its route, keeping the query (login's ?next= and ?expired=).
 function OldUrl({ to }) {
@@ -28,7 +51,7 @@ function OldUrl({ to }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       {/* Motion follows the device's "reduce motion" setting. */}
       <MotionConfig reducedMotion="user">
         <LiveProvider>
@@ -36,6 +59,7 @@ export default function App() {
           <ConfirmProvider>
           <UnsavedProvider>
           <Alerts />
+          <Preload />
           <Suspense fallback={null}>
             <Routes>
               <Route path="/" element={<Overview />} />

@@ -4,6 +4,7 @@ import { useCrop } from "../campaigns.jsx";
 import { api, fmtKg, fmtT, KIND_WORD } from "../lib.js";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
+import { SegToggle } from "../ui.jsx";
 
 // What happens on which day: calls made and planned (and the weekly Monday calls), harvests (the next round
 // each farmer gave, and later rounds projected from how often they harvest), deal delivery weeks, weighbridge
@@ -106,10 +107,7 @@ export default function Calendar() {
         <h1>Calendar</h1>
         <p>Calls, harvests, deals and deliveries by day{scope === "one" && campaign.label ? `, for ${campaign.label}` : ", for every campaign"}.</p>
       </div>
-      <div className="seg-toggle" role="group" aria-label="Which campaigns">
-        <button type="button" className={scope === "one" ? "on" : ""} aria-pressed={scope === "one"} onClick={() => setScope("one")}>This campaign</button>
-        <button type="button" className={scope === "all" ? "on" : ""} aria-pressed={scope === "all"} onClick={() => setScope("all")}>All campaigns</button>
-      </div>
+      <SegToggle label="Which campaigns" options={[["one", "This campaign"], ["all", "All campaigns"]]} value={scope} onChange={setScope} />
     </div>
   );
 

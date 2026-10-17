@@ -211,7 +211,7 @@ export default function Shell({ title, head, children }) {
           <div className="topbar-row">{head}<NextStep page={PAGE_OF[pathname]} /></div>
         </div>
         {/* A short fade as each page opens. */}
-        <motion.main className="page" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+        <motion.main className="page" initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} transition={{ duration: 0.16, ease: "easeOut" }}>
           {!session.capabilities?.length && (
             <div className="banner" role="note">View only. You can watch the forecast, offers and calls, but anything that changes data is blocked. Use Switch user to sign in as someone who can.</div>
           )}

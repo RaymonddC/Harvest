@@ -3,7 +3,9 @@ import { toast } from "sonner";
 import { crmOf, REASONS, STAGES } from "../../crm.js";
 import { api, can, fmtT, numberAllowed } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
+import { LayoutGroup, motion } from "motion/react";
 import FarmerFace from "../FarmerFace.jsx";
+import { SegToggle } from "../../ui.jsx";
 import FarmerList from "./FarmerList.jsx";
 
 const PER_COLUMN = 6;
@@ -79,10 +81,8 @@ export default function FarmerPipeline({ state, cid, title, filter, onClearFilte
           <h2 id="pipe-title">{title}</h2>
           <span className="sub">{crm.farmers.length} farmers · <b>{toCall} need a harvest call</b>{reasonText ? ` (${reasonText})` : ""}</span>
         </div>
-        <div className="seg-toggle" role="group" aria-label="View">
-          <button type="button" className={view === "board" ? "on" : ""} aria-pressed={view === "board"} onClick={() => { setView("board"); setStage(null); }}>Board</button>
-          <button type="button" className={view === "list" ? "on" : ""} aria-pressed={view === "list"} onClick={() => setView("list")}>List</button>
-        </div>
+        <SegToggle label="View" options={[["board", "Board"], ["list", "List"]]} value={view}
+          onChange={(v) => { setView(v); if (v === "board") setStage(null); }} />
       </div>
       <details className="who-calls">
         <summary>Who gets a harvest call, and why only {toCall} of {crm.farmers.length}? Can I drag cards?</summary>
@@ -96,6 +96,7 @@ export default function FarmerPipeline({ state, cid, title, filter, onClearFilte
         </div>
       )}
       {view === "board" ? (
+        <LayoutGroup>
         <div className="board" role="list">
           {STAGES.map((s) => {
             const items = rows.filter((x) => x.stage === s.key);
@@ -110,14 +111,15 @@ export default function FarmerPipeline({ state, cid, title, filter, onClearFilte
                 {!items.length && <p className="col-empty">{EMPTY[s.key]}</p>}
                 <ul>
                   {items.slice(0, PER_COLUMN).map((x) => (
-                    <li key={x.farmer.id}>
+                    <motion.li key={x.farmer.id} layout="position" layoutId={`card-${x.farmer.id}`}
+                      transition={{ type: "spring", stiffness: 380, damping: 34 }}>
                       <button type="button" className={`pcard ${drag?.farmer.id === x.farmer.id ? "dragging" : ""}`} onClick={() => onOpen?.(x.farmer)} aria-label={`Open ${x.farmer.name}`}
                         draggable onDragStart={(e) => { dragged.current = x; setDrag(x); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", x.farmer.id); }}
                         onDragEnd={() => { dragged.current = null; setDrag(null); setOver(null); }}>
                         <FarmerFace name={x.farmer.name} id={x.farmer.id} size={34} />
                         <span><b>{x.farmer.name}</b><small>{sub(x)}</small></span>
                       </button>
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
                 {items.length > PER_COLUMN && <button type="button" className="btn sm ghost col-more" onClick={() => openList(s.key)}>All {items.length}</button>}
@@ -125,6 +127,7 @@ export default function FarmerPipeline({ state, cid, title, filter, onClearFilte
             );
           })}
         </div>
+        </LayoutGroup>
       ) : (
         <>
           {stage && (

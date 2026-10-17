@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Link } from "react-router-dom";
 import { campaignFor, inCampaign, useCrop } from "../campaigns.jsx";
 import TargetBreakdown, { breakdown } from "../components/forecast/TargetBreakdown.jsx";
@@ -114,12 +115,15 @@ export default function Overview() {
               <h2 id="todo-title">What to do next</h2>
               {items.length ? (
                 <ol className="todo-list">
-                  {items.map((it) => (
-                    <li key={it.key} className={it.tone}>
-                      <div><b>{it.what}</b><small>{it.next}</small></div>
-                      <Link className="btn sm" to={it.to}>{it.verb || "Open"}</Link>
-                    </li>
-                  ))}
+                  <AnimatePresence initial={false}>
+                    {items.map((it) => (
+                      <motion.li key={it.key} className={it.tone} layout initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}>
+                        <div><b>{it.what}</b><small>{it.next}</small></div>
+                        <Link className="btn sm" to={it.to}>{it.verb || "Open"}</Link>
+                      </motion.li>
+                    ))}
+                  </AnimatePresence>
                 </ol>
               ) : (
                 <p className="todo-done"><Icon name="check" size={18} /> Nothing waiting: every week is on track and every farmer has answered{nextAutoText(campaign) ? `; ${nextAutoText(campaign)}` : ""}.</p>
