@@ -3,7 +3,7 @@ import { campaignFor, campaignsOf, farmerCampaign } from "../../campaigns.jsx";
 import { api, can } from "../../lib.js";
 import { useUnsaved } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
-import { DownloadLink, SubmitButton } from "../../ui.jsx";
+import { SubmitButton } from "../../ui.jsx";
 
 const EMPTY = { persona: { preset: "", name: "", voice: "", style: "", language_mode: "farmer", language: "", switch: true, also_speaks: [] }, questions: [] };
 const fromCampaign = (c) => ({
@@ -130,7 +130,7 @@ export default function AgentCard({ state, cid }) {
             <label className="field">Voice
               <select value={persona.voice} onChange={(e) => setPersona({ voice: e.target.value, preset: "" })}>
                 <option value="">Default voice</option>
-                {Object.entries(opts.voices).map(([v, d]) => <option key={v} value={v}>{v} · {d}</option>)}
+                {Object.entries(opts.voices).map(([v, d]) => <option key={v} value={v}>{v}, {d}</option>)}
               </select>
             </label>
             <label className="field">Speaking style
@@ -162,7 +162,7 @@ export default function AgentCard({ state, cid }) {
           </ol>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <button type="button" className="btn sm" onClick={addQuestion} disabled={full}>+ Add question</button>
-            <DownloadLink className="small" path="/api/answers.csv" filename="answers.csv">Download all answers (CSV)</DownloadLink>
+            <span className="small muted">Answers download from the button at the top of the page.</span>
           </div>
         </fieldset>
       </div>
@@ -171,6 +171,7 @@ export default function AgentCard({ state, cid }) {
         {allowed ? <SubmitButton busy={saving} disabled={!dirty} busyText="Saving…">Save agent</SubmitButton>
           : <button type="button" className="btn solid" disabled title="Your role cannot change the agent.">Save agent</button>}
         {dirty && <button type="button" className="btn ghost" onClick={() => setDirty(false)}>Discard changes</button>}
+        {dirty && <span className="unsaved-note">Unsaved changes</span>}
       </div>
     </form>
   );

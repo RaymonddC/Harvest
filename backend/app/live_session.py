@@ -35,6 +35,8 @@ log = logging.getLogger(__name__)
 
 INPUT_MIME = "audio/pcm;rate=16000"
 GOODBYE_GRACE_SECONDS = 10
+LIVE_EVERY_SECONDS = 1.0  # how often the conversation so far is saved on the call for the planner to follow
+LIVE_LINES = 40  # the live view keeps the last lines only
 GOODBYE_MAX_AUDIO_SECONDS = 5.0  # after end_call only a short goodbye is let through; the rest is cut
 OUTPUT_RATE = 24000
 
@@ -339,8 +341,22 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
         pending_translations.add(task)
         task.add_done_callback(pending_translations.discard)
 
+    live_view = {"at": 0.0, "pending": None}
+
+    def save_live(force: bool = False) -> None:
+        """Save the conversation so far on the call (the dashboard follows it live). At most once a second, off the
+        event loop; the store write never holds up the audio. Cleared when the call ends (finish_call)."""
+        now = time.monotonic()
+        if not force and now - live_view["at"] < LIVE_EVERY_SECONDS:
+            return
+        live_view["at"] = now
+        lines = [{"who": x["who"], "text": x["text"]} for x in transcript.cleaned()[-LIVE_LINES:]]
+        loop = asyncio.get_running_loop()
+        live_view["pending"] = loop.run_in_executor(None, lambda: store.set("calls", call_id, {"live": lines}, merge=True))
+
     async def caption(who: str, text: str) -> None:
         index, closed = transcript.add(who, text)
+        save_live(force=closed is not None)
         if recorder and "t" not in transcript.lines[index]:
             transcript.lines[index]["t"] = recorder.line_start(who)
         close_line(closed)
@@ -389,6 +405,10 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                                 # Off the event loop: a tool saves to the store and may recompute the forecast or send an alert,
                                 # which would otherwise stall the audio of every call running on this server.
                                 result = await asyncio.to_thread(handlers.dispatch, fn.name, fn.args)
+                                ui = handlers.last_ui or {}
+                                noted = {k: ui[k] for k in ("captured", "rail", "offer_saved") if k in ui}
+                                if noted:
+                                    await asyncio.to_thread(store.set, "calls", call_id, {"live_notes": noted}, merge=True)
                                 await send({"type": "tool", "name": fn.name, "args": fn.args or {},
                                             "result": result, "ui": handlers.last_ui})
                                 responses.append(types.FunctionResponse(id=fn.id, name=fn.name, response=result))
@@ -466,6 +486,9 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
         if pending_translations:
             with contextlib.suppress(Exception):
                 await asyncio.wait(pending_translations, timeout=4)
+        if live_view["pending"] is not None:
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(live_view["pending"], 3)
         try:
             services.finish_call(store, settings, call_id, ended_cleanly=session.ended,
                                  outcome=session.outcome, summary=session.summary,

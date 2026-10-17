@@ -126,7 +126,7 @@ export default function PriceRange({ l, crop }) {
         <summary>More about the price: where the market price comes from, and how the agent raises its offer</summary>
         {l && l.reference_source && !l.follows_official && <p className="sub">Market price source: {l.reference_source}</p>}
         <OfficialPrice l={l} crop={crop} />
-        <h4 className="price-more-h">How the agent raises its offer</h4>
+        <h3 className="price-more-h">How the agent raises its offer</h3>
         <div className="grid2" style={{ marginTop: 10 }}>
           <Field label="First offer, % over market" name="first_premium_pct" form={form} edit={edit} error={errs.first_premium_pct} decimal />
           <Field label="Each step, % of market" name="step_pct" form={form} edit={edit} error={errs.step_pct} decimal />

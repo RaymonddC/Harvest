@@ -39,7 +39,7 @@ export function todoItems(state, cid) {
   }
   if (gap) {
     const forward = (gap.shortlist || []).length;
-    items.push({ key: "gap", verb: "Fill it", to: "/forecast", tone: "amber", what: `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short`,
+    items.push({ key: "gap", verb: "Fill it", to: "/forecast", tone: "amber", what: `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short${usualKg ? `, ${fmtT(Math.max(gap.gap_kg - usualKg, 0))} t if the ${unknown.length} farmers who have not answered bring their usual` : ""}`,
       next: running && campaign.kind === "gap_fill" ? "Gap-fill calls are on it" : forward ? `Start gap-fill calls: ${forward} farmers can help` : "Add a rival quote or farmers who can harvest earlier" });
   }
   if (over) items.push({ key: "over", verb: "Move some", to: "/forecast", tone: "red", what: `Week ${over.week} is ${fmtT(over.surplus_kg)} t over capacity`, next: "Ask some farmers to deliver a week later" });

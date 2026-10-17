@@ -35,6 +35,8 @@ function AutoCalls({ campaign, phoneCalls, weeklyJob }) {
           onChange={(e) => save({ enabled: e.target.checked }, e.target.checked ? `Automatic calls on: ${daysText(days)} at ${time}${phoneCalls ? ", on the farmers' phones" : ""}.` : "Automatic calls off.")} />
         <span><b>Call automatically</b><small>{saved.enabled ? `${daysText(saved.days || [0])} at ${saved.time || "06:00"} (Jakarta time)` : "Off: you start the calls yourself"}</small></span>
       </label>
+      <details className="auto-more">
+        <summary>Days and time</summary>
       <div className="auto-days" role="group" aria-label="Days">
         {DAYS.map((d, i) => (
           <button key={d} type="button" className={days.includes(i) ? "on" : ""} aria-pressed={days.includes(i)} disabled={!allowed} onClick={() => toggleDay(i)}>{d}</button>
@@ -48,6 +50,7 @@ function AutoCalls({ campaign, phoneCalls, weeklyJob }) {
         </label>
         {changed && <button type="button" className="btn sm on-ink" onClick={() => save({}, "Schedule saved.")}>Save</button>}
       </div>
+      </details>
       {saved.enabled && !weeklyJob && <small className="auto-warn">The scheduler is not set up on this server yet (JOB_TOKEN), so automatic calls will not start.</small>}
     </div>
   );

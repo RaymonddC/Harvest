@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Meter from "../components/approvals/Meter.jsx";
 import Offer from "../components/approvals/Offer.jsx";
-import { api, gapFillBody, gapFillToast, plainPrice, startUrl } from "../lib.js";
+import { api, cachedGet, gapFillBody, gapFillToast, peekGet, plainPrice, startUrl } from "../lib.js";
 import { forCrop, inCampaign, useCrop } from "../campaigns.jsx";
 import { useConfirm } from "../dialogs.jsx";
 import { useLive } from "../live.jsx";
@@ -29,14 +29,15 @@ export default function Approvals() {
   const confirm = useConfirm();
   const { cid, crop } = useCrop();
   // What approving each waiting offer would do (weeks, cost, new gaps), fetched again when offers change.
-  const [impact, setImpact] = useState(null);
+  const impactUrl = `/api/approvals/impact?campaign=${encodeURIComponent(cid)}`;
+  const [impact, setImpact] = useState(() => peekGet(impactUrl) || null);
   const [impactFailed, setImpactFailed] = useState(false);
   const offersKey = state ? JSON.stringify(state.offers.map((o) => [o.id, o.status, o.kg])) + JSON.stringify(state.forecast.map((r) => r.expected_kg)) : "";
   useEffect(() => {
     if (!state) return undefined;
     let live = true;
-    const t = setTimeout(() => api(`/api/approvals/impact?campaign=${encodeURIComponent(cid)}`, { method: "GET" })
-      .then((r) => { if (live) { setImpact(r); setImpactFailed(false); } }).catch(() => { if (live) setImpactFailed(true); }), 300);
+    const t = setTimeout(() => cachedGet(impactUrl).then((r) => { if (live) { setImpact(r); setImpactFailed(false); } })
+      .catch(() => { if (live) setImpactFailed(true); }), peekGet(impactUrl) ? 300 : 0);
     return () => { live = false; clearTimeout(t); };
   }, [offersKey, cid]); // eslint-disable-line react-hooks/exhaustive-deps
   // Only the picked campaign's offers and weeks, and its crop's rival quotes.
@@ -45,7 +46,7 @@ export default function Approvals() {
   const head = (
     <div className="page-head">
       <div>
-        <h1>{week ? `Approve gap-fill deals · week ${week}` : "Approve gap-fill deals"}</h1>
+        <h1>{week ? `Approve gap-fill deals for week ${week}` : "Approve gap-fill deals"}</h1>
         <p>Every offer the agent made waits here. No deal is final until you approve it; the farmer then hears the confirmation by voice.</p>
       </div>
     </div>
@@ -104,7 +105,7 @@ export default function Approvals() {
       }, ok: "Back to pending." });
   };
   const gap = [...view.forecast].sort((a, b) => a.week - b.week).find((r) => r.is_gap);
-  const group = (title, n, extra) => <div className="offer-group"><h3>{title}<span className="count">{n}</span></h3>{extra}</div>;
+  const group = (title, n, extra) => <div className="offer-group"><h2 className="og-title">{title} <span className="count">{n}</span></h2>{extra}</div>;
 
   return (
     <Shell title="Approvals" head={head}>
@@ -157,7 +158,7 @@ export default function Approvals() {
           )}
         </div>
         <div className="offers-foot">
-          {l && `Price range: floor ${plainPrice(l.floor_price, l.currency)}, ceiling ${plainPrice(l.ceiling_price, l.currency)}. The bar under each price shows where it sits; red is above the ceiling${anyOut ? " (marked Needs planner)" : ""}. Synthetic data.`}
+          {l && `Price range: floor ${plainPrice(l.floor_price, l.currency)}, ceiling ${plainPrice(l.ceiling_price, l.currency)}.${toDecide.length ? ` The bar under each price shows where it sits; red is above the ceiling${anyOut ? " (marked Needs planner)" : ""}.` : ""} Synthetic data.`}
         </div>
       </section>
       </div>

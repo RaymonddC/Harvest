@@ -1574,6 +1574,8 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
         # The notice told the farmer how long it is kept (PDP Law, Art. 21); purge_expired_transcripts enforces it.
         "transcript_expires_at": ((dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=settings.call_audio_retention_days))
                                   .isoformat(timespec="seconds") if consent and transcript else None),
+        # The live view (the conversation while it ran) goes; only the transcript above is kept, and only with consent.
+        "live": None, "live_notes": None,
     }, merge=True)
     if (status == "done" and outcome == "completed" and call.get("kind") == "confirm"
             and call.get("offer_id")):

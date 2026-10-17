@@ -40,8 +40,8 @@ export default function Campaigns({ state }) {
                 </span>
                 {c.name && c.name !== cropName(c.crop) && <span className="camp-sub">{cropName(c.crop)}</span>}
                 <span className="camp-figs">
-                  <span><b className="num">{fmtT(c.target_kg_per_week || 0)} t</b> a week · {(({ start, end }) => `${shortDay(start)} – ${shortDay(end)}`)(datesOf(c, state.settings))}</span>
-                  <span>{farmers.length} farmers · {toCall} to call</span>
+                  <span><b className="num">{fmtT(c.target_kg_per_week || 0)} t</b> a week, {(({ start, end }) => `${shortDay(start)} – ${shortDay(end)}`)(datesOf(c, state.settings))}</span>
+                  <span>{farmers.length} farmers, {toCall} to call</span>
                 </span>
               </button>
               {picked && can("campaign.run") && (
@@ -167,7 +167,7 @@ function NewCampaign({ onClose, state, soon, onMade, ofFarmer }) {
                   return (
                     <li key={x.id}><label>
                       <input type="checkbox" checked={ticked.has(x.id)} onChange={() => toggle(x.id)} />
-                      <span>{x.name}<small className="muted">{x.village ? ` · ${x.village}` : ""}{now ? ` · now in ${campLabel(now)}` : ""}</small></span>
+                      <span>{x.name}<small className="muted">{x.village ? `, ${x.village}` : ""}{now ? `, now in ${campLabel(now)}` : ""}</small></span>
                     </label></li>
                   );
                 })}

@@ -26,6 +26,7 @@ function UserForm({ user, roles, onClose, onSaved }) {
     setSaving(false);
     onSaved();
   };
+  const self = editing && user.id === getSession()?.id;  // editing yourself: keep your own role and sign-in
   return (
     <Dialog open={!!user} onClose={onClose} title={editing ? `Edit ${user.name}` : "Add a user"}>
       <form onSubmit={save}>
@@ -43,14 +44,14 @@ function UserForm({ user, roles, onClose, onSaved }) {
             {editing && user.demo_login && <span className="hint">This account still uses the demo password. A new one takes it off the sign-in page's demo list.</span>}
           </label>
           <label className="field">Role
-            <select required value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>
+            <select required value={f.role} disabled={self} title={self ? "You cannot change your own role" : undefined} onChange={(e) => setF({ ...f, role: e.target.value })}>
               {roles.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
             </select>
           </label>
           <p className="sub" style={{ margin: 0 }}>{help}</p>
           {editing && (
             <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
-              <input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Can sign in
+              <input type="checkbox" checked={f.active} disabled={self} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Can sign in{self ? " (you cannot turn yourself off)" : ""}
             </label>
           )}
         </div>
@@ -115,14 +116,14 @@ export default function Users() {
           <div><h2 id="users-title">People</h2><div className="sub">{data.users.length} users, {active} can sign in</div></div>
         </div>
         <div className="table-wrap">
-          <table style={{ minWidth: 640 }}>
+          <table className="users-table">
             <thead><tr><th style={{ paddingLeft: 22 }}>Name</th><th>Username</th><th>Role</th><th>Status</th><th style={{ paddingRight: 22 }}><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {data.users.map((u) => (
                 <tr key={u.id}>
                   <td style={{ paddingLeft: 22 }}><div className="who-cell"><Avatar name={u.name} cls="sm" person /><div><b>{u.name}</b>{u.id === me.user_id && <span>You</span>}</div></div></td>
                   <td className="num">{u.username || "–"}</td>
-                  <td>{roleName(u.role)}{u.demo && <>{" "}<Pill cls="amber">Demo user</Pill></>}</td>
+                  <td>{roleName(u.role)}{u.demo && <>{" "}<Pill>Demo user</Pill></>}</td>
                   <td>{!u.active ? <Pill>Turned off</Pill> : !u.has_password ? <Pill cls="amber">No password yet</Pill> : <Pill cls="mint">Can sign in</Pill>}</td>
                   <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
                     <button className="btn sm" type="button" onClick={() => setForm(u)}>Edit</button>{" "}
@@ -138,7 +139,7 @@ export default function Users() {
       <section className="card" aria-labelledby="roles-title">
         <div className="card-head"><h2 id="roles-title">What each role may do</h2></div>
         <div className="table-wrap">
-          <table style={{ minWidth: 640 }}>
+          <table className="roles-table">
             <thead><tr><th style={{ paddingLeft: 22 }}>Right</th>{data.roles.map((r) => <th key={r.id} className="r" title={r.description}>{r.label}{r.demo && <div className="sub">demo</div>}</th>)}</tr></thead>
             <tbody>
               {caps.map(([key, label]) => (

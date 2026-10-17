@@ -20,7 +20,7 @@ in `DECISIONS.md`). Do not delete, shorten or "simplify" any of it without askin
 - `backend/app/`: FastAPI gateway (`main.py`), Gemini Live relay (`live_session.py`), the agent's tools
   (`tools.py`), prompt (`prompt.py`), price rules (`rules_engine.py`), services, `access.py` and `auth.py`
   (users, roles, capabilities), stores (memory or Firestore).
-- `frontend/`: the React dashboard (Vite), built into `frontend/dist` and served by Firebase Hosting. A teammate (Wilbert) owns it.
+- `frontend/`: the React dashboard (Vite), built into `frontend/dist` and served by Firebase Hosting. A teammate (Wilbert) owns it. Follow `DESIGN.md` for how screens look.
 - `web/`: the call client (`call.html`, `js/call.js`, `js/audio-worklets.js`), `mic-test.html`, shared `js/data.js` and `samples/`;
   the build copies these into `dist` (list in `frontend/vite.config.js`: add any new file there). The other pages in `web/`
   (`index.html`, `setup.html`, ...) are the old vanilla dashboard and are no longer deployed; change the React app instead.

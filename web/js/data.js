@@ -180,15 +180,15 @@ const PHONE_OUTCOME = { no_answer: "No answer", busy: "Busy", failed: "Call fail
   not_connected: "Not connected", skipped: "Skipped" };
 export function callChip(c) {
   const phone = c.channel === "twilio";
-  const tag = phone ? "Phone · " : "";
-  if (c.status === "on_call") return { cls: "leaf", text: `${tag}On call · ${elapsed(c.started_at)}` };
-  if (c.status === "done") return { cls: "mint", text: tag + (c.harvest_confidence ? `Done · ${c.harvest_confidence}` : "Done") };
+  const tag = phone ? "Phone, " : "";
+  if (c.status === "on_call") return { cls: "leaf", text: `${tag}on call, ${elapsed(c.started_at)}` };
+  if (c.status === "done") return { cls: "mint", text: tag + (c.harvest_confidence ? `done, ${c.harvest_confidence}` : "Done") };
   if (c.status === "dropped") {
     const why = phone && PHONE_OUTCOME[c.outcome] ? PHONE_OUTCOME[c.outcome] : "Dropped";
-    return { cls: "", text: tag + (c.retry_queued ? `${why} · retry queued` : why) };
+    return { cls: "", text: tag + (c.retry_queued ? `${why}, retry queued` : why) };
   }
   if (c.status === "declined") return { cls: "", text: `${tag}Declined` };
-  if (phone && c.dialed_at) return { cls: "leaf", text: "Phone · ringing" };
+  if (phone && c.dialed_at) return { cls: "leaf", text: "Phone, ringing" };
   return { cls: "", text: `${tag}Queued` };
 }
 

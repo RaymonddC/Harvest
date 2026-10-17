@@ -32,7 +32,7 @@ const Line = ({ label, kg }) => <div><span>{label}</span><b className="num">{fmt
 function TipBody({ r, target }) {
   return (
     <>
-      <strong>{r.label} · {shortDate(r.week_start)}</strong>
+      <strong>{r.label}, {shortDate(r.week_start)}</strong>
       <Line label="Firm answers" kg={r.firm_kg} />
       {r.unsure_weighted_kg > 0 && <Line label={r.unsure_count ? `${r.unsure_count} unsure, counted half` : "Unsure, counted half"} kg={r.unsure_weighted_kg} />}
       {r.projected_kg > 0 && <Line label="Later harvest rounds (projected)" kg={r.projected_kg} />}
@@ -54,7 +54,9 @@ function Col({ r, target, children }) {
   return (
     <Tooltip.Root open={open} onOpenChange={setOpen}>
       <Tooltip.Trigger asChild>
-        <div className={`col ${r.is_gap ? "is-gap" : ""} ${r.before_start ? "before-start" : ""}`} tabIndex={0} onClick={() => setOpen((o) => !o)}>{children}</div>
+        <div className={`col ${r.is_gap ? "is-gap" : ""} ${r.before_start ? "before-start" : ""}`} tabIndex={0} role="button" aria-expanded={open}
+          aria-label={`${r.label}: ${Math.round(r.expected_kg / 100) / 10} of ${Math.round(r.target_kg / 100) / 10} t expected${r.is_gap ? ", short" : ""}. Show the breakdown`}
+          onClick={() => setOpen((o) => !o)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}>{children}</div>
       </Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Content className="chart-tip" side="top" sideOffset={6} collisionPadding={12}>

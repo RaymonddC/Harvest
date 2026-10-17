@@ -4,6 +4,7 @@ import { useCrop } from "../campaigns.jsx";
 import { api, fmtKg, fmtT, KIND_WORD } from "../lib.js";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
+import { SegToggle } from "../ui.jsx";
 
 // What happens on which day: calls made and planned (and the weekly Monday calls), harvests (the next round
 // each farmer gave, and later rounds projected from how often they harvest), deal delivery weeks, weighbridge
@@ -22,17 +23,17 @@ const OUTCOME = { completed: "done", declined: "declined", no_answer: "no answer
 
 function label(e, names) {
   switch (e.type) {
-    case "call": return `${e.planned ? "Waiting: " : ""}${e.farmer_name} · ${(KIND_WORD[e.kind] || "call").replace(" call", "")}${e.outcome && OUTCOME[e.outcome] ? ` · ${OUTCOME[e.outcome]}` : ""}`;
-    case "call_plan": return `Weekly calls · ${names[e.campaign_id] || ""}`;
+    case "call": return `${e.planned ? "Waiting: " : ""}${e.farmer_name}, ${(KIND_WORD[e.kind] || "call").replace(" call", "")}${e.outcome && OUTCOME[e.outcome] ? `, ${OUTCOME[e.outcome]}` : ""}`;
+    case "call_plan": return `Weekly calls, ${names[e.campaign_id] || ""}`;
     case "campaign_start": return `${names[e.campaign_id] || "Campaign"} starts`;
     case "campaign_end": return `${names[e.campaign_id] || "Campaign"} ends`;
-    case "harvest": return `${e.farmer_name} · ${fmtT(e.kg)} t${e.projected ? " (projected)" : e.confidence === "unsure" ? " (unsure)" : ""}`;
-    case "deal": return `Deal · ${e.farmer_name} · ${fmtT(e.kg)} t${e.status === "approved" ? "" : " · waiting"}`;
-    case "delivery": return `Delivered · ${e.farmer_name} · ${fmtT(e.kg)} t`;
+    case "harvest": return `${e.farmer_name}, ${fmtT(e.kg)} t${e.projected ? " (projected)" : e.confidence === "unsure" ? " (unsure)" : ""}`;
+    case "deal": return `Deal, ${e.farmer_name}, ${fmtT(e.kg)} t${e.status === "approved" ? "" : ", waiting"}`;
+    case "delivery": return `Delivered, ${e.farmer_name}, ${fmtT(e.kg)} t`;
     default: return "";
   }
 }
-// One chip per kind and day: a single event by name, several as a count and total ("9 harvests · 12 t").
+// One chip per kind and day: a single event by name, several as a count and total ("12 t, 9 harvests").
 const GROUP_WORD = { call: ["call", "calls"], harvest: ["harvest", "harvests"], deal: ["deal", "deals"], delivery: ["delivery", "deliveries"] };
 function chips(evs, names) {
   const groups = [];
@@ -46,7 +47,7 @@ function chips(evs, names) {
     const kg = g.items.reduce((n, e) => n + (e.kg || 0), 0);
     const waiting = g.items.filter((e) => e.planned || (e.type === "deal" && e.status !== "approved")).length;
     const allProjected = g.items.every((e) => e.projected);
-    return { text: `${g.items.length} ${g.items.length === 1 ? one : many}${kg ? ` · ${fmtT(kg)} t` : ""}${waiting ? ` · ${waiting} waiting` : ""}${allProjected ? " (projected)" : ""}`,
+    return { text: `${kg ? `${fmtT(kg)} t, ` : ""}${g.items.length} ${g.items.length === 1 ? one : many}${waiting ? `, ${waiting} waiting` : ""}${allProjected ? " (projected)" : ""}`,
       cls: `${g.type} ${allProjected ? "projected" : ""} ${waiting === g.items.length && g.type === "call" ? "planned" : ""}` };
   });
 }
@@ -63,6 +64,12 @@ export default function Calendar() {
   const [shownTypes, setShownTypes] = useState(() => new Set(TYPES.map((t) => t.key)));
   const [data, setData] = useState(null);
   const [day, setDay] = useState(() => iso(asked || new Date()));
+  // A day outside the month on screen has no data loaded: move the selection into the month (today if it is there).
+  useEffect(() => {
+    if (new Date(`${day}T00:00:00`).getMonth() === month.getMonth()) return;
+    const now = new Date();
+    setDay(iso(now.getMonth() === month.getMonth() && now.getFullYear() === month.getFullYear() ? now : month));
+  }, [month]); // eslint-disable-line react-hooks/exhaustive-deps
   const [error, setError] = useState("");
 
   const gridStart = mondayOf(month);
@@ -106,10 +113,7 @@ export default function Calendar() {
         <h1>Calendar</h1>
         <p>Calls, harvests, deals and deliveries by day{scope === "one" && campaign.label ? `, for ${campaign.label}` : ", for every campaign"}.</p>
       </div>
-      <div className="seg-toggle" role="group" aria-label="Which campaigns">
-        <button type="button" className={scope === "one" ? "on" : ""} aria-pressed={scope === "one"} onClick={() => setScope("one")}>This campaign</button>
-        <button type="button" className={scope === "all" ? "on" : ""} aria-pressed={scope === "all"} onClick={() => setScope("all")}>All campaigns</button>
-      </div>
+      <SegToggle label="Which campaigns" options={[["one", "This campaign"], ["all", "All campaigns"]]} value={scope} onChange={setScope} />
     </div>
   );
 
@@ -166,7 +170,7 @@ export default function Calendar() {
           <h2>{new Date(day + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</h2>
           {dayWeek.map((w) => (
             <p key={`${w.campaign_id}-${w.label}`} className={`cal-weekline ${w.is_gap ? "short" : ""}`}>
-              {scope === "all" ? `${names[w.campaign_id] || ""} · ` : ""}{w.label}: {fmtT(w.expected_kg)} of {fmtT(w.target_kg)} t expected{w.is_gap ? ` · ${fmtT(w.gap_kg)} t short` : ""}
+              {scope === "all" ? `${names[w.campaign_id] || ""}, ` : ""}{w.label}: {fmtT(w.expected_kg)} of {fmtT(w.target_kg)} t expected{w.is_gap ? `, ${fmtT(w.gap_kg)} t short` : ""}
             </p>
           ))}
           {dayEvents.length ? (
@@ -180,7 +184,7 @@ export default function Calendar() {
                       {[e.time, scope === "all" && names[e.campaign_id], e.type === "deal" && e.price_per_kg ? `${fmtKg(e.price_per_kg)} ${e.currency}/kg` : null,
                         e.type === "deal" && e.status === "approved" ? (e.confirmed_by_voice ? "confirmed by voice" : "confirmation call waiting") : null,
                         e.type === "call_plan" ? (e.channel === "twilio" ? "rings the farmers' phones" : "queued for the browser") : null,
-                        e.type === "harvest" && e.projected ? "from how often they harvest" : null].filter(Boolean).join(" · ")}
+                        e.type === "harvest" && e.projected ? "from how often they harvest" : null].filter(Boolean).join(", ")}
                     </small>
                   </div>
                 </li>

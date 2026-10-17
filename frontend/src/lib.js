@@ -4,6 +4,7 @@ export {
   api, apiUrl, callChip, cfg, clearSession, cropLabel, download, fmtKg, fmtPrice, fmtT, getSession, ICON_PATHS,
   initials, KIND_WORD, maskPhone, plainPrice, roleLabel, can, signIn, subscribe,
 } from "../../web/js/data.js";
+import { api as dataApi } from "../../web/js/data.js";
 
 // Planner pages: route, sidebar label (the key is also the icon name). "need" is the capability a
 // page requires before it shows in the sidebar.
@@ -46,6 +47,12 @@ export const gapFillBody = (state) => ({ kind: "gap_fill", channel: state?.setti
 // The real-call allowlist: the server's numbers (REAL_CALL_ALLOWLIST) plus the ones added in the dashboard.
 // Same comparison as the backend: "+" and the digits.
 export const e164 = (phone) => `+${String(phone || "").replace(/\D/g, "")}`;
+// Reads the dashboard repeats (traceability, track record, ...) are kept for this visit, so a page shows the last
+// answer at once and refreshes it in place instead of popping a card in later and pushing the page down.
+const GET_CACHE = new Map();
+export const peekGet = (url) => GET_CACHE.get(url);
+export const cachedGet = (url) => dataApi(url, { method: "GET" }).then((r) => { GET_CACHE.set(url, r); return r; });
+
 // Real calls reach farmers with Agent calls on, and the numbers in REAL_CALL_ALLOWLIST on the server.
 export const numberAllowed = (state, phone) => {
   const s = state?.settings || {};

@@ -1425,7 +1425,7 @@ body.app .hero, .hero { background: none !important; border: 0; border-bottom: 1
 .hero.ok h2 .num { color: var(--leaf-deep); }
 .hero h2 small { font-size: 15px; font-weight: 500; }
 .hero p { margin: 0; color: var(--muted); }
-.hero .hero-mark { display: none; }
+.hero.gap .hero-mark { display: none; }
 .todo-list li { padding-left: 0; }
 .todo-list li::before { display: none; }
 .todo-list li b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 8px 1px 0; background: var(--line-strong); }
@@ -1476,3 +1476,288 @@ body.app .hero.gap, body.app .hero.ok, .hero.gap, .hero.ok { border-color: var(-
 .seg-fields legend { font-size: 13px; font-weight: 700; padding: 0 4px; }
 .avatar-face { flex: none; border-radius: 10px; }
 .avatar-face.quiet { opacity: .6; filter: saturate(.5); }
+
+/* ==========================================================================================
+   Design system pass (see DESIGN.md). Green has four jobs, the canvas is warm, cards float on a whisper of shadow,
+   every button is a pill that presses in, and tables are rows split by one hairline.
+   ========================================================================================== */
+body.app {
+  --g-deep: #0F3D2A;    /* sidebar, dark bands, the main dark button */
+  --g-action: #16774E;  /* filled actions, links, switches, progress */
+  --g-text: #12573A;    /* green words: positive figures, active tabs */
+  --g-wash: #E4F1E9;    /* tints: selected rows, soft chips */
+  --canvas-warm: #F3F2EC;
+  --text: #1B231F;
+  --hairline: #E5E4DD;
+  --card-shadow: 0 0 0.5px rgba(16, 24, 20, .16), 0 1px 2px rgba(16, 24, 20, .10);
+  --card-shadow-lift: 0 0 0.5px rgba(16, 24, 20, .16), 0 2px 4px rgba(16, 24, 20, .08), 0 8px 16px rgba(16, 24, 20, .06);
+  background: var(--canvas-warm);
+  color: var(--text);
+}
+body.app .card, body.app .kpi, body.app .facts-line, body.app .camp, body.app .offers-card, body.app .week-summary {
+  border: 0; border-radius: 12px; box-shadow: var(--card-shadow);
+}
+body.app .hc-sheet { box-shadow: var(--card-shadow-lift); }
+
+/* Buttons: one pill shape, pressed in on click, no coloured glow under them */
+body.app .btn { border-radius: 999px; padding: 0 18px; box-shadow: none !important; transition: transform .12s ease, background-color .15s, border-color .15s, color .15s; }
+body.app .btn:active:not(:disabled) { transform: scale(.96); }
+body.app .btn.solid:hover:not(:disabled), body.app .btn.leaf:hover:not(:disabled) { transform: none; }
+body.app .btn.solid { background: var(--g-deep); border-color: var(--g-deep); }
+body.app .btn.solid:hover:not(:disabled) { background: #14492F; border-color: #14492F; }
+body.app .btn.leaf { background: var(--g-action); border-color: var(--g-action); }
+body.app .btn:not(.solid):not(.leaf):not(.mint):not(.ghost):not(.on-ink):not(.danger-solid):not(.danger) { border-color: #CFCEC5; background: #fff; }
+body.app .btn:not(.solid):not(.leaf):not(.mint):not(.ghost):not(.on-ink):not(.danger-solid):not(.danger):hover:not(:disabled) { border-color: var(--g-action); color: var(--g-deep); }
+body.app .btn.sm { padding: 0 14px; }
+@media (prefers-reduced-motion: reduce) { body.app .btn:active { transform: none; } }
+
+/* Tables: rows split by one hairline, no fill on the header, numbers line up */
+body.app table th { background: none; color: var(--muted); font-size: 12.5px; font-weight: 700; border-bottom: 1px solid var(--hairline); }
+body.app table td { border-bottom: 1px solid var(--hairline); }
+body.app table tr:last-child td { border-bottom: 0; }
+body.app table tbody tr:hover td { background: #FAFAF6; }
+body.app .num, body.app td.r { font-variant-numeric: tabular-nums; }
+
+/* Green has a job, not a mood: green words for good figures and the active place */
+body.app .tabs a[aria-current="page"], body.app .tabs .on { color: var(--g-text); }
+body.app .pill.mint { background: var(--g-wash); color: var(--g-text); }
+body.app a:not(.btn) { color: var(--g-action); }
+
+/* Inputs: calm, square-ish, green when focused */
+body.app input[type="text"], body.app input[type="search"], body.app input[type="date"], body.app input[type="number"], body.app select, body.app textarea {
+  border-color: #D6D5CD; border-radius: 10px; background: #fff;
+}
+body.app input:focus-visible, body.app select:focus-visible, body.app textarea:focus-visible { outline: 3px solid var(--g-wash); outline-offset: 0; border-color: var(--g-action); }
+body.app table.farmers td:nth-child(2), body.app table.farmers td:nth-child(3), body.app table.farmers td:nth-child(4),
+body.app table.farmers td:nth-child(6) { white-space: nowrap; }
+body.app table.farmers .who-cell span { white-space: nowrap; }
+
+/* ---------- Motion that answers an action (see DESIGN.md) ---------- */
+.seg-toggle button { position: relative; }
+.seg-toggle button.on { background: none; color: var(--on-ink); }
+.seg-toggle .seg-pill { position: absolute; inset: 0; border-radius: 999px; background: var(--g-deep, var(--ink)); z-index: 0; }
+.seg-toggle .seg-text { position: relative; z-index: 1; }
+.seg-toggle button:not(.on):hover { color: var(--ink); }
+.todo-list li { overflow: hidden; }
+/* bars grow to their new size when the numbers change */
+.chain-bar span, .have-bar i { transition: flex-grow .5s cubic-bezier(.2, .8, .2, 1); }
+.tbd-bar > * { transition: width .5s cubic-bezier(.2, .8, .2, 1); }
+.meter i, .trace-rows .meter i { transition: width .5s cubic-bezier(.2, .8, .2, 1); }
+/* cards and rows answer the pointer */
+body.app .board .pcard { transition: background-color .15s ease, transform .15s ease; }
+body.app .board .pcard:active { transform: scale(.98); }
+@media (prefers-reduced-motion: reduce) {
+  .chain-bar span, .have-bar i, .tbd-bar > *, .meter i { transition: none; }
+  body.app .board .pcard:active { transform: none; }
+}
+
+/* Space held for a card that is still loading, so the page below does not jump when it arrives */
+.trace-wait { min-height: 266px; background: linear-gradient(90deg, #fff 0%, #FAFAF6 50%, #fff 100%); }
+
+/* ---------- Motion, after the find-animation-opportunities gate (see DESIGN.md) ----------
+   One curve everywhere; transform and opacity only; reduced motion keeps a gentle fade instead of movement. */
+:root { --ease-out: cubic-bezier(.2, .8, .2, 1); --ease-in: cubic-bezier(.5, 0, .75, 0); }
+
+/* 1. Panels leave the way they came (Radix waits for the closing animation before removing them) */
+.hc-sheet[data-state="closed"] { animation: hc-sheet-out .2s var(--ease-in) forwards; }
+.hc-overlay[data-state="closed"] { animation: hc-fade-out .15s ease-in forwards; }
+@keyframes hc-sheet-out { to { transform: translateX(100%); opacity: 0; } }
+@keyframes hc-fade-out { to { opacity: 0; } }
+@media (max-width: 640px) {
+  .hc-sheet[data-state="closed"] { animation-name: hc-sheet-down; }
+  @keyframes hc-sheet-down { to { transform: translateY(100%); opacity: 0; } }
+}
+.hc-dialog[data-state="closed"] { animation: hc-dialog-out .15s ease-in forwards; }
+@keyframes hc-dialog-out { to { opacity: 0; transform: translate(-50%, calc(-50% + 6px)); } }
+
+/* 2. Menus grow from the button that opened them */
+.hc-menu { transform-origin: var(--radix-dropdown-menu-content-transform-origin); }
+.hc-menu[data-state="open"] { animation: hc-menu-in .15s var(--ease-out); }
+.hc-menu[data-state="closed"] { animation: hc-fade-out .1s ease-in forwards; }
+@keyframes hc-menu-in { from { opacity: 0; transform: scale(.97); } }
+
+/* 3. Folded sections settle in when opened */
+details[open] > :not(summary) { animation: hc-unfold .18s var(--ease-out); }
+@keyframes hc-unfold { from { opacity: 0; transform: translateY(-4px); } }
+
+/* 4. The rare "all done" mark (motion in GapCard and Overview) */
+.todo-done .done-mark { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--leaf); color: #fff; vertical-align: middle; margin-right: 6px; }
+
+/* 5. Press feedback: subtle, on the shared curve */
+body.app .btn { transition: transform 160ms var(--ease-out), background-color .15s, border-color .15s, color .15s; }
+body.app .btn:active:not(:disabled) { transform: scale(.97); }
+
+/* Data bars change only when the numbers do, and quickly */
+.chain-bar span, .have-bar i { transition: flex-grow .3s var(--ease-out); }
+.tbd-bar > *, .meter i, .trace-rows .meter i { transition: width .3s var(--ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hc-sheet[data-state="closed"], .hc-dialog[data-state="closed"] { animation: hc-fade-out .15s ease-in forwards; }
+  .hc-menu[data-state="open"], details[open] > :not(summary) { animation: hc-fade .12s ease-out; }
+  body.app .btn:active:not(:disabled) { transform: none; }
+}
+
+/* ==================== Fixes from the impeccable review of every page ==================== */
+/* Danger buttons stay red (the design-system pass painted every non-solid button white) */
+body.app .btn.danger-solid { background: #B3261E; border-color: #B3261E; color: #fff; }
+body.app .btn.danger-solid:hover:not(:disabled) { background: #8F1D17; border-color: #8F1D17; color: #fff; }
+
+/* A focus ring you can see on light and dark: action green on light surfaces (5.5:1), mint on the dark sidebar */
+body.app :focus-visible { outline: 3px solid var(--g-action, #16774E); outline-offset: 2px; }
+body.app .side :focus-visible { outline-color: #7FE0B4; }
+body.app .side .account:focus-visible { outline: 3px solid #7FE0B4; outline-offset: 2px; background: rgba(255, 255, 255, .11); }
+
+/* Form controls: borders at 3:1 against white */
+body.app input[type="text"], body.app input[type="search"], body.app input[type="date"], body.app input[type="number"],
+body.app select, body.app textarea, body.app .filter-select { border-color: #8E8D84; }
+body.app input[type="checkbox"], body.app input[type="radio"] { width: 18px; height: 18px; accent-color: var(--g-action, #16774E); }
+
+/* Sidebar labels in sentence case, readable */
+.nav-step { text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 700; }
+body.app .guide-toggle { text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.step-label, .tbd-week { text-transform: none; letter-spacing: 0; }
+body.app .guide-steps li.done > span { color: #A9C6B6; }
+
+/* The step line under the tabs: a plain line, not a tinted box */
+body.app .flow-line { background: none; border: 0; box-shadow: none; padding: 0 0 4px; border-bottom: 1px solid var(--hairline, #E5E4DD); border-radius: 0; }
+
+/* Campaign context next to a page title */
+.h1-ctx { margin-left: 10px; font-size: .6em; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+.h-ctx { margin-left: 6px; font-weight: 600; color: var(--muted); }
+.og-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+
+/* Stage chips: a soft wash, no coloured left edge */
+.stage-chip { border-left: 0 !important; background: var(--g-wash, #E4F1E9); color: var(--g-text, #12573A); }
+.stage-chip.st-to_call, .stage-chip.st-no_reply { background: #FBF0D9; color: #8A5605; }
+.stage-chip.st-calling { background: #E3EEF8; color: #23598A; }
+.stage-chip.st-offer { background: #F3E8D6; color: #6E4A10; }
+.stage-chip.st-delivered { background: #EEEFEF; color: #4B5563; }
+.next-action { border: 0; }
+.next-action::before { display: none !important; }
+
+/* Calls: filter chips with counts, not stat tiles */
+.call-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.call-stat { flex-direction: row; align-items: baseline; gap: 6px; padding: 0 14px; min-height: 40px; border-radius: 999px; background: #fff; border: 1px solid #CFCEC5; box-shadow: none; }
+.call-stat b { font-size: 15px; }
+.call-stat span { font-size: 13.5px; }
+.call-stat small { font-size: 12px; color: var(--muted); }
+.call-stat.on { background: var(--g-deep, #0F3D2A); border-color: var(--g-deep, #0F3D2A); color: #fff; }
+.call-stat.on span, .call-stat.on small { color: #D7E9DF; }
+.call-stat.warn b { color: #8A5605; }
+.call-stat.on.warn b { color: #FFD48A; }
+
+/* Campaign's dark Call card: columns split by a hairline, not three tiles; the time select readable */
+body.app .start-card .stats { gap: 0; }
+body.app .start-card .stats div { background: none; border-left: 1px solid rgba(255, 255, 255, .14); border-radius: 0; padding: 2px 14px; }
+body.app .start-card .stats div:first-child { border-left: 0; padding-left: 0; }
+body.app .start-card select { color: #1B231F; background: #fff; }
+
+/* Agent: the unsaved note */
+.unsaved-note { font-size: 13px; font-weight: 700; color: #8A5605; align-self: center; }
+
+/* Phones: tap targets at least 44px, content clear of the bottom bar, calendar chips as counts */
+@media (max-width: 860px) {
+  body.app .btn.sm, body.app .seg-toggle button, .call-stat { min-height: 44px; }
+  body.app main.page { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .cal-chip { font-size: 0 !important; width: 8px; height: 8px; min-height: 0; padding: 0 !important; border-radius: 50%; overflow: hidden; display: inline-block; margin: 1px; }
+}
+
+/* Re-measure fixes: agent selects at 3:1, out-of-month day numbers readable (4.5:1) */
+body.app .agent-col select { border-color: #8E8D84; }
+body.app .cal-day.out .cal-num { color: #6B726D; }
+
+/* ---------- Nothing scrolls sideways: tables fit their card, the board wraps its lanes ---------- */
+.call-stat { align-items: center; justify-content: center; padding: 0 16px; line-height: 1.2; white-space: nowrap; }
+.call-stat b, .call-stat span, .call-stat small { line-height: 1.2; }
+.call-stat b { font-size: 15px; }
+.call-stat span { font-size: 13.5px; font-weight: 600; }
+
+body.app .table-wrap { overflow-x: visible; }
+body.app table.fit, body.app table.answers { min-width: 0 !important; width: 100%; }
+body.app table.answers td, body.app table.answers th { overflow-wrap: anywhere; }
+@media (max-width: 1280px) { body.app table.farmers .c-lang, body.app table.farmers .c-crop { display: none; } }
+@media (max-width: 1100px) { body.app table.farmers .c-plot, body.app table.answers .c-other { display: none; } }
+@media (max-width: 900px) { body.app table.farmers .c-phone, body.app table.farmers .c-kg, body.app table.answers .c-offer { display: none; } }
+@media (max-width: 640px) { body.app table.farmers .c-camp { display: none; } body.app table.farmers td:last-child .btn:not(.more) { display: none; } }
+
+/* Board: lanes share the width (empty lanes take less); below 1100px they wrap into rows instead of scrolling */
+body.app .board { overflow-x: visible; grid-auto-flow: row; grid-template-columns: var(--lanes, repeat(7, minmax(0, 1fr))); }
+@media (max-width: 1100px) {
+  body.app .board { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important; row-gap: 18px; }
+  body.app .board .col { border-left: 0; padding-left: 2px; }
+}
+/* the last pieces that still overflowed */
+@media (max-width: 1500px) { body.app table.farmers .c-lang, body.app table.farmers .c-crop { display: none; } }
+@media (max-width: 1100px) { body.app table.farmers .c-phone, body.app table.farmers .c-kg { display: none; } }
+body.app table.farmers .cell-select { max-width: 170px; }
+.auto-days { flex-wrap: wrap; }
+body.app .board .col { min-width: 0; }
+body.app .board .pcard { min-width: 0; }
+@media (max-width: 640px) {
+  body.app table.users-table th:nth-child(2), body.app table.users-table td:nth-child(2),
+  body.app table.users-table th:nth-child(4), body.app table.users-table td:nth-child(4) { display: none; }
+}
+body.app table.roles-table { table-layout: fixed; }
+body.app table.roles-table th, body.app table.roles-table td { overflow-wrap: anywhere; font-size: 13px; }
+.auto-days { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.auto-days button { min-width: 0; padding: 0 2px; }
+body.app table.users-table td, body.app table.users-table th { overflow-wrap: anywhere; }
+.cal-nav { flex-wrap: wrap; row-gap: 6px; }
+
+/* Forecast legends share one vocabulary: green is expected, grey is delivered (as on the board's Delivered lane),
+   deep green is an approved deal, amber is short, red is over capacity */
+.legend i.l-arrived { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: #6B7280; }
+.supply-chart .sb-del { background: #6B7280; }
+
+/* ---------- Campaign step cards, compact: each card as tall as its content, tighter type and spacing ---------- */
+body.app .steps.linked { align-items: start; gap: 18px; }
+body.app .steps.linked > .card { align-self: start; padding: 18px 20px; gap: 12px; }
+body.app .steps.linked > .card:not(:last-child)::after { top: 31px; }
+body.app .steps.linked .step-head h2 { font-size: 16px; }
+body.app .steps.linked .step-head .sub { font-size: 13px; line-height: 1.45; }
+/* Step 1: a plain summary instead of a dashed drop box */
+body.app .steps.linked .drop { border: 0; background: none; padding: 0; align-items: flex-start; text-align: left; gap: 6px; justify-content: flex-start; }
+body.app .steps.linked .drop .big { font-size: 15px; }
+body.app .steps.linked .drop .stack .avatar, body.app .steps.linked .drop .stack .avatar-face { width: 28px; height: 28px; }
+body.app .steps.linked .drop .btn { min-height: 36px; padding: 0 14px; font-size: 13px; }
+body.app .steps.linked .drop > div:last-child, body.app .steps.linked .drop .acts { justify-content: flex-start; }
+/* Step 2: the save row sits right under the range, not pushed to the bottom */
+body.app .steps.linked .card .save-row, body.app .steps.linked .card form > :last-child { margin-top: 4px; }
+/* Step 3: shorter blocks inside the dark card */
+body.app .start-card .stats div { padding: 0 12px; }
+body.app .start-card .stats b { font-size: 16px; }
+body.app .start-card .call-mode { font-size: 12.5px; padding: 8px 10px; }
+body.app .start-card .start-acts .btn.big { min-height: 44px; font-size: 14.5px; }
+body.app .start-card .auto-days button { min-height: 32px; font-size: 12.5px; }
+@media (max-width: 860px) { body.app .start-card .auto-days button, body.app .steps.linked .drop .btn { min-height: 44px; } }
+
+/* Campaign steps: three cards of the same width and height, the action at the bottom of each */
+@media (min-width: 1240px) { body.app .steps.linked { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+body.app .steps.linked { align-items: stretch; }
+body.app .steps.linked > .card { align-self: stretch; display: flex; flex-direction: column; }
+body.app .steps.linked > .card > :last-child { margin-top: auto; }
+body.app .steps.linked .drop { flex: 1; }
+.auto-more summary { cursor: pointer; font-size: 13px; font-weight: 700; color: #D7E9DF; margin: 6px 0; }
+.auto-more[open] summary { margin-bottom: 8px; }
+
+/* Calls page: the live line above the answers */
+.live-now { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; font-size: 14px; }
+
+/* ---------- Calls on now: one live card per call ---------- */
+.live-calls { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin: 0 0 16px; }
+.live-card { padding: 14px 16px; gap: 10px; outline: none; }
+.live-card:focus-visible { box-shadow: 0 0 0 3px var(--g-action, #16774E); }
+.live-head { display: flex; align-items: center; gap: 10px; }
+.live-head div { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.live-head small { color: var(--muted); font-size: 12.5px; }
+.live-time { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--g-text, #12573A); }
+.live-lines { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-top: 1px solid var(--hairline, #E5E4DD); border-bottom: 1px solid var(--hairline, #E5E4DD); }
+.live-line { margin: 0; font-size: 14px; line-height: 1.45; }
+.live-line span { display: block; font-size: 12px; font-weight: 700; color: var(--muted); }
+.live-line.agent span { color: var(--g-text, #12573A); }
+.live-notes { display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.live-notes b { font-weight: 700; }
+tr.is-live td { background: #F2F8F4; }
+.dot-live { animation: live-pulse 1.6s ease-in-out infinite; }
+@keyframes live-pulse { 50% { box-shadow: 0 0 0 5px rgba(22, 119, 78, .15); } }
+@media (prefers-reduced-motion: reduce) { .dot-live { animation: none; } }

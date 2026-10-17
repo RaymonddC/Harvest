@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { useLive } from "../../live.jsx";
 import { DeliveryBox } from "../setup/FarmerSheet.jsx";
-import { Dialog } from "../../ui.jsx";
+import { Dialog, DialogClose } from "../../ui.jsx";
 import { api, offerPoUrl, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { useConfirm } from "../../dialogs.jsx";
@@ -21,7 +21,7 @@ function detail(o) {
   else if (n.rung > 0) parts.push(`Accepted step ${n.rung + 1} of the offer ladder`);
   else parts.push("Accepted the first offer");
   if (o.from_week) parts.push(`moves delivery from week ${o.from_week}`);
-  return parts.join(" · ");
+  return parts.join(", ");
 }
 
 // What approving this offer does to the week it delivers in, from that week's shortfall today.
@@ -72,6 +72,8 @@ function RecordDelivery({ o }) {
       <Dialog open={open} onClose={() => setOpen(false)} title={`Delivery from ${farmer.name}`}>
         <p className="small muted" style={{ margin: "4px 0 10px" }}>Deal: {Math.round(o.kg).toLocaleString("en-US")} kg at {plainPrice(o.price_per_kg, o.currency || "IDR")}/kg. Enter what the weighbridge weighed; the receipt (PDF) is under All deliveries.</p>
         <DeliveryBox farmer={farmer} stateKey={String(o.delivered_kg || 0)} />
+        <p className="small muted" style={{ margin: "10px 0" }}>Enter the gross kg to add the delivery.</p>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}><DialogClose>Done</DialogClose></div>
       </Dialog>
     </>
   );
@@ -112,7 +114,7 @@ export default function Offer({ o, l, row, quote, confirming = false, imp = null
           </>
         ) : (
           <>
-            <Pill cls={o.status === "approved" ? "mint" : ""}>{confirmed ? "Approved · confirmed by voice" : confirming ? "Approved · calling now" : o.status === "approved" ? "Approved" : "Rejected"}</Pill>
+            <Pill cls={o.status === "approved" ? "mint" : ""}>{confirmed ? "Approved, confirmed by voice" : confirming ? "Approved, calling now" : o.status === "approved" ? "Approved" : "Rejected"}</Pill>
             {!confirmed && <ActButton need="offers.decide" className="btn ghost" busy="Undoing…" disabled={confirming} title={confirming ? "The confirmation call is in progress. Undo is available again if it ends without a confirmation." : undefined}
               run={() => act(() => api(`/api/offers/${o.id}/undo`), "Back to pending.")}>Undo</ActButton>}
           </>

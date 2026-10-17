@@ -23,16 +23,16 @@ function WeekCard({ state }) {
   const items = todoItems(state, cid);
   return (
     <div className="week-card" aria-label="To do">
-      <span className="wc-title">To do · {campaign.label || "this campaign"}</span>
+      <span className="wc-title">To do for {campaign.label || "this campaign"}</span>
       {items.length ? items.slice(0, 4).map((it) => (
         <Link key={it.key} className={`wc-item ${it.tone}`} to={it.to}>
           <i className="wc-dot" />
-          <span><b>{it.what}</b><small>{it.next} →</small></span>
+          <span><b>{it.what}</b><small>{it.next}</small></span>
         </Link>
       )) : (
         <div className="wc-item done"><i className="wc-dot" /><span><b>Nothing waiting</b><small>Every week is on track and every farmer has answered{nextAutoText(campaign) ? `; ${nextAutoText(campaign)}` : ""}.</small></span></div>
       )}
-      {items.length > 4 && <Link className="wc-more" to="/">All {items.length} on the Overview →</Link>}
+      {items.length > 4 && <Link className="wc-more" to="/">All {items.length} on the Overview</Link>}
     </div>
   );
 }
@@ -87,10 +87,10 @@ function FlowLine({ pathname, go }) {
   const next = PAGES.find((p) => p.key === page.next);
   return (
     <div className="flow-line" role="note">
-      {step ? <span className="flow-step"><b>{step.n}</b>Step {step.n} of {FLOW.length} · {step.label}</span>
+      {step ? <span className="flow-step"><b>{step.n}</b>Step {step.n} of {FLOW.length}: {step.label}</span>
         : <span className="flow-step settings">{page.step === OVERVIEW.id ? OVERVIEW.label : SETTINGS.label}</span>}
       <span className="flow-text">{page.line}</span>
-      {next && <Link className="flow-next" to={next.to} onClick={(e) => go(e, next.to)}>Then: {next.label} →</Link>}
+      {next && <Link className="flow-next" to={next.to} onClick={(e) => go(e, next.to)}>Next: {next.label}</Link>}
     </div>
   );
 }
@@ -105,12 +105,17 @@ const PAGE_OF = { "/": "overview", "/forecast": "forecast", "/setup": "setup", "
 
 // Sidebar (phone: top row plus a bottom tab bar, from app.css), a top bar holding the page
 // heading, and the banners for live-data trouble and view-only sessions.
+// The header's next-step button shows only where the page is about moving the work on; pages with their own main
+// action (Farmers, Campaign, Approvals) and settings pages do without it, so there is one main button per page.
+const NEXT_STEP_ON = ["/", "/forecast", "/calendar", "/calls"];
+
 export default function Shell({ title, head, children }) {
   const { state, status } = useLive();
   const { pathname } = useLocation();
   const session = getSession();
   const loading = !state && status !== "error";
   const navigate = useNavigate();
+  const { cid } = useCrop();
   const { guard } = useUnsaved();
   const waitingNow = state ? state.offers.filter((o) => ["pending", "escalated"].includes(o.status)).length : 0;
   // The tab title counts offers waiting for a decision, so it shows even in a background tab.
@@ -160,7 +165,7 @@ export default function Shell({ title, head, children }) {
   }, [loading]);
   if (!session) return <Navigate to={`/login?next=${encodeURIComponent(pathname)}`} replace />;
 
-  const waiting = state ? state.offers.filter((o) => ["pending", "escalated"].includes(o.status)).length : 0;
+  const waiting = state ? inCampaign(state, state.offers, cid).filter((o) => ["pending", "escalated"].includes(o.status)).length : 0;
   return (
     <>
       <aside className={`side ${collapsed ? "collapsed" : ""}`}>
@@ -209,10 +214,10 @@ export default function Shell({ title, head, children }) {
       </aside>
       <div className="workspace">
         <div className={`topbar ${scrolled ? "scrolled" : ""}`}>
-          <div className="topbar-row">{head}<NextStep page={PAGE_OF[pathname]} /></div>
+          <div className="topbar-row">{head}{NEXT_STEP_ON.includes(pathname) && <NextStep page={PAGE_OF[pathname]} />}</div>
         </div>
-        {/* A short fade as each page opens. */}
-        <motion.main className="page" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }}>
+        {/* No animation between pages: navigation is used all day, so the page simply swaps (pages are preloaded). */}
+        <main className="page">
           {!session.capabilities?.length && (
             <div className="banner" role="note">View only. You can watch the forecast, offers and calls, but anything that changes data is blocked. Use Switch user to sign in as someone who can.</div>
           )}
@@ -230,7 +235,7 @@ export default function Shell({ title, head, children }) {
           )}
           <FlowLine pathname={pathname} go={go} />
           {children}
-        </motion.main>
+        </main>
       </div>
       <Dialog open={help} onClose={() => setHelp(false)} title="Keyboard shortcuts">
         <dl className="shortcuts">

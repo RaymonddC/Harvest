@@ -24,7 +24,7 @@ const lasted = (c) => {  // "2 min 13 s" from start to end, when both are known
 
 function Row({ c, onShow }) {
   const chip = callChip(c);
-  const label = c.kind === "collect" ? c.farmer_name : `${c.farmer_name} · ${KIND_WORD[c.kind].replace(" call", "")}`;
+  const label = c.kind === "collect" ? c.farmer_name : `${c.farmer_name}, ${KIND_WORD[c.kind].replace(" call", "")}`;
   const inner = <><Avatar name={c.farmer_name} cls={`sm ${c.status === "on_call" ? "" : "grey"}`} /><span className="name">{label}</span><Pill cls={chip.cls}>{chip.text}</Pill></>;
   return c.status === "on_call" ? <div className="row">{inner}</div> : <button className="row" onClick={() => onShow(c)}>{inner}</button>;
 }

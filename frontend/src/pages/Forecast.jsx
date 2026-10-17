@@ -2,7 +2,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import CallRecap from "../components/forecast/CallRecap.jsx";
-import { CallLog, Calls } from "../components/forecast/Calls.jsx";
 import Chart from "../components/forecast/Chart.jsx";
 import { FillList, Hero } from "../components/forecast/GapCard.jsx";
 import GapNote from "../components/forecast/GapNote.jsx";
@@ -17,16 +16,16 @@ import { fmtT } from "../lib.js";
 import { campaignFor, forCrop, inCampaign, useCrop } from "../campaigns.jsx";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
+import { SegToggle } from "../ui.jsx";
 
-const PERIODS = [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]];
+const PERIODS = [["day", "Day"], ["week", "Week"], ["month", "Month"]];  // a year view was nearly empty for a season-long plan
 const PERIOD_KEY = "harvestPeriod";
 
 export default function Forecast() {
-  const [period, setPeriodState] = useState(() => { try { return localStorage.getItem(PERIOD_KEY) || "week"; } catch { return "week"; } });
+  const [period, setPeriodState] = useState(() => { try { const p = localStorage.getItem(PERIOD_KEY); return PERIODS.some(([k]) => k === p) ? p : "week"; } catch { return "week"; } });
   const setPeriod = (p) => { setPeriodState(p); try { localStorage.setItem(PERIOD_KEY, p); } catch { /* storage blocked */ } };
   const { state } = useLive();
   const [shown, setShown] = useState(null); // call in the detail dialog
-  const [logOpen, setLogOpen] = useState(false);
   const { cid, crop, campaign: picked } = useCrop();
   const rows = state ? inCampaign(state, state.forecast, cid).sort((a, b) => a.week - b.week) : []; // the picked campaign's weeks
   const gap = rows.find((r) => r.is_gap);
@@ -75,14 +74,12 @@ export default function Forecast() {
           <section className="card" aria-labelledby="chart-title">
             <div className="card-head">
               <h2 id="chart-title">Expected supply vs target, tonnes per {period}</h2>
-              <div className="seg-toggle" role="group" aria-label="Show by">
-                {PERIODS.map(([k, label]) => <button key={k} type="button" className={period === k ? "on" : ""} aria-pressed={period === k} onClick={() => setPeriod(k)}>{label}</button>)}
-              </div>
+              <SegToggle label="Show by" options={PERIODS} value={period} onChange={setPeriod} />
             </div>
             {period !== "week" ? (state && <SupplyChart cid={cid} period={period} refreshKey={JSON.stringify(rows.map((r) => r.expected_kg))} />) : <>
             <div className="card-head" style={{ marginTop: -6 }}>
               <div className="legend" aria-hidden="true">
-                <span><i className="l-leaf" />Firm</span>
+                <span><i className="l-leaf" />Expected: firm answers</span>
                 <span><i className="l-unsure" />Unsure, counted half</span>
                 <span><i className="l-projected" />Later rounds (projected)</span>
                 <span><i className="l-approved" />Approved deals</span>
@@ -105,18 +102,9 @@ export default function Forecast() {
         <div className="col-side">
           {state && gap && <FillList gap={gap} state={view} />}
           {state && rows.find((r) => r.is_surplus) && <SurplusCard row={rows.find((r) => r.is_surplus)} cid={cid} />}
-          <section className="card" aria-labelledby="calls-title">
-            <div className="card-head">
-              <h2 id="calls-title">Calls</h2>
-              <Link to="/calls">Open the calls</Link>
-            </div>
-            {state ? <Calls calls={view.calls} onShow={setShown} /> : <div className="rows" id="calls" />}
-            <button className="btn" onClick={() => setLogOpen(true)}>Call log</button>
-          </section>
         </div>
       </div>
       <CallRecap call={shown} onClose={() => setShown(null)} />
-      <CallLog open={logOpen} calls={view ? view.calls : []} onClose={() => setLogOpen(false)} onShow={setShown} />
     </Shell>
   );
 }

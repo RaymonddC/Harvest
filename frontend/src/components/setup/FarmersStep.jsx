@@ -47,7 +47,7 @@ export default function FarmersStep({ farmers, toCall, onAdd, cid, crop }) {
         <span className="big">{farmers.length ? `${farmers.length} farmers in this campaign` : "No farmers yet"}</span>
         <span className="sub">{farmers.length
           ? (unknown.unknown.length
-            ? <><a href="#farmer-list">{toCall} need a harvest call</a> · {unknown.unknown.length} with no current answer (about {fmtT(unknown.usualKg)} t a week)</>
+            ? <><a href="#farmer-list">{toCall} need a harvest call</a>, {unknown.unknown.length} with no current answer (about {fmtT(unknown.usualKg)} t a week)</>
             : toCall ? <><a href="#farmer-list">{toCall} need a harvest call</a> (unsure answers)</> : <>Every farmer has a current answer</>)
           : `Add ${cropName(crop)} farmers from the database, or new ones.`}</span>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
@@ -112,7 +112,7 @@ function PickFromDatabase({ cid, crop, onClose }) {
               return (
                 <li key={f.id}><label>
                   <input type="checkbox" checked={ticked.has(f.id)} onChange={() => toggle(f.id)} />
-                  <span>{f.name}<small className="muted">{f.village ? ` · ${f.village}` : ""}{now ? ` · now in ${camps.find((c) => c.id === now)?.label}` : ""}</small></span>
+                  <span>{f.name}<small className="muted">{f.village ? `, ${f.village}` : ""}{now ? `, now in ${camps.find((c) => c.id === now)?.label}` : ""}</small></span>
                 </label></li>
               );
             })}

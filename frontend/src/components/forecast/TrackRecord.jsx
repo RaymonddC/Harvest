@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../../lib.js";
+import { api, cachedGet, peekGet } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, needs } from "../../ui.jsx";
 
@@ -13,15 +13,15 @@ const SAMPLE = "phone,date,kg,unripe_pct,dirt_pct\n+62 810 0000 1000,2026-10-14,
 // or one at a time on a farmer's page.
 export default function TrackRecord({ cid, rows, refreshKey }) {
   const act = useAct();
-  const [data, setData] = useState(null);
+  const url = `/api/track-record?campaign=${encodeURIComponent(cid)}`;
+  const [data, setData] = useState(() => peekGet(url) || null);
   const [open, setOpen] = useState(false);
   const [csv, setCsv] = useState(SAMPLE);
   const [tick, setTick] = useState(0);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let live = true;
-    api(`/api/track-record?campaign=${encodeURIComponent(cid)}`, { method: "GET" })
-      .then((d) => { if (live) { setData(d); setFailed(false); } }).catch(() => { if (live) setFailed(true); });
+    cachedGet(url).then((d) => { if (live) { setData(d); setFailed(false); } }).catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
   }, [cid, refreshKey, tick]);
 

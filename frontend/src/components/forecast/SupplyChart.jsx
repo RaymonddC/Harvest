@@ -51,7 +51,7 @@ export default function SupplyChart({ cid, period, refreshKey }) {
         {shift !== 0 && <button type="button" className="btn sm ghost" onClick={() => setShift(0)}>Now</button>}
         <span className="small muted" style={{ marginLeft: "auto" }}>
           {data.daily_capacity_kg ? `Mill capacity ${fmtT(data.daily_capacity_kg)} t a day, ${data.working_days} days a week` : "Set the mill's capacity on the campaign to see days over capacity"}
-          {short ? ` · ${short} ${word} short` : ""}{over ? ` · ${over} ${word} over capacity` : ""}
+          {short ? `, ${short} ${word} short` : ""}{over ? `, ${over} ${word} over capacity` : ""}
         </span>
       </div>
       <div className={`supply-chart p-${period}`} role="img"
@@ -73,7 +73,7 @@ export default function SupplyChart({ cid, period, refreshKey }) {
       </div>
       <div className="legend small" aria-hidden="true">
         <span><i className="l-leaf" />Expected</span>
-        <span><i className="l-delivered" />Delivered (net, after grading)</span>
+        <span><i className="l-arrived" />Delivered (net, after grading)</span>
         <span><i className="l-target" />Target</span>
         <span><i className="l-cap" />Mill capacity</span>
         <span><i className="l-amber" />Short</span>

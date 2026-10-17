@@ -66,8 +66,8 @@ function HarvestBox({ farmer, harvest }) {
       {harvest ? (
         <>
           <b className="num">{fmtKg(harvest.kg)} kg</b> ready {day(harvest.ready_date, { weekday: "short", day: "numeric", month: "short" })}
-          {" · "}{harvest.confidence === "unsure" ? "unsure (counts for half)" : "firm"}
-          {harvest.every_days ? ` · harvests every ${harvest.every_days} days, so later rounds are in the forecast too` : ""}
+          {", "}{harvest.confidence === "unsure" ? "unsure (counts for half)" : "firm"}
+          {harvest.every_days ? `, harvests every ${harvest.every_days} days, so later rounds are in the forecast too` : ""}
           {harvest.edited_by && (
             <p className="small muted" style={{ margin: "4px 0 0" }}>
               Edited by {harvest.edited_by}{harvest.edited_at ? `, ${when(harvest.edited_at)}` : ""}.
@@ -98,7 +98,7 @@ function AnswerRow({ call, qid, a }) {
       {value === null ? (
         <div className="a">
           <b>{a.answer === "skipped" ? "Did not answer" : a.answer}</b>
-          {a.edited_by && <span className="small muted"> · edited by {a.edited_by} (agent heard “{a.original}”)</span>}
+          {a.edited_by && <span className="small muted">, edited by {a.edited_by} (agent heard “{a.original}”)</span>}
           <button type="button" className="btn sm ghost" {...needs("farmers.manage")} onClick={() => setValue(a.answer === "skipped" ? "" : a.answer)}>Edit</button>
         </div>
       ) : (
@@ -176,8 +176,8 @@ export function DeliveryBox({ farmer, stateKey }) {
           <summary>All deliveries ({rec.deliveries.length})</summary>
           <ul className="fs-list">
             {rec.deliveries.map((d) => (
-              <li key={d.id} className="row"><span className="name">{day(d.date)} · {fmtKg(d.kg)} kg{d.deduction_pct ? ` − ${d.deduction_pct}% = ${fmtKg(d.net_kg)} kg net` : ""}
-                {d.amount != null && <small className="muted"> · {plainPrice(d.amount, d.currency || "IDR")}{d.po_number ? ` (${d.po_number})` : " (reference price)"}</small>}</span>
+              <li key={d.id} className="row"><span className="name">{day(d.date)}, {fmtKg(d.kg)} kg{d.deduction_pct ? ` − ${d.deduction_pct}% = ${fmtKg(d.net_kg)} kg net` : ""}
+                {d.amount != null && <small className="muted">, {plainPrice(d.amount, d.currency || "IDR")}{d.po_number ? ` (${d.po_number})` : " (reference price)"}</small>}</span>
                 {d.paid
                   ? <span className="paid-tag" title={d.payment_ref ? `Ref. ${d.payment_ref}` : undefined}>Paid {day(d.paid_at)}</span>
                   : can("offers.decide") ? <ActButton className="btn sm" busy="Saving…" run={() => markPaid(d)}>Mark paid</ActButton>
@@ -207,7 +207,7 @@ function activityOf(state, f) {
   const h = state.harvests.find((x) => x.farmer_id === f.id);
   if (h) {
     out.push({ t: h.updated_at || null, kind: "harvest", what: `${h.source === "call" ? "Harvest given on a call" : h.edited_by ? `Harvest edited by ${h.edited_by}` : "Harvest on record"}: ${fmtKg(h.kg)} kg ready ${h.ready_date}`,
-      detail: [h.confidence === "unsure" ? "unsure" : "firm", h.every_days ? `every ${h.every_days} days` : "", h.rescheduled_from ? `moved from ${h.rescheduled_from}` : ""].filter(Boolean).join(" · ") });
+      detail: [h.confidence === "unsure" ? "unsure" : "firm", h.every_days ? `every ${h.every_days} days` : "", h.rescheduled_from ? `moved from ${h.rescheduled_from}` : ""].filter(Boolean).join(", ") });
   }
   for (const o of state.offers.filter((x) => x.farmer_id === f.id)) {
     out.push({ t: o.created_at, kind: "offer", what: `Offer: ${fmtKg(o.kg)} kg at ${plainPrice(o.price_per_kg, o.currency || "IDR")}/kg`, detail: o.deliver_week_start ? `for the week of ${o.deliver_week_start}` : "" });
@@ -242,14 +242,14 @@ export default function FarmerSheet({ farmer, state, onClose }) {
               <Avatar name={f.name} id={f.id} person />
               <div>
                 <RDialog.Title className="sheet-title">{f.name}</RDialog.Title>
-                <span className="sub">{[f.village, cropLabel(f.crop), f.language, maskPhone(f.phone)].filter(Boolean).join(" · ")}</span>
+                <span className="sub">{[f.village, cropLabel(f.crop), f.language, maskPhone(f.phone)].filter(Boolean).join(", ")}</span>
                 {f.do_not_call && <Pill cls="">Asked not to be called</Pill>}
                 <AgentToggle f={f} />
                 <span className="plot-line small">
                   {f.plot_lat != null && f.plot_lng != null
-                    ? <>Plot <a href={`https://www.google.com/maps?q=${f.plot_lat},${f.plot_lng}`} target="_blank" rel="noopener">{f.plot_lat}, {f.plot_lng}</a>{f.plot_ha ? ` · ${f.plot_ha} ha` : ""}</>
+                    ? <>Plot <a href={`https://www.google.com/maps?q=${f.plot_lat},${f.plot_lng}`} target="_blank" rel="noopener">{f.plot_lat}, {f.plot_lng}</a>{f.plot_ha ? `, ${f.plot_ha} ha` : ""}</>
                     : <span className="muted">Plot not mapped (needed for traceability)</span>}
-                  {f.certification && <> · <b>{f.certification}</b></>}
+                  {f.certification && <>, <b>{f.certification}</b></>}
                 </span>
               </div>
               <RDialog.Close className="sheet-x" aria-label="Close"><span aria-hidden="true">×</span></RDialog.Close>
@@ -266,6 +266,14 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                 </div>
               )}
               <Standing crm={rel} />
+              <section aria-labelledby="fs-harvest">
+                <h3 id="fs-harvest">Next harvest</h3>
+                <HarvestBox farmer={f} harvest={harvest} />
+              </section>
+              <section aria-labelledby="fs-track">
+                <h3 id="fs-track">Track record</h3>
+                <DeliveryBox farmer={f} stateKey={JSON.stringify(state?.forecast?.map((r) => r.expected_kg))} />
+              </section>
 
               <section aria-labelledby="fs-notes">
                 <h3 id="fs-notes">Notes and follow-ups</h3>
@@ -290,15 +298,7 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                 ) : <p className="muted">Nothing yet. The first harvest call starts the history.</p>}
               </section>
 
-              <section aria-labelledby="fs-harvest">
-                <h3 id="fs-harvest">Next harvest</h3>
-                <HarvestBox farmer={f} harvest={harvest} />
-              </section>
 
-              <section aria-labelledby="fs-track">
-                <h3 id="fs-track">Track record</h3>
-                <DeliveryBox farmer={f} stateKey={JSON.stringify(state?.forecast?.map((r) => r.expected_kg))} />
-              </section>
 
               <section aria-labelledby="fs-calls">
                 <h3 id="fs-calls">Calls <span className="sub">({calls.length})</span></h3>
@@ -309,7 +309,7 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                       return (
                         <li key={c.id}>
                           <button type="button" className="row" onClick={() => setShownCall(c)}>
-                            <span className="name">{KIND_WORD[c.kind]} · {when(c.started_at || c.created_at)}{c.summary ? ` · ${c.summary}` : ""}</span>
+                            <span className="name">{KIND_WORD[c.kind]}, {when(c.started_at || c.created_at)}{c.summary ? `, ${c.summary}` : ""}</span>
                             <Pill cls={chip.cls}>{chip.text}</Pill>
                           </button>
                         </li>
@@ -326,7 +326,7 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                     {offers.map((o) => (
                       <li key={o.id} className="row">
                         <span className="name">{fmtKg(o.kg)} kg to week {o.deliver_week} at {plainPrice(o.price_per_kg, o.currency || "IDR")}/kg</span>
-                        <Pill cls={o.status === "approved" ? "mint" : o.status === "pending" ? "amber" : ""}>{{ pending: "Waiting for you", escalated: "Above the ceiling", approved: o.confirmed_by_voice ? "Approved · confirmed" : "Approved", rejected: "Rejected" }[o.status] || o.status}</Pill>
+                        <Pill cls={o.status === "approved" ? "mint" : o.status === "pending" ? "amber" : ""}>{{ pending: "Waiting for you", escalated: "Above the ceiling", approved: o.confirmed_by_voice ? "Approved, confirmed" : "Approved", rejected: "Rejected" }[o.status] || o.status}</Pill>
                         {o.status === "approved" && <DownloadLink className="btn sm ghost" path={offerPoUrl(o.id)} filename={`purchase-order-${o.id}.pdf`}>Purchase order</DownloadLink>}
                       </li>
                     ))}

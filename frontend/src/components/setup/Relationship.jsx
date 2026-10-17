@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, can } from "../../lib.js";
+import { api, cachedGet, can, peekGet } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton } from "../../ui.jsx";
 
@@ -18,10 +18,10 @@ const day = (iso) => (iso ? new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDat
 
 // What /api/crm says about this farmer (segment, reliability, churn signals); refreshed when the data changes.
 export function useCrmOf(farmerId, key) {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState(() => peekGet("/api/crm") || null);
   useEffect(() => {
     let live = true;
-    api("/api/crm", { method: "GET" }).then((r) => { if (live) setData(r); }).catch(() => {});
+    cachedGet("/api/crm").then((r) => { if (live) setData(r); }).catch(() => {});
     return () => { live = false; };
   }, [farmerId, key]);
   return data?.farmers?.[farmerId] || null;
@@ -50,7 +50,7 @@ export function Standing({ crm }) {
     <div className="standing">
       <p className="seg-line">
         {SEGMENT_WORD.reliability[s.reliability]}{crm.reliability != null ? ` (${Math.round(crm.reliability * 100)}% of promises kept)` : ""}
-        {" · "}{SEGMENT_WORD.size[s.size]} grower · {SEGMENT_WORD.certified[s.certified]}
+        {", "}{SEGMENT_WORD.size[s.size]} grower, {SEGMENT_WORD.certified[s.certified]}
       </p>
       {crm.churn.length > 0 && (
         <div className="churn" role="note">
@@ -99,8 +99,8 @@ export function Notes({ f, notes }) {
           {list.map((n) => (
             <li key={n.id} className={`${n.kind} ${n.done ? "done" : ""}`}>
               <div className="note-head">
-                <b>{KIND_WORD[n.kind] || n.kind}{n.rating ? ` · ${n.rating} of 5` : ""}</b>
-                <span className="muted">{day(n.at)} · {n.by}</span>
+                <b>{KIND_WORD[n.kind] || n.kind}{n.rating ? `, ${n.rating} of 5` : ""}</b>
+                <span className="muted">{day(n.at)}, {n.by}</span>
               </div>
               {n.text && <p>{n.text}</p>}
               {(n.follow_up_on || n.kind === "complaint") && (

@@ -28,7 +28,7 @@ export default function OfficialPrice({ l, crop }) {
       <div className="official-line">
         <span className="small">
           {latest ? <>Official price <b>{plainPrice(latest.price_per_kg, l.currency)}</b> ({latest.province}, from {latest.valid_from}{latest.source ? `, ${latest.source}` : ""})</> : "No official price recorded yet."}
-          {latest?.url && <> · <a href={latest.url} target="_blank" rel="noopener">source</a></>}
+          {latest?.url && <>, <a href={latest.url} target="_blank" rel="noopener">source</a></>}
         </span>
         <span className="official-acts">
           {latest && (
@@ -53,7 +53,7 @@ export default function OfficialPrice({ l, crop }) {
         {mine.length > 0 && (
           <details style={{ marginTop: 10 }}>
             <summary className="small">Earlier official prices ({mine.length})</summary>
-            <ul className="fs-list">{mine.slice(0, 8).map((p) => <li key={p.id} className="row"><span className="name">{p.valid_from} · {p.province}</span><span className="num">{plainPrice(p.price_per_kg, l.currency)}</span></li>)}</ul>
+            <ul className="fs-list">{mine.slice(0, 8).map((p) => <li key={p.id} className="row"><span className="name">{p.valid_from}, {p.province}</span><span className="num">{plainPrice(p.price_per_kg, l.currency)}</span></li>)}</ul>
           </details>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
