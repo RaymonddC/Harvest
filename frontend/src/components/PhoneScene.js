@@ -192,11 +192,10 @@ export function startPhone(canvas, { still = false } = {}) {
     const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    // The phone fills about a third of the panel's height, centred in its upper part (between the logo and the
-    // headline). The view is shifted, not the phone, so it stays centred in its own turn.
-    const wide = w / h > 0.9; // the phone layout: a short, wide header strip
-    camera.position.z = wide ? 14 : 22;
-    camera.setViewOffset(w, h, 0, h * (wide ? 0.05 : 0.2), w, h);
+    // The canvas has its own box between the logo and the headline: fit the phone (4.6 high, with room for its
+    // tilt and the rings) to the box's height, or to its width when the box is narrow.
+    const view = 2 * Math.tan((camera.fov * Math.PI) / 360); // visible height per unit of distance
+    camera.position.z = Math.max(5.6 / view, 3.6 / (view * camera.aspect));
     camera.updateProjectionMatrix();
   }
   const ro = new ResizeObserver(resize);

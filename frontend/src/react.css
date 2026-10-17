@@ -176,7 +176,7 @@ body.login-page { background: var(--surface); }
 .login-story .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; color: #fff; }
 .login-story .brand .mark { width: 34px; height: 34px; border-radius: 10px; background: #2FBF7F; color: #06130D; display: grid; place-items: center; }
 .ls-body { margin-top: auto; display: flex; flex-direction: column; gap: 28px; }
-.ls-body h2 { font-size: clamp(26px, 2.6vw, 36px); font-weight: 800; line-height: 1.15; letter-spacing: -0.025em; color: #fff; max-width: 20ch; }
+.ls-body .ls-title { margin: 0; font-size: clamp(26px, 2.6vw, 36px); font-weight: 800; line-height: 1.15; letter-spacing: -0.025em; color: #fff; max-width: 20ch; }
 .ls-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .ls-steps li { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; color: #CFE3D8; }
 .ls-n { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid rgba(127, 224, 180, .5); color: #7FE0B4;
@@ -215,7 +215,7 @@ body.login-page { background: var(--surface); }
   .login-split { grid-template-columns: 1fr; min-height: 0; }
   .login-story { gap: 18px; padding: 24px 20px; }
   .ls-body { margin-top: 0; gap: 0; }
-  .ls-body h2 { font-size: 22px; max-width: none; }
+  .ls-body .ls-title { font-size: 22px; max-width: none; }
   .ls-steps, .ls-facts { display: none; }
   .login-pick { padding: 24px 16px 40px; }
 }
@@ -1215,3 +1215,28 @@ table.answers tr:focus-visible td { background: var(--leaf-soft); outline: none;
 .own-account { border-top: 1px solid var(--line); padding-top: 14px; }
 .own-account summary { cursor: pointer; font-weight: 700; color: var(--leaf-deep); }
 .own-account[open] summary { margin-bottom: 14px; }
+
+/* Sign-in after the critique: the phone only where it has room, tiles that lead with the role, a loading state */
+.login-pick.picker .role-tile.main { box-shadow: var(--shadow); }
+.login-pick.picker .role-tile .role-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.role-chip { font-size: 11.5px; font-weight: 700; color: var(--leaf-deep); background: var(--leaf-soft); border-radius: 999px; padding: 2px 8px; letter-spacing: 0; }
+.role-start { font-size: 11.5px; font-weight: 700; color: #fff; background: var(--leaf); border-radius: 999px; padding: 2px 8px; margin-left: auto; }
+.role-tile.skeleton { cursor: default; min-height: 104px; box-shadow: none; }
+.role-tile.skeleton i { display: block; height: 10px; border-radius: 6px; background: var(--line); grid-column: 1 / -1; }
+.role-tile.skeleton i:first-child { width: 45%; height: 14px; }
+.role-tile.skeleton i:nth-child(2) { width: 90%; }
+.role-tile.skeleton i:last-child { width: 35%; }
+.lp-retry { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* The Harvest-Call logo (components/Logo.jsx) replaces the leaf mark in the brand */
+.brand .logo { flex: none; display: block; border-radius: 9px; }
+
+/* The phone gets its own space between the logo and the headline (it used to fill the panel behind the text) */
+.login-story .ls-scene { position: relative; inset: auto; flex: 1 1 0; min-height: 220px; width: 100%; height: auto; }
+.login-story::after { display: none; }
+.login-story .ls-body { margin-top: 0; }
+.login-story { gap: 28px; }
+.login-story .ls-scene { min-height: 150px; }
+@media (max-height: 640px) { .login-story .ls-scene { display: none; } }
+.login-pick.picker .role-tile { position: relative; }
+.role-start { position: absolute; top: 10px; right: 10px; margin: 0; }

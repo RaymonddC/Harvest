@@ -14,7 +14,9 @@ export default function SignInForm({ onSignedIn, exclude, initialError = "", aut
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(initialError);
   const [demo, setDemo] = useState({ password: "", accounts: [] });
-  useEffect(() => { api("/api/auth/demo", { method: "GET", auth: false }).then(setDemo).catch(() => {}); }, []);
+  useEffect(() => {
+    if (!noDemo) api("/api/auth/demo", { method: "GET", auth: false }).then(setDemo).catch(() => {});
+  }, [noDemo]);
 
   const refuse = (message) => {
     setError(message);
@@ -27,7 +29,8 @@ export default function SignInForm({ onSignedIn, exclude, initialError = "", aut
       const session = await signIn(username, password);
       await onSignedIn(session);
     } catch (err) {
-      refuse(err.status ? err.message : `${err.message || "Cannot reach the server."} Check the backend URL in config.js.`);
+      if (!err.status) console.warn("Harvest-Call: cannot reach the backend. Check the backend URL in config.js.", err);
+      refuse(err.status ? err.message : "Can't reach Harvest-Call right now. Try again in a moment.");
       if (err.status === 401) { setForm((f) => ({ ...f, password: "" })); passwordRef.current?.focus(); }
     } finally {
       setBusy(false);

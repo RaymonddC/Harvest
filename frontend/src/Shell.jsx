@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { can, FLOW, fmtT, getSession, OVERVIEW, PAGES, SETTINGS } from "./lib.js";
 import AccountMenu from "./components/AccountMenu.jsx";
+import Logo from "./components/Logo.jsx";
 import CropSwitcher from "./components/CropSwitcher.jsx";
 import { campaignFor, inCampaign, useCrop } from "./campaigns.jsx";
 import NextStep from "./components/NextStep.jsx";
@@ -163,7 +164,7 @@ export default function Shell({ title, head, children }) {
     <>
       <aside className={`side ${collapsed ? "collapsed" : ""}`}>
         <div className="side-top">
-          <Link className="brand" to="/" onClick={(e) => go(e, "/")} title="Harvest-Call"><span className="mark"><Icon name="leaf" /></span><span className="brand-name">Harvest-Call</span></Link>
+          <Link className="brand" to="/" onClick={(e) => go(e, "/")} title="Harvest-Call"><Logo size={32} /><span className="brand-name">Harvest-Call</span></Link>
           <button type="button" className="nav-toggle" onClick={toggleNav} aria-expanded={!collapsed}
             aria-label={collapsed ? "Expand the menu" : "Collapse the menu"} title={collapsed ? "Expand the menu" : "Collapse the menu"}>
             <span aria-hidden="true">{collapsed ? "»" : "«"}</span>
