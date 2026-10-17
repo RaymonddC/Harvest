@@ -2,6 +2,7 @@
 
 Events between two dates, for one campaign or all of them:
   week      a planning week of a campaign (amber when short of the target)
+  campaign_start, campaign_end  the first and last day of a campaign
   call      a call made (or waiting in the queue: "planned")
   call_plan the weekly calls a campaign makes by itself on Mondays at 06:00
   harvest   a farmer's next harvest, and the later rounds projected from how often they harvest
@@ -66,6 +67,14 @@ def events(store: Store, settings: Settings, start: dt.date, end: dt.date, campa
                         "gap_kg": r.get("gap_kg", 0), "expected_kg": r.get("expected_kg", 0),
                         "target_kg": r.get("target_kg", 0)})
 
+    for camp in camps:
+        if campaign and camp["id"] != campaign:
+            continue
+        first, last = services.campaign_dates(settings, camp)
+        for d, kind in ((first, "campaign_start"), (last, "campaign_end")):
+            if start <= d <= end:
+                out.append({"type": kind, "date": d.isoformat(), "campaign_id": camp["id"]})
+
     for c in store.list("calls"):
         cid = mine(c)
         if cid is False:
@@ -121,7 +130,8 @@ def events(store: Store, settings: Settings, start: dt.date, end: dt.date, campa
             out.append({"type": "delivery", "date": d.isoformat(), "id": dl["id"], "farmer_id": dl.get("farmer_id"),
                         "farmer_name": name_of(dl), "kg": dl.get("kg", 0), "campaign_id": cid})
 
-    order = {"week": 0, "call_plan": 1, "call": 2, "harvest": 3, "deal": 4, "delivery": 5}
+    order = {"week": 0, "campaign_start": 1, "campaign_end": 1, "call_plan": 2, "call": 3, "harvest": 4, "deal": 5,
+             "delivery": 6}
     out.sort(key=lambda e: (e["date"], order[e["type"]], e.get("time") or "", e.get("farmer_name") or ""))
     return {"start": start.isoformat(), "end": end.isoformat(), "campaign_id": campaign, "campaigns": names,
             "events": out}

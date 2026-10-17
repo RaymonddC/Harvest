@@ -53,7 +53,7 @@ function Col({ r, target, children }) {
   return (
     <Tooltip.Root open={open} onOpenChange={setOpen}>
       <Tooltip.Trigger asChild>
-        <div className={`col ${r.is_gap ? "is-gap" : ""}`} tabIndex={0} onClick={() => setOpen((o) => !o)}>{children}</div>
+        <div className={`col ${r.is_gap ? "is-gap" : ""} ${r.before_start ? "before-start" : ""}`} tabIndex={0} onClick={() => setOpen((o) => !o)}>{children}</div>
       </Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Content className="chart-tip" side="top" sideOffset={6} collisionPadding={12}>
@@ -108,7 +108,7 @@ export default function Chart({ rows }) {
         </div>
       </div>
       <div className="xlabels has-axis" aria-hidden="true">
-        {rows.map((r) => <span key={r.week} className={r.is_gap ? "gap" : ""}>{r.label}<small>{shortDate(r.week_start)}</small></span>)}
+        {rows.map((r) => <span key={r.week} className={`${r.is_gap ? "gap" : ""} ${r.before_start ? "before-start" : ""}`}>{r.label}<small>{r.before_start ? "not started" : shortDate(r.week_start)}</small></span>)}
       </div>
     </Tooltip.Provider>
   );

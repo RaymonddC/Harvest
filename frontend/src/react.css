@@ -832,3 +832,10 @@ body.app .side nav { gap: 10px; }
 .nav-group.settings { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--pp-line, rgba(255,255,255,.12)); }
 .flow-step.settings { color: var(--muted); }
 @media (max-width: 860px) { .nav-group.settings { border-top: 0; margin: 0; padding: 0; } }
+
+/* Campaign dates: weeks before the start are greyed out on the chart; start and end on the calendar. */
+body.app .chart .col.before-start { opacity: .38; }
+.xlabels .before-start { opacity: .55; }
+.cal-chip.campaign { background: var(--ink); color: var(--on-ink); font-weight: 800; }
+.cal-list li.campaign i { background: var(--ink); }
+.hc-dialog input[type="date"], .field input[type="date"] { min-height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); font: inherit; color: var(--ink); width: 100%; }

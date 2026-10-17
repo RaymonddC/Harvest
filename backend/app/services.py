@@ -199,8 +199,42 @@ def get_campaign(store: Store, settings: Settings, crop: str | None = None) -> d
     return resolve_campaign(store, settings, crop)
 
 
+def _date(value) -> dt.date | None:
+    try:
+        return dt.date.fromisoformat(str(value or "")[:10])
+    except ValueError:
+        return None
+
+
+def campaign_weeks(settings: Settings, camp: dict) -> int:
+    """How many weeks the forecast shows for a campaign: from week 1 (next week) to its end date, at most MAX_WEEKS.
+    A campaign without dates (older data) keeps its number of weeks."""
+    end = _date(camp.get("end_date"))
+    if end:
+        return max(1, min(MAX_WEEKS, ((end - settings.plan_start).days // 7) + 1))
+    return int(camp.get("weeks") or settings.weeks)
+
+
+def campaign_dates(settings: Settings, camp: dict) -> tuple[dt.date, dt.date]:
+    """The campaign's first and last day (from the weeks for older campaigns without dates)."""
+    start = _date(camp.get("start_date")) or settings.plan_start
+    end = _date(camp.get("end_date")) or settings.plan_start + dt.timedelta(days=7 * campaign_weeks(settings, camp) - 1)
+    return start, end
+
+
+def _before_start(settings: Settings, camp: dict, rows: list[dict]) -> list[dict]:
+    """Weeks that end before the campaign starts are shown but never count as short."""
+    start = _date(camp.get("start_date"))
+    for r in rows:
+        ws = _date(r.get("week_start"))
+        r["before_start"] = bool(start and ws and ws + dt.timedelta(days=6) < start)
+        if r["before_start"]:
+            r["is_gap"], r["gap_kg"] = False, 0
+    return rows
+
+
 def weeks_for(store: Store, settings: Settings, crop: str | None = None) -> int:
-    return int((get_campaign(store, settings, crop) or {}).get("weeks") or settings.weeks)
+    return campaign_weeks(settings, get_campaign(store, settings, crop) or {})
 
 
 def campaign_of_farmer(store: Store, settings: Settings, farmer: dict) -> dict | None:
@@ -221,7 +255,7 @@ def settings_for_crop(store: Store, settings: Settings, crop: str | None) -> Set
 
 def settings_for_campaign(settings: Settings, c: dict) -> Settings:
     voice = (c.get("persona") or {}).get("voice") or settings.voice_name
-    return dataclasses.replace(settings, weeks=int(c.get("weeks") or settings.weeks),
+    return dataclasses.replace(settings, weeks=campaign_weeks(settings, c),
                                target_kg_per_week=int(c.get("target_kg_per_week") or settings.target_kg_per_week),
                                voice_name=voice if voice in agent_profile.VOICES or voice == settings.voice_name
                                else settings.voice_name)
@@ -396,21 +430,46 @@ def _check_campaign_fields(target_kg_per_week: float | None, weeks: int | None, 
         raise ServiceError(f"The name can be at most {MAX_NAME} characters.")
 
 
-def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_week: float, weeks: int,
-                    name: str | None = None, farmer_ids: list[str] | None = None) -> dict:
-    """A new campaign for a crop (a crop can have several). farmer_ids: farmers of that crop to move into it."""
+def _check_dates(settings: Settings, start_date: str | None, end_date: str | None) -> dict:
+    """Start and end dates of a campaign (YYYY-MM-DD). The end must not be before the start or in the past."""
+    start, end = _date(start_date), _date(end_date)
+    if (start_date and not start) or (end_date and not end):
+        raise ServiceError("Dates must look like 2026-10-19.")
+    if bool(start) != bool(end):
+        raise ServiceError("Give both a start and an end date.")
+    if not start:
+        return {}
+    if end < start:
+        raise ServiceError("The end date is before the start date.")
+    if end < settings.plan_start:
+        raise ServiceError(f"The campaign must run into week 1 or later (it starts {settings.plan_start:%d %b %Y}): "
+                           "pick a later end date.")
+    if (end - start).days > 366:
+        raise ServiceError("A campaign can run for at most a year.")
+    return {"start_date": start.isoformat(), "end_date": end.isoformat()}
+
+
+def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_week: float, weeks: int | None = None,
+                    name: str | None = None, farmer_ids: list[str] | None = None, start_date: str | None = None,
+                    end_date: str | None = None) -> dict:
+    """A new campaign for a crop (a crop can have several), from a start date to an end date (or, older callers,
+    a number of weeks). farmer_ids: farmers of that crop to move into it."""
     if not settings.multi_crop:
         raise ServiceError("Running more than one campaign is turned off (MULTI_CROP).")
     key = normalize_crop(crop)
     if key not in CROP_LABELS:
         raise ServiceError(f"Unknown crop {crop!r}. Use one of: {', '.join(CROP_LABELS)}.")
-    _check_campaign_fields(target_kg_per_week, weeks, name)
+    dates = _check_dates(settings, start_date, end_date)
+    if not dates and weeks is None:
+        raise ServiceError("Give the campaign's start and end dates.")
+    _check_campaign_fields(target_kg_per_week, None if dates else weeks, name)
     camps = list_campaigns(store, settings)
     cid = campaign_id(settings, key)
     if any(c["id"] == cid for c in camps):
         cid = f"{key}-{hashlib.sha1(now_iso().encode() + str(len(camps)).encode()).hexdigest()[:6]}"
     doc = {"crop": key, "name": (name or "").strip() or None, "kind": None, "status": "idle",
-           "target_kg_per_week": round(target_kg_per_week), "weeks": int(weeks), "created_at": now_iso()}
+           "target_kg_per_week": round(target_kg_per_week), "created_at": now_iso(), **dates}
+    doc["weeks"] = campaign_weeks(settings, {**doc, "weeks": weeks})
     store.set("campaigns", cid, doc)
     if farmer_ids:
         set_campaign_farmers(store, settings, cid, add=farmer_ids)
@@ -419,9 +478,11 @@ def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_w
 
 
 def update_campaign(store: Store, settings: Settings, ref: str, name: str | None = None,
-                    target_kg_per_week: float | None = None, weeks: int | None = None) -> dict:
-    """Rename a campaign, or change its weekly target or weeks to plan. Fields left out stay as they are."""
+                    target_kg_per_week: float | None = None, weeks: int | None = None,
+                    start_date: str | None = None, end_date: str | None = None) -> dict:
+    """Rename a campaign, or change its weekly target or its dates (or weeks). Fields left out stay as they are."""
     camp = need_campaign(store, settings, ref)
+    dates = _check_dates(settings, start_date, end_date)
     _check_campaign_fields(target_kg_per_week, weeks, name)
     changes: dict = {"updated_at": now_iso()}
     if name is not None:
@@ -429,7 +490,10 @@ def update_campaign(store: Store, settings: Settings, ref: str, name: str | None
     if target_kg_per_week is not None:
         changes["target_kg_per_week"] = round(target_kg_per_week)
     if weeks is not None:
-        changes["weeks"] = int(weeks)
+        changes.update(weeks=int(weeks), start_date=None, end_date=None)
+    if dates:
+        changes.update(dates)
+        changes["weeks"] = campaign_weeks(settings, dates)
     store.set("campaigns", camp["id"], changes, merge=True)
     recompute_forecast(store, settings)
     return {**camp, **changes}
@@ -497,12 +561,13 @@ def recompute_forecast(store: Store, settings: Settings) -> list[dict]:
     keep: set[str] = set()
     for camp in camps:
         crop = campaign_crop(settings, camp)
-        weeks = int(camp.get("weeks") or settings.weeks)
+        weeks = campaign_weeks(settings, camp)
         target = int(camp.get("target_kg_per_week") or settings.target_kg_per_week)
         mine = by_camp.get(camp["id"], {"harvests": [], "offers": []})
         harvests, offers = mine["harvests"], mine["offers"]
         crop_farmers = [f for f in farmer_list if farmer_campaign(settings, f, camps) == camp["id"]]
-        for row in fc.compute_forecast(harvests, offers, settings.plan_start, weeks, target, settings.gap_tolerance):
+        computed = fc.compute_forecast(harvests, offers, settings.plan_start, weeks, target, settings.gap_tolerance)
+        for row in _before_start(settings, camp, computed):
             row["crop"] = crop
             row["campaign_id"] = camp["id"]
             row["shortlist"] = (fc.shortlist(row["week"], crop_farmers, harvests, offers,
@@ -664,7 +729,7 @@ def create_offer(store: Store, settings: Settings, *, farmer: dict, crop: str, k
     if not camp:
         camp = resolve_campaign(store, settings, crop)
     camp = camp or {}
-    weeks = int(camp.get("weeks") or settings.weeks)
+    weeks = campaign_weeks(settings, camp)
     harvest = store.get("harvests", f"h-{farmer['id']}-{crop}")
     from_week = None
     harvest_id = None
@@ -737,14 +802,15 @@ def approval_impact(store: Store, settings: Settings, crop: str | None = None) -
     costs, and whether it opens a new gap somewhere else. Also the same for approving all of them together."""
     camp = need_campaign(store, settings, crop)
     crop = campaign_crop(settings, camp)
-    weeks = int(camp.get("weeks") or settings.weeks)
+    weeks = campaign_weeks(settings, camp)
     target = int(camp.get("target_kg_per_week") or settings.target_kg_per_week)
     harvests = campaign_records(store, settings, camp["id"], "harvests")
     offers = campaign_records(store, settings, camp["id"], "offers")
 
     def rows(approve_ids: set[str]) -> list[dict]:
         trial = [{**o, "status": "approved"} if o["id"] in approve_ids else o for o in offers]
-        return fc.compute_forecast(harvests, trial, settings.plan_start, weeks, target, settings.gap_tolerance)
+        return _before_start(settings, camp, fc.compute_forecast(harvests, trial, settings.plan_start, weeks, target,
+                                                                 settings.gap_tolerance))
 
     def compare(after: list[dict]) -> dict:
         changes = [{"label": a["label"], "before_kg": b["expected_kg"], "after_kg": a["expected_kg"],

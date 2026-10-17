@@ -60,15 +60,19 @@ class CampaignIn(BaseModel):
 class NewCampaignIn(BaseModel):
     crop: str
     target_kg_per_week: float
-    weeks: int
+    weeks: int | None = None  # older screens; the dashboard sends start_date and end_date
     name: str | None = None
     farmer_ids: list[str] | None = None
+    start_date: str | None = None
+    end_date: str | None = None
 
 
 class CampaignEditIn(BaseModel):
     name: str | None = None
     target_kg_per_week: float | None = None
     weeks: int | None = None
+    start_date: str | None = None
+    end_date: str | None = None
 
 
 class CampaignFarmersIn(BaseModel):
@@ -408,12 +412,13 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     @app.post("/api/campaigns", dependencies=[Depends(need("campaign.run"))])
     def campaign_create(body: NewCampaignIn):
         return services.create_campaign(store, settings, body.crop, body.target_kg_per_week, body.weeks,
-                                        body.name, body.farmer_ids)
+                                        body.name, body.farmer_ids, body.start_date, body.end_date)
 
     @app.put("/api/campaigns/{campaign_id}", dependencies=[Depends(need("campaign.run"))])
     def campaign_edit(campaign_id: str, body: CampaignEditIn):
         """Rename a campaign or change its weekly target or weeks to plan."""
-        return services.update_campaign(store, settings, campaign_id, body.name, body.target_kg_per_week, body.weeks)
+        return services.update_campaign(store, settings, campaign_id, body.name, body.target_kg_per_week, body.weeks,
+                                        body.start_date, body.end_date)
 
     @app.delete("/api/campaigns/{campaign_id}", dependencies=[Depends(need("campaign.run"))])
     def campaign_delete(campaign_id: str):

@@ -201,5 +201,12 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     planning weeks, calls made and planned, Monday calls, harvests with projected rounds, deal weeks, deliveries). Setup is
     now "Campaign". Price ranges stay per crop (campaigns of one crop share them).
 
+19. **Simpler dashboard and campaign dates (code done 17 Oct, branch `claude/flow-nav`).** The sidebar follows the
+    planner's flow (1 Prepare, 2 Call, 3 Watch, 4 Decide), with Agent under Settings and Users in the account menu; each
+    page opens with its step and the next page; the menu collapses to icons. Campaigns run from a start date to an end
+    date (`start_date`, `end_date`): the forecast shows week 1 (next week) up to the end, at most 12 weeks; weeks before a
+    later start are greyed out and never short. Older campaigns with only `weeks` still work. Fixed: chart bar layers drawn
+    as white pills (CSS class clash with the calendar toggle), projected rounds not drawn, phone pages scrolling sideways.
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

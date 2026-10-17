@@ -11,7 +11,7 @@ const TYPES = [
   { key: "call", label: "Calls", also: ["call_plan"] },
   { key: "harvest", label: "Harvests" },
   { key: "deal", label: "Deals & deliveries", also: ["delivery"] },
-  { key: "week", label: "Campaign weeks" },
+  { key: "week", label: "Campaign weeks", also: ["campaign_start", "campaign_end"] },
 ];
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -23,6 +23,8 @@ function label(e, names) {
   switch (e.type) {
     case "call": return `${e.planned ? "Waiting: " : ""}${e.farmer_name} · ${(KIND_WORD[e.kind] || "call").replace(" call", "")}${e.outcome && OUTCOME[e.outcome] ? ` · ${OUTCOME[e.outcome]}` : ""}`;
     case "call_plan": return `Weekly calls · ${names[e.campaign_id] || ""}`;
+    case "campaign_start": return `${names[e.campaign_id] || "Campaign"} starts`;
+    case "campaign_end": return `${names[e.campaign_id] || "Campaign"} ends`;
     case "harvest": return `${e.farmer_name} · ${fmtT(e.kg)} t${e.projected ? " (projected)" : e.confidence === "unsure" ? " (unsure)" : ""}`;
     case "deal": return `Deal · ${e.farmer_name} · ${fmtT(e.kg)} t${e.status === "approved" ? "" : " · waiting"}`;
     case "delivery": return `Delivered · ${e.farmer_name} · ${fmtT(e.kg)} t`;
@@ -34,7 +36,7 @@ const GROUP_WORD = { call: ["call", "calls"], harvest: ["harvest", "harvests"], 
 function chips(evs, names) {
   const groups = [];
   for (const e of evs) {
-    const g = groups.find((x) => x.type === e.type && e.type !== "call_plan");
+    const g = groups.find((x) => x.type === e.type && !["call_plan", "campaign_start", "campaign_end"].includes(e.type));
     if (g) g.items.push(e); else groups.push({ type: e.type, items: [e] });
   }
   return groups.map((g) => {
@@ -47,7 +49,7 @@ function chips(evs, names) {
       cls: `${g.type} ${allProjected ? "projected" : ""} ${waiting === g.items.length && g.type === "call" ? "planned" : ""}` };
   });
 }
-const cls = (e) => (e.type === "call" ? (e.planned ? "call planned" : "call")
+const cls = (e) => (e.type.startsWith("campaign_") ? "campaign" : e.type === "call" ? (e.planned ? "call planned" : "call")
   : e.type === "harvest" ? `harvest ${e.projected ? "projected" : ""}` : e.type === "deal" ? `deal ${e.status}` : e.type);
 
 export default function Calendar() {
