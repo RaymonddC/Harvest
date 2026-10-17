@@ -165,6 +165,8 @@ def supply_series(store: Store, settings: Settings, campaign: str | None, period
     wd = working_days(camp)
     cap_day, tkg = daily_capacity(camp), truck_kg(camp)
     first, last = services.campaign_dates(settings, camp)
+    # Beyond the forecast's last week nothing is planned yet (harvest answers reach a few weeks ahead).
+    horizon = settings.plan_start + dt.timedelta(days=7 * services.campaign_weeks(settings, camp) - 1)
     expected = expected_by_day(store, settings, camp, start, end)
     delivered = delivered_by_day(store, settings, camp, start, end)
     buckets: dict[dt.date, dict] = {}
@@ -199,6 +201,9 @@ def supply_series(store: Store, settings: Settings, campaign: str | None, period
             b["capacity_kg"] = round(b["capacity_kg"])
         b["is_gap"] = bool(b["target_kg"] and not b["past"] and b["expected_kg"] < b["target_kg"] * (1 - settings.gap_tolerance))
         b["is_surplus"] = bool(b["capacity_kg"] and b["expected_kg"] > b["capacity_kg"] * (1 + SURPLUS_TOLERANCE))
+        b["beyond"] = dt.date.fromisoformat(b["start"]) > horizon
+        if b["beyond"]:
+            b["is_gap"] = False
         rows.append(b)
     return {"campaign_id": camp["id"], "period": period, "start": start.isoformat(), "end": end.isoformat(),
             "daily_capacity_kg": cap_day, "working_days": wd, "truck_kg": tkg, "rows": rows}

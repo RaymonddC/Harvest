@@ -7,13 +7,20 @@ import Chart from "../components/forecast/Chart.jsx";
 import { FillList, Hero } from "../components/forecast/GapCard.jsx";
 import GapNote from "../components/forecast/GapNote.jsx";
 import Kpis from "../components/forecast/Kpis.jsx";
+import SupplyChart from "../components/forecast/SupplyChart.jsx";
+import SurplusCard from "../components/forecast/SurplusCard.jsx";
 import TrackRecord from "../components/forecast/TrackRecord.jsx";
 import { apiUrl, fmtT } from "../lib.js";
 import { campaignFor, forCrop, inCampaign, useCrop } from "../campaigns.jsx";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 
+const PERIODS = [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]];
+const PERIOD_KEY = "harvestPeriod";
+
 export default function Forecast() {
+  const [period, setPeriodState] = useState(() => { try { return localStorage.getItem(PERIOD_KEY) || "week"; } catch { return "week"; } });
+  const setPeriod = (p) => { setPeriodState(p); try { localStorage.setItem(PERIOD_KEY, p); } catch { /* storage blocked */ } };
   const { state } = useLive();
   const [shown, setShown] = useState(null); // call in the detail dialog
   const [logOpen, setLogOpen] = useState(false);
@@ -58,7 +65,13 @@ export default function Forecast() {
         <div className="col-main">
           <section className="card" aria-labelledby="chart-title">
             <div className="card-head">
-              <h2 id="chart-title">Expected supply vs target, tonnes per week</h2>
+              <h2 id="chart-title">Expected supply vs target, tonnes per {period}</h2>
+              <div className="seg-toggle" role="group" aria-label="Show by">
+                {PERIODS.map(([k, label]) => <button key={k} type="button" className={period === k ? "on" : ""} aria-pressed={period === k} onClick={() => setPeriod(k)}>{label}</button>)}
+              </div>
+            </div>
+            {period !== "week" ? (state && <SupplyChart cid={cid} period={period} refreshKey={JSON.stringify(rows.map((r) => r.expected_kg))} />) : <>
+            <div className="card-head" style={{ marginTop: -6 }}>
               <div className="legend" aria-hidden="true">
                 <span><i className="l-leaf" />Firm</span>
                 <span><i className="l-unsure" />Unsure, counted half</span>
@@ -66,6 +79,7 @@ export default function Forecast() {
                 <span><i className="l-approved" />Approved deals</span>
                 <span><i className="l-amber" />Gap week</span>
                 <span><i className="l-pend" />Pending approval</span>
+                {rows[0]?.capacity_kg ? <span><i className="l-cap" />Mill capacity</span> : null}
                 <span><i className="l-target" /><span>{target ? `Target ${fmtT(target)} t` : "Target"}</span></span>
               </div>
             </div>
@@ -74,12 +88,14 @@ export default function Forecast() {
                 : state ? <div className="empty"><p>No forecast yet. Start a call campaign to collect harvest answers.</p><Link className="btn" to="/setup">Go to setup</Link></div> : null}
             </div>
             <GapNote gap={gap} />
-            <p className="small muted">Unsure answers count for half; later harvest rounds are projected from how often each farmer harvests. All data is synthetic.</p>
+            </>}
+            <p className="small muted">Unsure answers count for half; later harvest rounds are projected from how often each farmer harvests. Deliveries are net, after grading. All data is synthetic.</p>
           </section>
           {state && <TrackRecord cid={cid} rows={rows} refreshKey={JSON.stringify(rows.map((r) => r.expected_kg))} />}
         </div>
         <div className="col-side">
           {state && gap && <FillList gap={gap} state={view} />}
+          {state && rows.find((r) => r.is_surplus) && <SurplusCard row={rows.find((r) => r.is_surplus)} cid={cid} />}
           <section className="card" aria-labelledby="calls-title">
             <div className="card-head">
               <h2 id="calls-title">Live calls</h2>

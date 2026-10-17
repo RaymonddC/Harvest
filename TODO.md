@@ -208,5 +208,14 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     later start are greyed out and never short. Older campaigns with only `weeks` still work. Fixed: chart bar layers drawn
     as white pills (CSS class clash with the calendar toggle), projected rounds not drawn, phone pages scrolling sideways.
 
+20. **Mill operations (code done 17 Oct, branch `claude/mill-operations`).** The forecast shows supply by day, week,
+    month or year (`GET /api/supply`: expected, net deliveries, target, capacity, truck loads). Campaigns have the mill's
+    capacity per day, working days and truck load; weeks over capacity are a surplus with the farmers to move a week
+    later (texted). Deliveries carry weighbridge grading (unripe, dirt, other), the net weight and the price from the
+    matched purchase order, with a goods receipt and payment PDF. Official farmgate prices (Disbun) can drive the price
+    range. Farmers have plot location, area and certification; a traceability summary and CSV flag farmers who deliver
+    more than their plot can grow. Still to do: real Disbun price import (no public API found; entered by hand), voice
+    calls that ask farmers to deliver later (today the planner agrees it and the farmer gets a text), plot polygons.
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

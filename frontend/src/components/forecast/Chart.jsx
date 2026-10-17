@@ -38,6 +38,7 @@ function TipBody({ r, target }) {
       {r.projected_kg > 0 && <Line label="Later harvest rounds (projected)" kg={r.projected_kg} />}
       {r.approved_in_kg > 0 && <Line label="Approved deals" kg={r.approved_in_kg} />}
       {r.pending_kg > 0 && <Line label="Waiting for approval" kg={r.pending_kg} />}
+      {r.capacity_kg ? <Line label={r.is_surplus ? "Over the mill's capacity" : "Mill capacity"} kg={r.is_surplus ? r.surplus_kg : r.capacity_kg} /> : null}
       <div className="sum"><span>Expected</span><b className="num">{fmtT(r.expected_kg)} of {fmtT(target)} t</b></div>
       <p className={r.is_gap ? "short" : "fine"}>
         {r.is_gap ? `${fmtT(r.gap_kg)} t short of the target` : r.gap_kg ? `${fmtT(r.gap_kg)} t under target, within the gap threshold` : "At or above the target"}
@@ -75,7 +76,9 @@ export default function Chart({ rows }) {
     return () => { cancelAnimationFrame(f); clearTimeout(t); };
   }, []);
   const target = rows[0].target_kg;
-  const max = Math.max(target * 1.15, ...rows.map((r) => r.expected_kg + r.pending_kg));
+  const cap = rows[0].capacity_kg || 0;
+  // Headroom above the tallest bar for its label (and the pending part on top).
+  const max = Math.max(target * 1.15, cap * 1.12, ...rows.map((r) => (r.expected_kg + r.pending_kg) * 1.15));
   const pct = (kg) => (grown ? `${(kg / max) * 100}%` : "0%");
   const at = (kg) => `${(kg / max) * 100}%`;
   return (
@@ -87,12 +90,13 @@ export default function Chart({ rows }) {
           <span className="unit">t</span>
         </div>
         <div className="target" data-label={`Target ${fmtT(target)} t`} style={{ bottom: at(target) }} />
+        {cap > 0 && <div className="capacity" data-label={`Mill capacity ${fmtT(cap)} t`} style={{ bottom: at(cap) }} />}
         <div className="bars">
           {rows.map((r) => (
             <Col key={r.week} r={r} target={target}>
               <div className="val num">
                 {/* On a phone the shortfall moves out of the pill (the KPI card above still shows it). */}
-                <span>{fmtT(r.expected_kg)}{r.is_gap && <span className="short"> · {fmtT(r.gap_kg)} t short</span>}</span>
+                <span>{fmtT(r.expected_kg)}{r.is_gap && <span className="short"> · {fmtT(r.gap_kg)} t short</span>}{r.is_surplus && <span className="short over"> · {fmtT(r.surplus_kg)} t over</span>}</span>
                 {r.pending_kg > 0 && <small><span>+{fmtT(r.pending_kg)} pending</span></small>}
               </div>
               <div className="pend" hidden={!r.pending_kg} style={{ height: pct(r.pending_kg) }} title={`${fmtT(r.pending_kg)} t waiting for approval`} />

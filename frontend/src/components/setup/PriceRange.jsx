@@ -4,6 +4,7 @@ import { api, can, cropLabel, plainPrice } from "../../lib.js";
 import { useUnsaved } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
 import { SubmitButton } from "../../ui.jsx";
+import OfficialPrice from "./OfficialPrice.jsx";
 import StepTop from "./StepTop.jsx";
 
 const FIELDS = ["floor_price", "reference_price", "ceiling_price", "first_premium_pct", "step_pct"];
@@ -120,7 +121,8 @@ export default function PriceRange({ l, crop }) {
         <Field label="Highest" name="ceiling_price" form={form} edit={edit} error={errs.ceiling_price} />
       </div>
       {form && l && <PriceSlider form={form} l={l} onChange={slide} />}
-      <span className="sub">{l && l.reference_source ? `Market price source: ${l.reference_source}` : ""}</span>
+      {l && l.reference_source && !l.follows_official && <span className="sub">Market price source: {l.reference_source}</span>}
+      <OfficialPrice l={l} crop={crop} />
       <details>
         <summary>How the agent climbs the offer</summary>
         <div className="grid2" style={{ marginTop: 10 }}>

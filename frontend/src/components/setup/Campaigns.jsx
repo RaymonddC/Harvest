@@ -101,6 +101,18 @@ function Fields({ f, setF, planStart }) {
           {pastEnd && !datesBad && <span className="field-err">Must end in week 1 ({shortDay(planStart)}) or later.</span>}
         </label>
       </div>
+      <div className="grid3">
+        <label className="field">Mill capacity a day, t
+          <input type="text" inputMode="decimal" className="num-input" placeholder="e.g. 20" value={f.cap ?? ""} onChange={(e) => setF({ ...f, cap: e.target.value.replace(/[^0-9.]/g, "") })} />
+        </label>
+        <label className="field">Working days a week
+          <select value={f.days ?? "6"} onChange={(e) => setF({ ...f, days: e.target.value })}>{[5, 6, 7].map((n) => <option key={n} value={n}>{n}{n === 6 ? " (Mon to Sat)" : n === 5 ? " (Mon to Fri)" : " (every day)"}</option>)}</select>
+        </label>
+        <label className="field">Truck load, t
+          <input type="text" inputMode="decimal" className="num-input" value={f.truck ?? "8"} onChange={(e) => setF({ ...f, truck: e.target.value.replace(/[^0-9.]/g, "") })} />
+        </label>
+      </div>
+      <p className="small muted" style={{ margin: 0 }}>Palm fruit has to be pressed within a day or two, so the mill's daily capacity shows the days and weeks with more fruit than it can take.</p>
       {shown > 0 && (
         <p className="sub" style={{ margin: 0 }}>
           {shortDay(f.start)} to {shortDay(f.end)}, {daysBetween(f.start, f.end) + 1} days. The forecast shows {shown} week{shown === 1 ? "" : "s"} from {shortDay(planStart)}
@@ -110,6 +122,8 @@ function Fields({ f, setF, planStart }) {
     </>
   );
 }
+// Capacity fields in tonnes on screen, kg for the API (an empty capacity clears it).
+const ops = (f) => ({ daily_capacity_kg: f.cap ? Number(f.cap) * 1000 : 0, working_days: Number(f.days || 6), truck_kg: Number(f.truck || 8) * 1000 });
 const fieldsOk = (f, planStart) => Number(f.target) >= 1 && f.start && f.end && f.end >= f.start && (!planStart || f.end >= planStart);
 
 // Crop, name, weekly target, start and end dates, and which farmers of that crop join it (those in no campaign are ticked).
@@ -129,7 +143,7 @@ function NewCampaign({ onClose, state, soon, onMade, ofFarmer }) {
     if (soon) return;
     setSaving(true);
     const made = await act(() => api("/api/campaigns", { body: { crop: f.crop, name: f.name || null, target_kg_per_week: Number(f.target) * 1000,
-      start_date: f.start, end_date: f.end, farmer_ids: [...ticked] } }), (r) => `${r.name || cropName(r.crop)} campaign created.`);
+      start_date: f.start, end_date: f.end, ...ops(f), farmer_ids: [...ticked] } }), (r) => `${r.name || cropName(r.crop)} campaign created.`);
     setSaving(false);
     if (made) { onMade(made.id); onClose(); }
   };
@@ -176,14 +190,15 @@ function EditCampaign({ c, onClose, state }) {
   const act = useAct();
   const confirm = useConfirm();
   const planStart = state.settings?.plan_start;
-  const [f, setF] = useState(() => ({ name: c.name || "", target: String(Math.round((c.target_kg_per_week || 0) / 1000)), ...datesOf(c, state.settings) }));
+  const [f, setF] = useState(() => ({ name: c.name || "", target: String(Math.round((c.target_kg_per_week || 0) / 1000)), ...datesOf(c, state.settings),
+    cap: c.daily_capacity_kg ? String(c.daily_capacity_kg / 1000) : "", days: String(c.working_days || 6), truck: String((c.truck_kg || 8000) / 1000) }));
   const [saving, setSaving] = useState(false);
   const only = campaignsOf(state).length <= 1;
   const save = async (e) => {
     e.preventDefault();
     setSaving(true);
     const ok = await act(() => api(`/api/campaigns/${encodeURIComponent(c.id)}`, { method: "PUT",
-      body: { name: f.name, target_kg_per_week: Number(f.target) * 1000, start_date: f.start, end_date: f.end } }), "Campaign saved.");
+      body: { name: f.name, target_kg_per_week: Number(f.target) * 1000, start_date: f.start, end_date: f.end, ...ops(f) } }), "Campaign saved.");
     setSaving(false);
     if (ok) onClose();
   };

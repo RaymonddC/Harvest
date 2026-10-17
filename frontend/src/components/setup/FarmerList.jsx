@@ -120,6 +120,7 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
               <SortHead col={COLUMNS[1]} sort={sort} setSort={sortBy} />
               <SortHead col={COLUMNS[2]} sort={sort} setSort={sortBy} />
               {showCampaign && <SortHead col={{ key: "campaign", label: "Campaign" }} sort={sort} setSort={sortBy} />}
+              {showCampaign && <th>Plot</th>}
               <SortHead col={COLUMNS[3]} sort={sort} setSort={sortBy} className="r" />
               <th style={{ paddingRight: 22 }}><span className="sr-only">Actions</span></th>
             </tr>
@@ -141,6 +142,11 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
                       </select>
                     )}
                   </td>
+                )}
+                {showCampaign && (
+                  <td>{f.plot_lat != null && f.plot_lng != null
+                    ? <span className="small">{f.plot_ha ? `${f.plot_ha} ha` : "Mapped"}{f.certification ? ` · ${f.certification}` : ""}</span>
+                    : <span className="small muted">Not mapped</span>}</td>
                 )}
                 <td className="r num">{f.usual_kg_week ? fmtKg(f.usual_kg_week) : "–"}</td>
                 <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>

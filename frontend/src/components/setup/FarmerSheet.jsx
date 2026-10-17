@@ -116,15 +116,19 @@ function DeliveryBox({ farmer, stateKey }) {
   const confirm = useConfirm();
   const [rec, setRec] = useState(null);
   const [tick, setTick] = useState(0);
-  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), kg: "" });
+  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), kg: "", unripe: "", dirt: "" });
+  const pctIn = (k) => (e) => setForm({ ...form, [k]: e.target.value.replace(/[^0-9.]/g, "") });
+  const net = Number(form.kg) * (1 - (Number(form.unripe || 0) + Number(form.dirt || 0)) / 100);
   useEffect(() => {
     let live = true;
     api(`/api/farmers/${farmer.id}/track-record`, { method: "GET" }).then((r) => { if (live) setRec(r); }).catch(() => {});
     return () => { live = false; };
   }, [farmer.id, stateKey, tick]);
   const add = async () => {
-    const r = await act(() => api("/api/deliveries", { body: { farmer_id: farmer.id, kg: Number(form.kg), date: form.date } }), "Delivery recorded.");
-    if (r) { setForm({ ...form, kg: "" }); setTick((n) => n + 1); }
+    const r = await act(() => api("/api/deliveries", { body: { farmer_id: farmer.id, kg: Number(form.kg), date: form.date,
+      unripe_pct: form.unripe ? Number(form.unripe) : null, dirt_pct: form.dirt ? Number(form.dirt) : null } }),
+      (d) => `Delivery recorded: ${fmtKg(d.net_kg)} kg net${d.po_number ? `, paid at ${d.po_number}` : ""}.`);
+    if (r) { setForm({ ...form, kg: "", unripe: "", dirt: "" }); setTick((n) => n + 1); }
   };
   const remove = async (d) => {
     if (await confirm({ title: "Remove this delivery?", body: `${fmtKg(d.kg)} kg on ${day(d.date)}.`, confirm: "Remove", danger: true })) {
@@ -147,10 +151,13 @@ function DeliveryBox({ farmer, stateKey }) {
         </ul>
       )}
       {can("farmers.manage") && (
-        <div className="grid3" style={{ alignItems: "end", marginTop: 8 }}>
+        <div className="delivery-form">
           <label className="field">Delivered on<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
-          <label className="field">Kg<input type="text" inputMode="numeric" className="num-input" value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value.replace(/[^0-9]/g, "") })} /></label>
+          <label className="field">Gross kg<input type="text" inputMode="numeric" className="num-input" value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value.replace(/[^0-9]/g, "") })} /></label>
+          <label className="field">Unripe %<input type="text" inputMode="decimal" className="num-input" placeholder="0" value={form.unripe} onChange={pctIn("unripe")} /></label>
+          <label className="field">Dirt %<input type="text" inputMode="decimal" className="num-input" placeholder="0" value={form.dirt} onChange={pctIn("dirt")} /></label>
           <ActButton className="btn sm leaf" busy="Saving…" disabled={!(Number(form.kg) > 0)} run={add}>Add delivery</ActButton>
+          {Number(form.kg) > 0 && <span className="small muted">{fmtKg(Math.round(net))} kg net after grading</span>}
         </div>
       )}
       {rec.deliveries.length > 0 && (
@@ -158,7 +165,9 @@ function DeliveryBox({ farmer, stateKey }) {
           <summary>All deliveries ({rec.deliveries.length})</summary>
           <ul className="fs-list">
             {rec.deliveries.map((d) => (
-              <li key={d.id} className="row"><span className="name">{day(d.date)} · {fmtKg(d.kg)} kg · {d.recorded_by}</span>
+              <li key={d.id} className="row"><span className="name">{day(d.date)} · {fmtKg(d.kg)} kg{d.deduction_pct ? ` − ${d.deduction_pct}% = ${fmtKg(d.net_kg)} kg net` : ""}
+                {d.amount != null && <small className="muted"> · {plainPrice(d.amount, d.currency || "IDR")}{d.po_number ? ` (${d.po_number})` : " (reference price)"}</small>}</span>
+                <a className="btn sm ghost" href={apiUrl(`/api/deliveries/${d.id}/receipt.pdf`)} download>Receipt</a>
                 {can("farmers.manage") && <button type="button" className="btn sm ghost" onClick={() => remove(d)}>Remove</button>}</li>
             ))}
           </ul>
@@ -213,6 +222,12 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                 <span className="sub">{[f.village, cropLabel(f.crop), f.language, maskPhone(f.phone)].filter(Boolean).join(" · ")}</span>
                 {f.do_not_call && <Pill cls="">Asked not to be called</Pill>}
                 <PhoneAllow f={f} state={state} />
+                <span className="plot-line small">
+                  {f.plot_lat != null && f.plot_lng != null
+                    ? <>Plot <a href={`https://www.google.com/maps?q=${f.plot_lat},${f.plot_lng}`} target="_blank" rel="noopener">{f.plot_lat}, {f.plot_lng}</a>{f.plot_ha ? ` · ${f.plot_ha} ha` : ""}</>
+                    : <span className="muted">Plot not mapped (needed for traceability)</span>}
+                  {f.certification && <> · <b>{f.certification}</b></>}
+                </span>
               </div>
               <RDialog.Close className="sheet-x" aria-label="Close"><span aria-hidden="true">×</span></RDialog.Close>
             </header>
