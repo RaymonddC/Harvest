@@ -392,6 +392,7 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                         if not sc:
                             continue
                         if sc.interrupted:
+                            log.info("call %s: agent interrupted by the farmer's side (after_end=%s)", call_id, session.ended)
                             if recorder:
                                 recorder.interrupted()
                             await send({"type": "interrupted"})
@@ -405,6 +406,7 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                                         # the browser long after the call was closed.
                                         post_end_seconds += len(part.inline_data.data) / 2 / OUTPUT_RATE
                                         if post_end_seconds > GOODBYE_MAX_AUDIO_SECONDS:
+                                            log.info("call %s: goodbye cut after %.1f s of speech", call_id, post_end_seconds)
                                             return
                                     if recorder:
                                         recorder.add_agent(part.inline_data.data)

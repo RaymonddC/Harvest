@@ -253,3 +253,7 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
 
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.
+
+15. **Audit of 16 Oct and open reports** (see `AUDIT.md`). Items A1 to A5 (public reads, demo password, call websocket token, sticky refusal,
+    transcript retention) come before any real farmer. Also open: the agent's voice sometimes stops before it has finished its sentence
+    (cause not found; see the diagnostics added to `live_session.py`: the log lines "agent interrupted" and "goodbye cut" show which case it is).
