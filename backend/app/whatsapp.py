@@ -99,6 +99,25 @@ def _send(settings: Settings, to: str, body: str, opening_for: dict | None = Non
     return getattr(msg, "sid", None)
 
 
+def recent_messages(settings: Settings, limit: int = 10) -> list[dict]:
+    """The sender's latest WhatsApp messages as Twilio sees them: direction, status and error code (to find out why
+    one was not delivered). Phone numbers are masked."""
+    if not whatsapp_ready(settings):
+        raise services.ServiceError(note(settings))
+    from twilio.rest import Client
+
+    client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
+    me = f"whatsapp:{normalize_phone(settings.twilio_whatsapp_from)}"
+    mask = lambda n: (n or "")[:-7] + "•••" + (n or "")[-4:]  # noqa: E731
+    out = []
+    for m in [*client.messages.list(from_=me, limit=limit), *client.messages.list(to=me, limit=limit)]:
+        out.append({"sid": m.sid, "at": m.date_created.isoformat() if m.date_created else None,
+                    "direction": m.direction, "status": m.status, "error_code": m.error_code,
+                    "error_message": m.error_message, "to": mask(m.to), "from": mask(m.from_),
+                    "body": (m.body or "")[:60]})
+    return sorted(out, key=lambda x: x["at"] or "", reverse=True)[:limit]
+
+
 SENDERS_URL = "https://messaging.twilio.com/v2/Channels/Senders"
 
 
@@ -479,7 +498,28 @@ async def handle_incoming(store: Store, settings: Settings, form: dict) -> str |
             data = await asyncio.to_thread(_download_media, settings, url)
             if data:
                 media.append((data, mime.split(";")[0]))
-    return await agent_reply(store, settings, call["id"], str(form.get("Body", "")).strip(), media)
+    reply = await agent_reply(store, settings, call["id"], str(form.get("Body", "")).strip(), media)
+    if not reply:
+        return None
+    try:
+        sid = await asyncio.to_thread(_send, settings, normalize_phone(farmer["phone"]), reply)
+        _note_sid(store, call["id"], sid)
+    except Exception:  # noqa: BLE001 - the reply is in the chat; the dashboard shows it was not sent
+        log.exception("whatsapp chat %s: Twilio did not take the reply", call["id"])
+    return None
+
+
+def _note_sid(store: Store, call_id: str, sid: str | None) -> None:
+    """Mark the newest agent line with the Twilio SID it went out with."""
+    call = store.get("calls", call_id) or {}
+    lines = list(call.get("chat") or [])
+    for line in reversed(lines):
+        if line.get("who") == "agent":
+            line["sid"] = sid
+            break
+    target = "chat" if call.get("status") in ("queued", "on_call") else ("transcript" if call.get("transcript") else None)
+    if target == "chat":
+        store.set("calls", call_id, {"chat": lines}, merge=True)
 
 
 async def reply_as_farmer(store: Store, settings: Settings, call_id: str, text: str, generate=None) -> str | None:

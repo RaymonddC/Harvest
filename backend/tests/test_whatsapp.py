@@ -179,6 +179,8 @@ def test_real_whatsapp_only_to_allowlisted_numbers_with_the_template(store, sett
 
 
 def test_incoming_messages_reach_the_agent_and_strangers_are_ignored(store, settings, monkeypatch):
+    fake = FakeTwilio()
+    monkeypatch.setattr("twilio.rest.Client", fake.client())
     s = live(settings)
     f = farmer_of(store)
     store.set("farmers", f["id"], {"phone": "+62 811 4617 000"}, merge=True)
@@ -187,8 +189,10 @@ def test_incoming_messages_reach_the_agent_and_strangers_are_ignored(store, sett
     stranger = {"From": "whatsapp:+628999999999", "Body": "halo", "MessageSid": "SM0"}
     assert run(whatsapp.handle_incoming(store, s, stranger)) is None
     msg = {"From": f"whatsapp:{PHONE}", "Body": "Panen saya minggu depan", "MessageSid": "SM1", "NumMedia": "0"}
-    assert "asisten AI" in run(whatsapp.handle_incoming(store, s, msg))
+    assert run(whatsapp.handle_incoming(store, s, msg)) is None  # answered through the API, not the webhook
+    assert "asisten AI" in fake.sent[-1]["body"] and fake.sent[-1]["to"] == f"whatsapp:{PHONE}"
     chat = whatsapp.open_chat_for(store, f["id"])
+    assert chat["chat"][-1]["sid"] == "SM1"
     assert chat["farmer_started"] and chat["chat"][0] == {**chat["chat"][0], "who": "farmer", "text": "Panen saya minggu depan"}
     assert "the farmer wrote first" in model.seen[0][1]
     assert run(whatsapp.handle_incoming(store, s, msg)) is None  # the same message again is not answered twice
@@ -197,6 +201,8 @@ def test_incoming_messages_reach_the_agent_and_strangers_are_ignored(store, sett
 def test_webhook_checks_twilio_signature_and_answers_in_twiml(store, settings, monkeypatch):
     from twilio.request_validator import RequestValidator
 
+    fake = FakeTwilio()
+    monkeypatch.setattr("twilio.rest.Client", fake.client())
     s = live(settings)
     f = farmer_of(store)
     store.set("farmers", f["id"], {"phone": "+62 811 4617 000"}, merge=True)
@@ -206,7 +212,7 @@ def test_webhook_checks_twilio_signature_and_answers_in_twiml(store, settings, m
     assert client.post("/twilio/whatsapp", data=form, headers={"X-Twilio-Signature": "bad"}).status_code == 403
     sig = RequestValidator("tok").compute_signature("https://gw.example/twilio/whatsapp", form)
     r = client.post("/twilio/whatsapp", data=form, headers={"X-Twilio-Signature": sig})
-    assert r.status_code == 200 and "<Message>Harga &amp; jadwal &lt;ok&gt;</Message>" in r.text
+    assert r.status_code == 200 and "<Message>" not in r.text and fake.sent[-1]["body"] == "Harga & jadwal <ok>"
 
 
 def test_api_starts_a_chat_and_a_whatsapp_campaign(store, settings, monkeypatch):

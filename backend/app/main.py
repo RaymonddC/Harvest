@@ -778,12 +778,13 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         """A farmer's WhatsApp message (set as the sender's "message comes in" webhook in Twilio). The agent's answer
         goes back as the webhook's reply."""
         form = await twilio_form(request, "/twilio/whatsapp", ready=whatsapp.whatsapp_ready)
-        reply = await whatsapp.handle_incoming(store, settings, form)
-        from xml.sax.saxutils import escape
+        await whatsapp.handle_incoming(store, settings, form)  # the agent's answer is sent through the API
+        return Response(content='<?xml version="1.0" encoding="UTF-8"?><Response></Response>', media_type="text/xml")
 
-        body = f"<Message>{escape(reply)}</Message>" if reply else ""
-        return Response(content=f'<?xml version="1.0" encoding="UTF-8"?><Response>{body}</Response>',
-                        media_type="text/xml")
+    @app.get("/api/whatsapp/messages", dependencies=[Depends(need("users.admin"))])
+    def whatsapp_messages():
+        """The sender's latest messages and their delivery status (to see why one did not arrive)."""
+        return {"messages": whatsapp.recent_messages(settings)}
 
     @app.post("/twilio/status", include_in_schema=False)
     async def twilio_status(request: Request, call_id: str):
