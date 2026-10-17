@@ -1236,8 +1236,8 @@ table.answers tr:focus-visible td { background: var(--leaf-soft); outline: none;
 .login-story::after { display: none; }
 .login-story .ls-body { margin-top: 0; }
 .login-story { gap: 28px; }
-.login-story .ls-scene { min-height: 150px; }
-@media (max-height: 640px) { .login-story .ls-scene { display: none; } }
+.login-story .ls-scene { min-height: 120px; }
+@media (max-height: 480px) { .login-story .ls-scene { display: none; } }
 .login-pick.picker .role-tile { position: relative; }
 .role-start { position: absolute; top: 10px; right: 10px; margin: 0; }
 /* Sign-in, from the browser checks: a focus ring that stands out on white (5.5:1), firmer tile edges,
@@ -1247,3 +1247,11 @@ table.answers tr:focus-visible td { background: var(--leaf-soft); outline: none;
 .login-pick.picker .role-tile.main { border-color: var(--leaf); }
 .own-account summary { min-height: 44px; display: flex; align-items: center; }
 .login-pick .pw-toggle { min-width: 44px; min-height: 44px; }
+/* Short laptop screens: tighter text on the left, so the phone keeps a useful size */
+@media (min-width: 861px) and (max-height: 760px) {
+  .login-story { gap: 18px; padding-top: 28px; padding-bottom: 28px; }
+  .ls-body { gap: 16px; }
+  .ls-body .ls-title { font-size: clamp(22px, 2vw, 28px); }
+  .ls-steps { gap: 8px; }
+  .ls-steps li { font-size: 14px; }
+}
