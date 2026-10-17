@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, can } from "../../lib.js";
+import { api, cachedGet, can, peekGet } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton } from "../../ui.jsx";
 
@@ -18,10 +18,10 @@ const day = (iso) => (iso ? new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDat
 
 // What /api/crm says about this farmer (segment, reliability, churn signals); refreshed when the data changes.
 export function useCrmOf(farmerId, key) {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState(() => peekGet("/api/crm") || null);
   useEffect(() => {
     let live = true;
-    api("/api/crm", { method: "GET" }).then((r) => { if (live) setData(r); }).catch(() => {});
+    cachedGet("/api/crm").then((r) => { if (live) setData(r); }).catch(() => {});
     return () => { live = false; };
   }, [farmerId, key]);
   return data?.farmers?.[farmerId] || null;

@@ -1549,3 +1549,6 @@ body.app .note-list li, body.app .fs-list li { animation: hc-fade .2s ease-out; 
   .chain-bar span, .have-bar i, .tbd-bar > *, .meter i { transition: none; }
   body.app .board .pcard:active { transform: none; }
 }
+
+/* Space held for a card that is still loading, so the page below does not jump when it arrives */
+.trace-wait { min-height: 266px; background: linear-gradient(90deg, #fff 0%, #FAFAF6 50%, #fff 100%); }

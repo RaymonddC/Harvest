@@ -4,7 +4,7 @@ import { campaignsOf, CROPS, useCrop, useMembership } from "../campaigns.jsx";
 import FarmerForm from "../components/setup/FarmerForm.jsx";
 import FarmerList from "../components/setup/FarmerList.jsx";
 import FarmerSheet from "../components/setup/FarmerSheet.jsx";
-import { api, apiUrl, can, fmtKg, maskPhone } from "../lib.js";
+import { api, apiUrl, cachedGet, can, fmtKg, maskPhone, peekGet } from "../lib.js";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 import { useAct } from "../toast.jsx";
@@ -113,14 +113,16 @@ export default function Farmers() {
 function Traceability() {
   const { state } = useLive();
   const { cid, campaign } = useCrop();
-  const [t, setT] = useState(null);
+  const url = `/api/traceability?campaign=${encodeURIComponent(cid)}`;
+  const [got, setT] = useState(() => peekGet(url) || null);
+  const t = got || peekGet(url);
   const key = JSON.stringify(state.farmers.map((f) => [f.id, f.plot_lat, f.plot_ha, f.certification, f.campaign_id]));
   useEffect(() => {
     let live = true;
-    api(`/api/traceability?campaign=${encodeURIComponent(cid)}`, { method: "GET" }).then((r) => { if (live) setT(r); }).catch(() => {});
+    cachedGet(url).then((r) => { if (live) setT(r); }).catch(() => {});
     return () => { live = false; };
-  }, [cid, key]);
-  if (!t) return null;
+  }, [url, key]);
+  if (!t) return <section className="card trace-card trace-wait" aria-hidden="true" />;  // holds the space until it loads
   const pct = (n) => (t.farmers ? Math.round((n / t.farmers) * 100) : 0);
   return (
     <section className="card trace-card" aria-labelledby="trace-title">

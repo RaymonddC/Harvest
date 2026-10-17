@@ -2,10 +2,10 @@ import { MotionConfig } from "motion/react";
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Alerts from "./alerts.jsx";
-import { CropProvider } from "./campaigns.jsx";
+import { CropProvider, useCrop } from "./campaigns.jsx";
 import { ConfirmProvider, UnsavedProvider } from "./dialogs.jsx";
 import { LiveProvider } from "./live.jsx";
-import { OLD_URLS } from "./lib.js";
+import { cachedGet, getSession, OLD_URLS } from "./lib.js";
 import { Toasts } from "./toast.jsx";
 
 // Each page is its own chunk. They load in the background once the app is up (see Preload), so moving between pages
@@ -34,6 +34,14 @@ const Calendar = lazy(PAGE_CODE.Calendar);
 const Login = lazy(PAGE_CODE.Login);
 
 function Preload() {
+  const { cid } = useCrop();
+  useEffect(() => {
+    if (!cid || !getSession()) return undefined;
+    const c = encodeURIComponent(cid);
+    const t = setTimeout(() => [`/api/traceability?campaign=${c}`, `/api/track-record?campaign=${c}`,
+      `/api/approvals/impact?campaign=${c}`, "/api/crm"].forEach((u) => cachedGet(u).catch(() => {})), 1500);
+    return () => clearTimeout(t);
+  }, [cid]);
   useEffect(() => {
     const load = () => Object.values(PAGE_CODE).forEach((get) => get().catch(() => {}));
     const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200));

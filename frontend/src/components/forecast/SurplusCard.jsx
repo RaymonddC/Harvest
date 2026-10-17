@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useConfirm } from "../../dialogs.jsx";
-import { api, can, fmtT } from "../../lib.js";
+import { api, cachedGet, can, fmtT, peekGet } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton } from "../../ui.jsx";
 import { shortDate } from "./Chart.jsx";
@@ -12,12 +12,12 @@ const later = (iso, days) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCD
 export default function SurplusCard({ row, cid }) {
   const act = useAct();
   const confirm = useConfirm();
-  const [list, setList] = useState(null);
+  const url = `/api/surplus?week=${row.week}&campaign=${encodeURIComponent(cid)}`;
+  const [list, setList] = useState(() => peekGet(url)?.farmers || null);
   const [tick, setTick] = useState(0);
   useEffect(() => {
     let live = true;
-    api(`/api/surplus?week=${row.week}&campaign=${encodeURIComponent(cid)}`, { method: "GET" })
-      .then((r) => { if (live) setList(r.farmers); }).catch(() => {});
+    cachedGet(url).then((r) => { if (live) setList(r.farmers); }).catch(() => {});
     return () => { live = false; };
   }, [row.week, row.expected_kg, cid, tick]);
   const move = async (f) => {
