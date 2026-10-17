@@ -1314,16 +1314,25 @@ _dial_lock = threading.Lock()
 
 
 def dial_next(store: Store, settings: Settings) -> str | None:
-    """Phone campaigns ring one farmer at a time: the Live API allows only a few sessions at once,
-    and a planner can follow one call. Dial the oldest waiting first-attempt phone call of a running
-    phone campaign, unless a phone call is already ringing or in progress. A farmer the safety gate
-    refuses is skipped (the call ends as dropped with the reason, no retry) and the next one is tried.
-    Retries of missed calls are left for the planner to dial (see dial_now)."""
+    """Phone campaigns ring PHONE_CALLS_AT_ONCE farmers at the same time (each call is a Gemini Live session, and the
+    Live API allows only a few at once). Dial the oldest waiting first-attempt phone calls of a running phone campaign
+    until that many are ringing or in progress. A farmer the safety gate refuses is skipped (the call ends as dropped
+    with the reason, no retry) and the next one is tried. Retries of missed calls are left for the planner to dial
+    (see dial_now). Returns the first call dialled, if any."""
+    first = None
+    while True:
+        placed = _dial_one(store, settings)
+        if not placed:
+            return first
+        first = first or placed
+
+
+def _dial_one(store: Store, settings: Settings) -> str | None:
     with _dial_lock:
         calls = store.list("calls")
-        if any(c.get("channel") == "twilio" and (c["status"] == "on_call"
-                                                 or (c["status"] == "queued" and c.get("dialed_at")))
-               for c in calls):
+        busy = sum(1 for c in calls if c.get("channel") == "twilio" and (
+            c["status"] == "on_call" or (c["status"] == "queued" and c.get("dialed_at"))))
+        if busy >= settings.phone_calls_at_once:
             return None
         phone_crops = {normalize_crop(c.get("crop") or settings.demo_crop) for c in store.list("campaigns")
                        if c.get("status") == "running" and c.get("channel") == "twilio"}

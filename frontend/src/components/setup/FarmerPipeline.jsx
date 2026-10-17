@@ -3,10 +3,19 @@ import { toast } from "sonner";
 import { crmOf, REASONS, STAGES } from "../../crm.js";
 import { api, can, fmtT, numberAllowed } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
-import { Avatar } from "../../ui.jsx";
+import FarmerFace from "../FarmerFace.jsx";
 import FarmerList from "./FarmerList.jsx";
 
 const PER_COLUMN = 6;
+const EMPTY = {
+  to_call: "Everyone has a current answer.",
+  calling: "No call is waiting.",
+  no_reply: "Every call got through.",
+  answered: "No firm answers yet.",
+  offer: "Nothing waiting for you.",
+  deal: "No deals yet.",
+  delivered: "Nothing weighed yet.",
+};
 
 // Drag and drop: a stage comes from what happened (calls, answers, offers), so only moves that are a real action are
 // allowed; any other drop says why.
@@ -93,15 +102,18 @@ export default function FarmerPipeline({ state, cid, title, filter, onClearFilte
               <div key={s.key} className={`col st-${s.key} ${over === s.key ? "drop-on" : ""}`} role="listitem" aria-label={`${s.label}: ${items.length}`}
                 onDragOver={(e) => { if (dragged.current) { e.preventDefault(); setOver(s.key); } }} onDragLeave={() => setOver((o) => (o === s.key ? null : o))}
                 onDrop={(e) => { e.preventDefault(); drop(dragged.current, s.key); }}>
-                <div className="col-head"><b>{s.label}</b><span className="count-pill">{items.length}</span></div>
-                <small className="col-hint">{s.hint}</small>
+                <div className="col-head">
+                  <span className="col-n num">{items.length}</span>
+                  <span className="col-name"><b>{s.label}</b><small>{s.hint}</small></span>
+                </div>
+                {!items.length && <p className="col-empty">{EMPTY[s.key]}</p>}
                 <ul>
                   {items.slice(0, PER_COLUMN).map((x) => (
                     <li key={x.farmer.id}>
                       <button type="button" className={`pcard ${drag?.farmer.id === x.farmer.id ? "dragging" : ""}`} onClick={() => onOpen?.(x.farmer)} aria-label={`Open ${x.farmer.name}`}
                         draggable onDragStart={(e) => { dragged.current = x; setDrag(x); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", x.farmer.id); }}
                         onDragEnd={() => { dragged.current = null; setDrag(null); setOver(null); }}>
-                        <Avatar name={x.farmer.name} cls="sm" />
+                        <FarmerFace name={x.farmer.name} id={x.farmer.id} size={34} />
                         <span><b>{x.farmer.name}</b><small>{sub(x)}</small></span>
                       </button>
                     </li>

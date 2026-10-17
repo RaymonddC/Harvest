@@ -689,7 +689,7 @@ def test_phone_campaign_dials_one_farmer_at_a_time_and_skips_refused_numbers(sto
     monkeypatch.setattr(services, "_after_phone_call", services.dial_next)  # run the next dial inline
     to_call = sorted(services.call_list(store, settings, services.campaign_members(store, settings, "current")))
     allowed = tuple(normalize_phone(store.get("farmers", fid)["phone"]) for fid in to_call[1:3])
-    s = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=allowed)
+    s = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=allowed, phone_calls_at_once=1)
 
     r = services.start_campaign(store, s, "collect", channel="twilio")
     assert r["channel"] == "twilio" and r["queued"] == len(to_call)
@@ -708,6 +708,24 @@ def test_phone_campaign_dials_one_farmer_at_a_time_and_skips_refused_numbers(sto
     assert len(fake.created) == 2
     assert all(c["status"] in ("done", "dropped") or c.get("attempt") == 2
                for c in store.list("calls") if c.get("channel") == "twilio")
+
+
+def test_phone_campaign_rings_several_farmers_at_once(store, settings, monkeypatch):
+    from app.config import normalize_phone
+
+    fake = _FakeTwilio()
+    monkeypatch.setattr("twilio.rest.Client", fake.Client)
+    monkeypatch.setattr(services, "_after_phone_call", services.dial_next)
+    to_call = sorted(services.call_list(store, settings, services.campaign_members(store, settings, "current")))
+    allowed = tuple(normalize_phone(store.get("farmers", fid)["phone"]) for fid in to_call[:5])
+    s = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=allowed, phone_calls_at_once=3)
+    services.start_campaign(store, s, "collect", channel="twilio")
+    assert len(fake.created) == 3  # three ring at the same time
+    assert services.dial_next(store, s) is None  # the limit is reached
+    first = next(c for c in store.list("calls") if c.get("dialed_at"))
+    services.finish_call(store, s, first["id"], ended_cleanly=True, outcome="completed", summary="ok",
+                         consent=False, transcript=[])
+    assert len(fake.created) == 4  # one ended, the next one rings
 
 
 def test_phone_campaign_refuses_when_phone_calls_are_off(store, settings):
