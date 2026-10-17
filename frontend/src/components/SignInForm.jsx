@@ -6,7 +6,7 @@ import { Avatar, Icon, SubmitButton } from "../ui.jsx";
 // Username and password, plus the built-in demo accounts (their shared password is shown so judges
 // can get in with one click). Used by the sign-in page and by the Switch user dialog.
 // onSignedIn(session) runs after a successful sign-in; exclude hides the account already signed in.
-export default function SignInForm({ onSignedIn, exclude, initialError = "", autoFocus = true, submitLabel = "Sign in" }) {
+export default function SignInForm({ onSignedIn, exclude, initialError = "", autoFocus = true, submitLabel = "Sign in", noDemo = false }) {
   const shake = useAnimationControls();
   const passwordRef = useRef(null);
   const [form, setForm] = useState({ username: "", password: "" });
@@ -14,7 +14,9 @@ export default function SignInForm({ onSignedIn, exclude, initialError = "", aut
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(initialError);
   const [demo, setDemo] = useState({ password: "", accounts: [] });
-  useEffect(() => { api("/api/auth/demo", { method: "GET", auth: false }).then(setDemo).catch(() => {}); }, []);
+  useEffect(() => {
+    if (!noDemo) api("/api/auth/demo", { method: "GET", auth: false }).then(setDemo).catch(() => {});
+  }, [noDemo]);
 
   const refuse = (message) => {
     setError(message);
@@ -27,7 +29,8 @@ export default function SignInForm({ onSignedIn, exclude, initialError = "", aut
       const session = await signIn(username, password);
       await onSignedIn(session);
     } catch (err) {
-      refuse(err.status ? err.message : `${err.message || "Cannot reach the server."} Check the backend URL in config.js.`);
+      if (!err.status) console.warn("Harvest-Call: cannot reach the backend. Check the backend URL in config.js.", err);
+      refuse(err.status ? err.message : "Can't reach Harvest-Call right now. Try again in a moment.");
       if (err.status === 401) { setForm((f) => ({ ...f, password: "" })); passwordRef.current?.focus(); }
     } finally {
       setBusy(false);
@@ -59,7 +62,7 @@ export default function SignInForm({ onSignedIn, exclude, initialError = "", aut
         <SubmitButton className="btn solid big block" busy={busy} busyText="Signing in…">{submitLabel}</SubmitButton>
       </motion.form>
 
-      {accounts.length > 0 && (
+      {!noDemo && accounts.length > 0 && (
         <div className="demo-box">
           <div className="demo-head">
             <span>Demo accounts</span>

@@ -176,7 +176,7 @@ body.login-page { background: var(--surface); }
 .login-story .brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; color: #fff; }
 .login-story .brand .mark { width: 34px; height: 34px; border-radius: 10px; background: #2FBF7F; color: #06130D; display: grid; place-items: center; }
 .ls-body { margin-top: auto; display: flex; flex-direction: column; gap: 28px; }
-.ls-body h2 { font-size: clamp(26px, 2.6vw, 36px); font-weight: 800; line-height: 1.15; letter-spacing: -0.025em; color: #fff; max-width: 20ch; }
+.ls-body .ls-title { margin: 0; font-size: clamp(26px, 2.6vw, 36px); font-weight: 800; line-height: 1.15; letter-spacing: -0.025em; color: #fff; max-width: 20ch; }
 .ls-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .ls-steps li { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; color: #CFE3D8; }
 .ls-n { width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid rgba(127, 224, 180, .5); color: #7FE0B4;
@@ -215,7 +215,7 @@ body.login-page { background: var(--surface); }
   .login-split { grid-template-columns: 1fr; min-height: 0; }
   .login-story { gap: 18px; padding: 24px 20px; }
   .ls-body { margin-top: 0; gap: 0; }
-  .ls-body h2 { font-size: 22px; max-width: none; }
+  .ls-body .ls-title { font-size: 22px; max-width: none; }
   .ls-steps, .ls-facts { display: none; }
   .login-pick { padding: 24px 16px 40px; }
 }
@@ -1187,3 +1187,89 @@ table.answers tr:focus-visible td { background: var(--leaf-soft); outline: none;
 .price-more summary { cursor: pointer; font-weight: 700; color: var(--leaf-deep); font-size: 13.5px; }
 .price-more[open] { display: flex; flex-direction: column; gap: 8px; }
 .price-more-h { margin: 8px 0 0; font-size: 13.5px; }
+
+/* ---------- sign-in, the 3D plantation (replaces the dot grid and ripples) ----------
+   The canvas fills the story panel; a fade from the bottom and the top keeps the words readable over it. */
+.ls-field, .ls-call { display: none; }
+.ls-scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.login-story::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(15, 61, 42, .85) 0%, rgba(15, 61, 42, 0) 22%, rgba(15, 61, 42, 0) 38%, rgba(15, 61, 42, .92) 66%, #0F3D2A 100%); }
+.login-story > :not(.ls-scene) { position: relative; z-index: 1; }
+@media (max-width: 860px) {
+  .ls-scene, .login-story::after { display: none; } /* a short header strip: no 3D picture */
+}
+
+/* Sign-in: Wilbert's person picker on the right (tile styles from app.css), one column of people */
+.login-pick.picker { max-width: 560px; gap: 20px; }
+.login-pick.picker .lp-head h1 { font-size: 26px; letter-spacing: -0.01em; }
+.login-pick.picker .lp-head p { font-size: 14.5px; }
+.login-pick.picker .roles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+/* Compact tiles: the icon sits beside the name, the description and link stay below it */
+.login-pick.picker .role-tile { display: grid; grid-template-columns: 28px 1fr; column-gap: 10px; row-gap: 3px; align-items: center; padding: 12px 14px; border-radius: 12px; }
+.login-pick.picker .role-tile .role-icon { width: 28px; height: 28px; border-radius: 8px; margin: 0; }
+.login-pick.picker .role-tile .role-icon svg { width: 16px; height: 16px; }
+.login-pick.picker .role-tile .role-name { font-size: 15px; }
+.login-pick.picker .role-tile .role-desc,
+.login-pick.picker .role-tile .role-go { grid-column: 1 / -1; }
+.login-pick.picker .role-tile .role-desc { font-size: 12.5px; line-height: 1.4; }
+.login-pick.picker .role-tile .role-go { font-size: 12.5px; padding-top: 2px; }
+@media (max-width: 520px) { .login-pick.picker .roles { grid-template-columns: 1fr; } }
+.own-account { border-top: 1px solid var(--line); padding-top: 14px; }
+.own-account summary { cursor: pointer; font-weight: 700; color: var(--leaf-deep); }
+.own-account[open] summary { margin-bottom: 14px; }
+
+/* Sign-in after the critique: the phone only where it has room, tiles that lead with the role, a loading state */
+.login-pick.picker .role-tile.main { box-shadow: var(--shadow); }
+.login-pick.picker .role-tile .role-name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.role-chip { font-size: 11.5px; font-weight: 700; color: var(--leaf-deep); background: var(--leaf-soft); border-radius: 999px; padding: 2px 8px; letter-spacing: 0; }
+.role-start { font-size: 11.5px; font-weight: 700; color: #fff; background: var(--leaf); border-radius: 999px; padding: 2px 8px; margin-left: auto; }
+.role-tile.skeleton { cursor: default; min-height: 104px; box-shadow: none; }
+.role-tile.skeleton i { display: block; height: 10px; border-radius: 6px; background: var(--line); grid-column: 1 / -1; }
+.role-tile.skeleton i:first-child { width: 45%; height: 14px; }
+.role-tile.skeleton i:nth-child(2) { width: 90%; }
+.role-tile.skeleton i:last-child { width: 35%; }
+.lp-retry { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* The Harvest-Call logo (components/Logo.jsx) replaces the leaf mark in the brand */
+.brand .logo { flex: none; display: block; border-radius: 9px; }
+
+/* The phone gets its own space between the logo and the headline (it used to fill the panel behind the text) */
+.login-story .ls-scene { position: relative; inset: auto; flex: 1 1 0; min-height: 220px; width: 100%; height: auto; }
+.login-story::after { display: none; }
+.login-story .ls-body { margin-top: 0; }
+.login-story { gap: 28px; }
+.login-story .ls-scene { min-height: 120px; }
+@media (max-height: 480px) { .login-story .ls-scene { display: none; } }
+.login-pick.picker .role-tile { position: relative; }
+.role-start { position: absolute; top: 10px; right: 10px; margin: 0; }
+/* Sign-in, from the browser checks: a focus ring that stands out on white (5.5:1), firmer tile edges,
+   44px tap targets for the username toggle and the show-password button */
+.login-pick :focus-visible { outline: 3px solid var(--leaf); outline-offset: 2px; }
+.login-pick.picker .role-tile { border-color: #C3CCC7; }
+.login-pick.picker .role-tile.main { border-color: var(--leaf); }
+.own-account summary { min-height: 44px; display: flex; align-items: center; }
+.login-pick .pw-toggle { min-width: 44px; min-height: 44px; }
+/* Short laptop screens: tighter text on the left, so the phone keeps a useful size */
+@media (min-width: 861px) and (max-height: 760px) {
+  .login-story { gap: 18px; padding-top: 28px; padding-bottom: 28px; }
+  .ls-body { gap: 16px; }
+  .ls-body .ls-title { font-size: clamp(22px, 2vw, 28px); }
+  .ls-steps { gap: 8px; }
+  .ls-steps li { font-size: 14px; }
+}
+
+/* Sign-in, big phone: the 3D phone fills the panel again and the words sit on a dark see-through card in front of
+   its lower edge (PhoneScene fits the phone between the logo and the card) */
+.login-story .ls-scene { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; flex: none; }
+.ls-card { margin-top: auto; display: flex; flex-direction: column; gap: 22px; padding: 24px 26px;
+  background: rgba(9, 38, 26, .74); border: 1px solid rgba(255, 255, 255, .1); border-radius: 18px;
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: 0 18px 40px rgba(0, 0, 0, .28); }
+.ls-card .ls-facts { padding-top: 18px; }
+@media (min-width: 861px) and (max-height: 760px) { .ls-card { gap: 14px; padding: 18px 20px; } }
+@media (max-width: 860px) {
+  .ls-card { margin-top: 0; padding: 0; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+/* A bigger phone that shows through the card: lighter card, softer blur, a slightly smaller headline */
+.ls-card { background: rgba(9, 38, 26, .45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-color: rgba(255, 255, 255, .14); }
+.ls-card .ls-title { font-size: clamp(24px, 2.2vw, 32px); text-shadow: 0 1px 12px rgba(0, 0, 0, .35); }
+.ls-card .ls-steps li, .ls-card .ls-facts { text-shadow: 0 1px 8px rgba(0, 0, 0, .4); }
