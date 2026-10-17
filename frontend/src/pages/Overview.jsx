@@ -93,7 +93,7 @@ export default function Overview() {
               <div className="card-head">
                 <div>
                   <h2 id="have-title" className="have-say"><b className="num">{fmtT(have)} t</b> of the {fmtT(target)} t target is in hand</h2>
-                  <span className="sub">Next {data.length} weeks. {sum("missing") > 0 ? `${fmtT(sum("missing"))} t still has to be found` : "Nothing left to find"}{sum("unknown") > 0 ? `, and about ${fmtT(sum("unknown"))} t more should come once ${supply.unknown.length} farmers answer.` : "."}</span>
+                  <span className="sub">Next {data.length} weeks. {sum("missing") > 0 ? `${fmtT(sum("missing"))} t still has to be found across those weeks` : "Nothing left to find"}{sum("unknown") > 0 ? `, and about ${fmtT(sum("unknown"))} t more should come once ${supply.unknown.length} farmers answer.` : "."}</span>
                 </div>
                 <Link className="btn sm" to="/forecast">Live forecast</Link>
               </div>

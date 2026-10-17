@@ -162,7 +162,7 @@ export default function AgentCard({ state, cid }) {
           </ol>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <button type="button" className="btn sm" onClick={addQuestion} disabled={full}>+ Add question</button>
-            <a className="small" href={apiUrl("/api/answers.csv")} download="answers.csv">Download all answers (CSV)</a>
+            <span className="small muted">Answers download from the button at the top of the page.</span>
           </div>
         </fieldset>
       </div>

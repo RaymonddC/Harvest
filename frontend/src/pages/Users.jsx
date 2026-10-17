@@ -123,7 +123,7 @@ export default function Users() {
                 <tr key={u.id}>
                   <td style={{ paddingLeft: 22 }}><div className="who-cell"><Avatar name={u.name} cls="sm" person /><div><b>{u.name}</b>{u.id === me.user_id && <span>You</span>}</div></div></td>
                   <td className="num">{u.username || "–"}</td>
-                  <td>{roleName(u.role)}{u.demo && <>{" "}<Pill cls="amber">Demo user</Pill></>}</td>
+                  <td>{roleName(u.role)}{u.demo && <>{" "}<Pill>Demo user</Pill></>}</td>
                   <td>{!u.active ? <Pill>Turned off</Pill> : !u.has_password ? <Pill cls="amber">No password yet</Pill> : <Pill cls="mint">Can sign in</Pill>}</td>
                   <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
                     <button className="btn sm" type="button" onClick={() => setForm(u)}>Edit</button>{" "}

@@ -141,7 +141,7 @@ export default function Approvals() {
           )}
         </div>
         <div className="offers-foot">
-          {l && `Price range: floor ${plainPrice(l.floor_price, l.currency)}, ceiling ${plainPrice(l.ceiling_price, l.currency)}. The bar under each price shows where it sits; red is above the ceiling${anyOut ? " (marked Needs planner)" : ""}. Synthetic data.`}
+          {l && `Price range: floor ${plainPrice(l.floor_price, l.currency)}, ceiling ${plainPrice(l.ceiling_price, l.currency)}.${toDecide.length ? ` The bar under each price shows where it sits; red is above the ceiling${anyOut ? " (marked Needs planner)" : ""}.` : ""} Synthetic data.`}
         </div>
       </section>
       </div>

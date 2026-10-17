@@ -266,6 +266,14 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                 </div>
               )}
               <Standing crm={rel} />
+              <section aria-labelledby="fs-harvest">
+                <h3 id="fs-harvest">Next harvest</h3>
+                <HarvestBox farmer={f} harvest={harvest} />
+              </section>
+              <section aria-labelledby="fs-track">
+                <h3 id="fs-track">Track record</h3>
+                <DeliveryBox farmer={f} stateKey={JSON.stringify(state?.forecast?.map((r) => r.expected_kg))} />
+              </section>
 
               <section aria-labelledby="fs-notes">
                 <h3 id="fs-notes">Notes and follow-ups</h3>
@@ -290,15 +298,7 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                 ) : <p className="muted">Nothing yet. The first harvest call starts the history.</p>}
               </section>
 
-              <section aria-labelledby="fs-harvest">
-                <h3 id="fs-harvest">Next harvest</h3>
-                <HarvestBox farmer={f} harvest={harvest} />
-              </section>
 
-              <section aria-labelledby="fs-track">
-                <h3 id="fs-track">Track record</h3>
-                <DeliveryBox farmer={f} stateKey={JSON.stringify(state?.forecast?.map((r) => r.expected_kg))} />
-              </section>
 
               <section aria-labelledby="fs-calls">
                 <h3 id="fs-calls">Calls <span className="sub">({calls.length})</span></h3>
