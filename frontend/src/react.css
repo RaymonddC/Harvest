@@ -1759,3 +1759,10 @@ tr.is-live td { background: #F2F8F4; }
 .dot-live { animation: live-pulse 1.6s ease-in-out infinite; }
 @keyframes live-pulse { 50% { box-shadow: 0 0 0 5px rgba(22, 119, 78, .15); } }
 @media (prefers-reduced-motion: reduce) { .dot-live { animation: none; } }
+
+/* Call recap: Gemini's summary and how the farmer sounded */
+.insights { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-top: 1px solid var(--hairline, #E5E4DD); border-bottom: 1px solid var(--hairline, #E5E4DD); }
+.ins-head { display: flex; align-items: center; gap: 8px; margin: 0; }
+.ins-sum { margin: 0; font-size: 14.5px; }
+.pill.red { background: #FBE9E4; color: #8A2E0D; }
+.insights-none { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

@@ -503,6 +503,18 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             ids = {f["id"] for f in services.campaign_members(store, settings, camp["id"])}
         return crm.overview(store, ids)
 
+    @app.post("/api/calls/{call_id}/insights", dependencies=[Depends(need("campaign.run"))])
+    def call_insights_run(call_id: str):
+        """Have Gemini write the call's summary and sentiment (only for calls whose farmer agreed to the transcript)."""
+        from . import call_insights
+
+        if not store.get("calls", call_id):
+            raise HTTPException(404, "Call not found.")
+        out = call_insights.analyze(store, settings, call_id)
+        if out is None:
+            raise HTTPException(400, "No insights: the farmer did not agree to a transcript, or Gemini is not available.")
+        return out
+
     @app.post("/api/farmers/{farmer_id}/notes")
     def add_note(farmer_id: str, body: NoteIn, actor: auth.Actor = Depends(need("farmers.manage"))):
         return crm_call(crm.add_note, store, farmer_id, body.kind, body.text, body.rating, body.follow_up_on, actor.name)
@@ -821,10 +833,9 @@ def _polish(settings: Settings, text: str, instruction: str) -> str | None:
     if text in _polish_cache:
         return _polish_cache[text]
     try:
-        from .live_session import genai_client
+        from . import gemini_text
 
-        client = genai_client()
-        resp = client.models.generate_content(model=settings.text_model, contents=f"{instruction}\n\n{text}")
+        resp = gemini_text.generate(settings, f"{instruction}\n\n{text}")
         out = (resp.text or "").strip() or None
     except Exception:  # noqa: BLE001 - no key or network: the template is fine
         return None

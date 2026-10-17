@@ -81,6 +81,10 @@ def churn_signals(farmer: dict, reliability: float | None, calls: list[dict], no
         out.append({"key": "stopped_answering", "text": "Stopped answering: the last two calls did not reach them"})
     if reliability is not None and reliability < MIXED:
         out.append({"key": "under_delivers", "text": f"Delivers {round(reliability * 100)}% of what they promise"})
+    heard = sorted((c for c in calls if (c.get("insights") or {}).get("sentiment")), key=lambda c: c.get("ended_at") or c.get("created_at") or "")
+    if heard and heard[-1]["insights"]["sentiment"] == "negative":
+        worry = ", ".join(heard[-1]["insights"].get("concerns") or [])
+        out.append({"key": "sounded_unhappy", "text": "Sounded unhappy on the last call" + (f" ({worry})" if worry else "")})
     rated = sorted((n for n in notes if n.get("kind") == "feedback" and n.get("rating")), key=lambda n: n.get("at") or "")
     if rated and int(rated[-1]["rating"]) <= 2:
         out.append({"key": "unhappy", "text": f"Unhappy: rated the mill {rated[-1]['rating']} of 5"})

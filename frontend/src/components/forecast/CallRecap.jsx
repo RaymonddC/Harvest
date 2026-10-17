@@ -63,6 +63,26 @@ const Fact = ({ ok, label, children }) => (
 // A finished call, opened from the calls list: what the agent captured, then the conversation.
 // It reads the call's harvest answer and offer from the live data, so it stays current
 // while the panel is open (an offer approved meanwhile shows as approved).
+// Gemini's reading of the call (only when the farmer agreed to the transcript): a summary, how they sounded, concerns.
+const MOOD = { positive: ["mint", "Sounded happy"], neutral: ["", "Sounded neutral"], negative: ["red", "Sounded unhappy"] };
+function Insights({ c }) {
+  const act = useAct();
+  const i = c.insights;
+  if (!i) {
+    if (!c.consent || !c.transcript?.length || !can("campaign.run")) return null;
+    return <p className="small muted insights-none">No AI summary yet. <ActButton className="btn sm ghost" busy="Reading the call…"
+      run={() => act(() => api(`/api/calls/${c.id}/insights`, { body: {} }), "Summary written.")}>Write one with Gemini</ActButton></p>;
+  }
+  const [cls, word] = MOOD[i.sentiment] || MOOD.neutral;
+  return (
+    <section className="insights" aria-label="AI summary of the call">
+      <p className="ins-head"><Pill cls={cls}>{word}</Pill><span className="small muted">Summary by Gemini, from the transcript</span></p>
+      {i.summary && <p className="ins-sum">{i.summary}</p>}
+      {i.concerns?.length > 0 && <p className="small"><b>Raised:</b> {i.concerns.join(", ")}</p>}
+    </section>
+  );
+}
+
 export default function CallRecap({ call, onClose }) {
   const { state } = useLive();
   const act = useAct();
@@ -99,6 +119,7 @@ export default function CallRecap({ call, onClose }) {
 
             <div className="sheet-body">
               <div className="recap-status"><Pill cls={chip.cls}>{chip.text}</Pill>{c.summary && <p>{c.summary}</p>}</div>
+              <Insights c={c} />
 
               <section aria-labelledby="captured-title">
                 <h3 id="captured-title">What the agent captured</h3>

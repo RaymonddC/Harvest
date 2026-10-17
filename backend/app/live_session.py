@@ -215,11 +215,10 @@ def make_translator(settings: Settings) -> Translate:
         if time.monotonic() < paused_until:
             return None
         try:
-            if client is None:
-                client = genai_client()
-            resp = await client.aio.models.generate_content(
-                model=settings.text_model,
-                contents=f"Translate this phone-call line into {target}. Reply with the translation only.\n\n{text}")
+            from . import gemini_text
+
+            resp = await gemini_text.agenerate(
+                settings, f"Translate this phone-call line into {target}. Reply with the translation only.\n\n{text}")
             return (resp.text or "").strip() or None
         except Exception as e:  # noqa: BLE001 - captions without translation are still useful
             if getattr(e, "code", None) == 429:
@@ -495,6 +494,11 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                                  consent=session.consent, transcript=transcript.cleaned())
         except Exception:  # noqa: BLE001  the browser still has to be told, and the socket closed
             log.exception("call %s: finishing the call failed", call_id)
+        if session.consent and transcript.lines:
+            from . import call_insights
+
+            task = asyncio.get_running_loop().run_in_executor(None, call_insights.analyze, store, settings, call_id)
+            task.add_done_callback(lambda f: f.exception())  # logged inside analyze; never raises here
         if recorder and session.consent:
             await keep_recording(recorder, audio_store, store, settings, call_id)
         final = store.get("calls", call_id) or {}
