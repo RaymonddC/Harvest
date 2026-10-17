@@ -1090,9 +1090,68 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
 
 
 def stop_campaign(store: Store, settings: Settings, crop: str | None = None) -> dict:
+    """Stop a campaign and withdraw its calls that have not started (a phone already ringing or a call on now is
+    left to finish)."""
     camp = need_campaign(store, settings, crop)
     store.set("campaigns", camp["id"], {"status": "stopped", "stopped_at": now_iso()}, merge=True)
-    return {"status": "stopped", "crop": campaign_crop(settings, camp), "campaign_id": camp["id"]}
+    members = {f["id"] for f in campaign_members(store, settings, camp["id"])}
+    withdrawn = withdraw_calls(store, lambda c: c.get("campaign_id") == camp["id"]
+                               or (not c.get("campaign_id") and c["farmer_id"] in members))
+    return {"status": "stopped", "crop": campaign_crop(settings, camp), "campaign_id": camp["id"],
+            "calls_withdrawn": withdrawn}
+
+
+def withdraw_calls(store: Store, which=None) -> int:
+    """End calls that are waiting and have not started: never answered in the call client, or a retry nobody dialled.
+    They stay in the history as "withdrawn" (no retry), so a farmer no longer shows as being called."""
+    n = 0
+    for c in store.list("calls"):
+        if c["status"] != "queued" or c.get("dialed_at") or c.get("kind") == "confirm":
+            continue
+        if which and not which(c):
+            continue
+        store.set("calls", c["id"], {"status": "dropped", "outcome": "withdrawn", "summary": "Withdrawn before it started.",
+                                     "ended_at": now_iso()}, merge=True)
+        n += 1
+    return n
+
+
+def withdraw_farmer_calls(store: Store, settings: Settings, farmer_id: str) -> dict:
+    if not store.get("farmers", farmer_id):
+        raise ServiceError("Farmer not found.")
+    n = withdraw_calls(store, lambda c: c["farmer_id"] == farmer_id)
+    refresh_campaign_status(store, settings)
+    return {"farmer_id": farmer_id, "calls_withdrawn": n}
+
+
+STALE_AFTER = dt.timedelta(minutes=20)
+
+
+def heal_stale_calls(store: Store, settings: Settings, now: dt.datetime | None = None) -> int:
+    """A call left "on call" by a server restart (or by a channel that no longer exists) would block its farmer for
+    ever. A call still on after its time limit plus STALE_AFTER, or on a channel that is gone, is ended as dropped
+    (no retry). A phone that rang without an answer and never got Twilio's final status is ended the same way."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    limit = dt.timedelta(seconds=settings.max_call_seconds) + STALE_AFTER
+    n = 0
+    for c in store.list("calls"):
+        gone = c.get("channel") not in (None, "browser", "twilio")
+        if c["status"] == "on_call":
+            since = c.get("started_at")
+        elif c["status"] == "queued" and (c.get("dialed_at") or gone):
+            since = c.get("dialed_at") or c.get("created_at")
+        else:
+            continue
+        try:
+            old = now - dt.datetime.fromisoformat(since) > limit
+        except (TypeError, ValueError):
+            old = True
+        if gone or old:
+            store.set("calls", c["id"], {"status": "dropped", "outcome": c.get("outcome") or "dropped",
+                                         "summary": c.get("summary") or "The call ended without a result.",
+                                         "ended_at": now_iso()}, merge=True)
+            n += 1
+    return n
 
 
 def call_now(store: Store, farmer_id: str, kind: str | None = None, settings: Settings | None = None) -> str:
@@ -1495,7 +1554,7 @@ def delete_farmer(store: Store, farmer_id: str) -> dict:
     if not store.get("farmers", farmer_id):
         raise ServiceError("Farmer not found.")
     for c in store.list("calls"):
-        if c["farmer_id"] == farmer_id and c["status"] == "on_call":
+        if c["farmer_id"] == farmer_id and c["status"] == "on_call" and c.get("channel", "browser") in ("browser", "twilio"):
             raise ServiceError("This farmer is on a call right now. Try again when it ends.")
     withdrawn = 0
     for c in store.list("calls"):

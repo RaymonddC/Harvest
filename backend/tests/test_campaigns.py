@@ -104,7 +104,8 @@ def test_legacy_endpoints_still_run_the_default_crop(client, store):
     r = client.post("/api/campaign/start", json={"kind": "collect"})
     assert r.status_code == 200 and r.json()["crop"] == "palm" and r.json()["queued"] > 0
     assert store.get("campaigns", "current")["status"] == "running"
-    assert client.post("/api/campaign/stop").json() == {"status": "stopped", "crop": "palm", "campaign_id": "current"}
+    assert client.post("/api/campaign/stop").json() == {"status": "stopped", "crop": "palm", "campaign_id": "current",
+                                                         "calls_withdrawn": 18}  # its calls that had not started
     assert client.post("/api/campaign/stop", json={"crop": "rubber"}).status_code == 404  # no rubber campaign yet
     make_rubber(client)
     assert client.post("/api/campaign/stop", json={"crop": "rubber"}).json()["crop"] == "rubber"

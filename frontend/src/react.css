@@ -1413,3 +1413,27 @@ body.app .chart .bar.gap { background: var(--amber); }
 .dot-live { width: 8px; height: 8px; border-radius: 50%; background: var(--leaf); box-shadow: 0 0 0 3px var(--leaf-soft); }
 .calls-sub { margin: 10px 0 2px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
 .calls-waiting { margin: 10px 0 0; padding: 10px 0 0 18px; border-top: 1px solid var(--line); color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+
+/* No coloured stripes down the left of boxes (a template tell): the gap notice is a plain line on the page, the
+   to-do rows carry a small dot, and the traceability warning is plain red text. */
+body.app .hero, .hero { background: none !important; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 4px 0 18px; }
+.hero::before { display: none; }
+.hero h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.hero h2 .num { color: #8A5605; font-weight: 800; }
+.hero.ok h2 .num { color: var(--leaf-deep); }
+.hero h2 small { font-size: 15px; font-weight: 500; }
+.hero p { margin: 0; color: var(--muted); }
+.hero .hero-mark { display: none; }
+.todo-list li { padding-left: 0; }
+.todo-list li::before { display: none; }
+.todo-list li b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 8px 1px 0; background: var(--line-strong); }
+.todo-list li.amber b::before { background: var(--amber); } .todo-list li.red b::before { background: #C2410C; } .todo-list li.on b::before { background: var(--leaf); }
+.todo-list li small { padding-left: 16px; }
+.trace-flag { background: none; padding: 4px 0 0; }
+.trace-flag::before { display: none; }
+
+/* No visible scrollbars anywhere; the page and the wide tables and boards still scroll (wheel, trackpad, touch, keys). */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.todo-list li, .todo-list li.amber, .todo-list li.red, .todo-list li.on { border-color: var(--line) !important; }
+body.app .hero.gap, body.app .hero.ok, .hero.gap, .hero.ok { border-color: var(--line); }

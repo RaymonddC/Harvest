@@ -159,6 +159,10 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
                     <Menu.Portal>
                       <Menu.Content className="hc-menu" align="end" sideOffset={4}>
                         <Menu.Item className="hc-menu-item" disabled={!can("farmers.manage")} onSelect={() => onEdit(f)}>Edit</Menu.Item>
+                        {state.calls.some((c) => c.farmer_id === f.id && c.status === "queued" && !c.dialed_at && c.kind !== "confirm") && (
+                          <Menu.Item className="hc-menu-item" disabled={!can("campaign.run")}
+                            onSelect={() => act(() => api(`/api/farmers/${f.id}/withdraw-calls`, { body: {} }), (r) => `${r.calls_withdrawn} waiting call${r.calls_withdrawn === 1 ? "" : "s"} for ${f.name} cancelled.`)}>Cancel waiting calls</Menu.Item>
+                        )}
                         {cid && <Menu.Item className="hc-menu-item" disabled={!can("farmers.manage")} onSelect={() => moveFarmer(act, f, cid, "")}>Remove from campaign</Menu.Item>}
                         <Menu.Item className="hc-menu-item danger" disabled={!can("farmers.manage")} onSelect={() => remove(f)}>Delete…</Menu.Item>
                       </Menu.Content>

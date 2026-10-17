@@ -48,7 +48,7 @@ export function Hero({ gap, rows, state }) {
   return (
     <section className="hero gap" aria-live="polite">
       <div className="hero-text">
-        <h2>Week {gap.week} is <span className="num">{fmtT(gap.gap_kg)} t</span> short <small>from {shortDate(gap.week_start)}</small></h2>
+        <h2>Week {gap.week} <small>(from {shortDate(gap.week_start)})</small> is <span className="num">{fmtT(gap.gap_kg)} t</span> short</h2>
         <p>{fmtT(gap.expected_kg)} of {fmtT(target)} t expected. {text}{calling ? " Gap-fill calls are running now." : ""}</p>
       </div>
       <div className="hero-acts">

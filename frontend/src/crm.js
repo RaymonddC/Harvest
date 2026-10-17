@@ -55,7 +55,8 @@ export function crmOf(state, cid) {
   const list = state.farmers.filter((f) => f.type !== "supplier" && farmerCampaign(f, camps) === cid).map((f) => {
     const h = harvests.get(f.id) || null;
     const mine = (calls.get(f.id) || []).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
-    const open = mine.find((c) => ["queued", "on_call"].includes(c.status));
+    // An undialled retry of a missed phone call waits for the planner: the farmer is "No answer", not "Calling".
+    const open = mine.find((c) => c.status === "on_call" || (c.status === "queued" && !(c.channel === "twilio" && (c.attempt || 1) > 1 && !c.dialed_at)));
     const last = mine.find((c) => !["queued", "on_call"].includes(c.status));
     const fo = offers.get(f.id) || [];
     const pending = fo.find((o) => ["pending", "escalated"].includes(o.status));

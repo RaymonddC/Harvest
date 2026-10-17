@@ -300,6 +300,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     # ----- read model -----
 
     def snapshot() -> dict:
+        services.heal_stale_calls(store, settings)  # a call left "on call" by a restart must not block its farmer
         services.refresh_campaign_status(store, settings)  # a campaign left "running" by an older version heals here
         data = {c: store.list(c) for c in COLLECTIONS}
         data["settings"] = {"mill_name": settings.mill_name,
@@ -469,6 +470,11 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def campaign_farmers(campaign_id: str, body: CampaignFarmersIn):
         """Move farmers from the database into this campaign, or out of it."""
         return services.set_campaign_farmers(store, settings, campaign_id, body.add, body.remove)
+
+    @app.post("/api/farmers/{farmer_id}/withdraw-calls", dependencies=[Depends(need("campaign.run"))])
+    def farmer_withdraw_calls(farmer_id: str):
+        """Cancel the farmer's calls that have not started (demo calls not answered, retries not dialled)."""
+        return services.withdraw_farmer_calls(store, settings, farmer_id)
 
     @app.put("/api/farmers/{farmer_id}/to-call", dependencies=[Depends(need("farmers.manage"))])
     def put_to_call(farmer_id: str, body: ToCallIn):

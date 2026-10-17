@@ -147,3 +147,33 @@ def test_a_retry_stays_in_the_campaign_of_the_missed_call(store, settings):
                          consent=None, transcript=[])
     retry = next(c for c in store.list("calls") if c.get("attempt") == 2 and c["farmer_id"] == farmer["id"])
     assert retry["campaign_id"] == "current"
+
+
+
+def test_stopping_a_campaign_withdraws_its_calls_that_have_not_started(store, settings):
+    from app import services
+    farmers = [f for f in store.list("farmers") if f.get("type", "farmer") == "farmer"][:2]
+    waiting = services.queue_call(store, farmers[0], "collect", campaign_id="current")
+    ringing = services.queue_call(store, farmers[1], "collect", channel="twilio", campaign_id="current")
+    store.set("calls", ringing, {"dialed_at": services.now_iso()}, merge=True)
+    r = services.stop_campaign(store, settings, "current")
+    assert r["calls_withdrawn"] >= 1
+    assert store.get("calls", waiting)["status"] == "dropped" and store.get("calls", waiting)["outcome"] == "withdrawn"
+    assert store.get("calls", ringing)["status"] == "queued"  # a phone already ringing is left to finish
+
+
+def test_a_call_left_on_after_its_time_limit_or_on_a_removed_channel_is_ended(store, settings):
+    import datetime as dt
+    from app import services
+    f = next(x for x in store.list("farmers") if x.get("type", "farmer") == "farmer")
+    old = services.queue_call(store, f, "collect", channel="twilio")
+    store.set("calls", old, {"status": "on_call", "started_at": "2026-10-01T10:00:00+00:00"}, merge=True)
+    chat = services.queue_call(store, f, "collect", channel="whatsapp")
+    store.set("calls", chat, {"status": "on_call", "started_at": services.now_iso()}, merge=True)
+    fresh = services.queue_call(store, f, "collect", channel="twilio")
+    store.set("calls", fresh, {"status": "on_call", "started_at": services.now_iso()}, merge=True)
+    assert services.heal_stale_calls(store, settings) == 2
+    assert store.get("calls", old)["status"] == "dropped" and store.get("calls", chat)["status"] == "dropped"
+    assert store.get("calls", fresh)["status"] == "on_call"
+    assert not [c for c in store.list("calls") if c.get("attempt") == 2]  # no retry for a healed call
+    assert services.withdraw_farmer_calls(store, settings, f["id"])["calls_withdrawn"] == 0
