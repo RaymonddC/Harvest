@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import datetime as dt
 import json
 import array
 import logging
@@ -25,6 +26,7 @@ from google.genai import types
 from . import forecast as fc
 from . import services
 from .config import Settings
+from .call_audio import CallRecorder, make_audio_store
 from .prompt import KICKOFF, build_system_instruction
 from .store import Store
 from .tools import TOOL_DECLARATIONS, CallSession, ToolHandlers
@@ -134,6 +136,8 @@ class Transcript:
             text = " ".join(line["text"].split())
             if text:
                 item = {"who": line["who"], "text": text}
+                if line.get("t") is not None:
+                    item["t"] = line["t"]  # seconds from the start of the call, to jump to it in the recording
                 if line.get("translation"):
                     item["translation"] = line["translation"]
                 out.append(item)
@@ -232,6 +236,20 @@ def confirm_details(store: Store, settings: Settings, offer: dict | None) -> dic
             "from_week": o.get("from_week"), "decided_by": o.get("decided_by")}
 
 
+async def keep_recording(recorder: CallRecorder, audio_store, store: Store, settings: Settings, call_id: str) -> None:
+    """Save the recording of a call whose farmer agreed. A failure here is logged and never stops the call from finishing."""
+    try:
+        data = await asyncio.to_thread(recorder.encode)
+        name = await asyncio.to_thread(audio_store.save, call_id, data)
+        now = services.now_iso()
+        expires = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=settings.call_audio_retention_days)).isoformat(timespec="seconds")
+        store.set("calls", call_id, {"audio": {"name": name, "seconds": round(recorder.seconds(), 1), "bytes": len(data),
+                                               "saved_at": now, "expires_at": expires}}, merge=True)
+        await asyncio.to_thread(audio_store.purge, settings.call_audio_retention_days)
+    except Exception:  # noqa: BLE001
+        log.exception("call %s: the recording could not be saved", call_id)
+
+
 async def run_call(channel: Channel, store: Store, settings: Settings, call_id: str,
                    connect: Callable[[str, types.LiveConnectConfig], Any] | None = None,
                    translate: Translate | None = None, expected_channel: str = "browser") -> None:
@@ -276,6 +294,12 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
         target = None  # captions are already in the target language
     translate = translate or (make_translator(settings) if target else None)
     pending_translations: set[asyncio.Task] = set()
+    try:
+        audio_store = make_audio_store(settings)
+    except Exception:  # noqa: BLE001  (e.g. no cloud credentials): the call goes on without a recording
+        log.exception("call %s: recording is on but the store could not be opened", call_id)
+        audio_store = None
+    recorder = CallRecorder() if audio_store else None  # kept only if the farmer agreed, decided at the end
 
     async def send(payload: dict) -> None:
         await channel.send_control(payload)
@@ -299,6 +323,8 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
 
     async def caption(who: str, text: str) -> None:
         index, closed = transcript.add(who, text)
+        if recorder and "t" not in transcript.lines[index]:
+            transcript.lines[index]["t"] = recorder.line_start(who)
         close_line(closed)
         await send({"type": "caption", "who": who, "text": text, "index": index})
 
@@ -323,6 +349,8 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                     if isinstance(msg, bytes):
                         mic["chunks"] += 1
                         mic["bytes"] += len(msg)
+                        if recorder:
+                            recorder.add_farmer(msg)
                         samples = array.array("h", msg[: len(msg) // 2 * 2])
                         if samples:
                             mic["peak"] = max(mic["peak"], max(map(abs, samples)))
@@ -347,6 +375,8 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                         if not sc:
                             continue
                         if sc.interrupted:
+                            if recorder:
+                                recorder.interrupted()
                             await send({"type": "interrupted"})
                         if sc.model_turn:
                             for part in sc.model_turn.parts or []:
@@ -359,6 +389,8 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                                         post_end_seconds += len(part.inline_data.data) / 2 / OUTPUT_RATE
                                         if post_end_seconds > GOODBYE_MAX_AUDIO_SECONDS:
                                             return
+                                    if recorder:
+                                        recorder.add_agent(part.inline_data.data)
                                     await channel.send_audio(part.inline_data.data)
                         if sc.input_transcription and sc.input_transcription.text:
                             await caption("farmer", sc.input_transcription.text)
@@ -408,6 +440,8 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
         services.finish_call(store, settings, call_id, ended_cleanly=session.ended,
                              outcome=session.outcome, summary=session.summary,
                              consent=session.consent, transcript=transcript.cleaned())
+        if recorder and session.consent:
+            await keep_recording(recorder, audio_store, store, settings, call_id)
         final = store.get("calls", call_id) or {}
         await send({"type": "ended", "status": final.get("status"), "summary": final.get("summary"),
                     "kind": call["kind"], "consent": final.get("consent"),

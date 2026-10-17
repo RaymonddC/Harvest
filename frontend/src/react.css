@@ -597,6 +597,13 @@ ul.proof li.over { color: var(--danger); font-weight: 600; }
 ul.proof li.over i { background: var(--danger); }
 @media (max-width: 640px) { ul.proof { padding-left: 0; } }
 
+/* The call recording in the call recap: the player, and the clickable time on each transcript line. */
+.recording { margin: 0 0 12px; }
+.recording audio { width: 100%; }
+.transcript .jump { margin-left: 8px; padding: 0 6px; border: 1px solid var(--line, #cfd8d2); border-radius: 6px; background: transparent;
+  color: inherit; font: inherit; font-size: 11px; cursor: pointer; opacity: .75; }
+.transcript .jump:hover, .transcript .jump:focus-visible { opacity: 1; }
+
 /* ---------- The agent card (Setup): persona and the planner's own questions ---------- */
 body.app .agent-card { gap: 18px; }
 body.app .agent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }

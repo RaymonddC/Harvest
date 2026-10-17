@@ -7,4 +7,7 @@ twilio>=9
 python-multipart>=0.0.9
 PyJWT>=2.8
 python-dotenv>=1.0
+numpy>=1.26
+soundfile>=0.12.1
+google-cloud-storage>=2.16
 fpdf2>=2.7
