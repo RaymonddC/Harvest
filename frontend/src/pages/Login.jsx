@@ -1,7 +1,8 @@
 import { motion } from "motion/react";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import SignInForm from "../components/SignInForm.jsx";
+import { campaignsOf, inCampaign } from "../campaigns.jsx";
 import { cfg, getSession, OLD_URLS, roleLabel } from "../lib.js";
 import { useLive } from "../live.jsx";
 import { Icon } from "../ui.jsx";
@@ -13,8 +14,6 @@ const STEPS = [
   "Fills short weeks, and asks you before any deal",
 ];
 
-// Where the "calls" light up on the field drawing (percent of the panel), and when.
-const CALLS = [[22, 30, 0], [68, 22, 1.4], [40, 58, 2.6], [80, 64, 0.7], [16, 78, 3.4], [56, 86, 2]];
 
 // Only ever return to one of our own pages: a route ("/setup") or an old file name ("setup.html").
 function returnTo(next) {
@@ -22,17 +21,22 @@ function returnTo(next) {
   return ["/", "/setup", "/approvals", "/users"].includes(next) ? next : "/";
 }
 
-// Rows of palms seen from above, with calls ringing out across them now and then.
+// A 3D palm plantation seen from above: calls arc out from the mill and each farm lights up when its farmer
+// answers (components/PlantationScene.js, Three.js, loaded only here). Still with "reduce motion"; left out when the
+// browser has no WebGL (the panel keeps its plain colour).
 function Field() {
-  return (
-    <div className="ls-field" aria-hidden="true">
-      {CALLS.map(([x, y, delay]) => (
-        <span key={`${x}-${y}`} className="ls-call" style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${delay}s` }}>
-          <i style={{ animationDelay: `${delay}s` }} /><i style={{ animationDelay: `${delay + 0.6}s` }} />
-        </span>
-      ))}
-    </div>
-  );
+  const ref = useRef(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let stop = null, alive = true;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    import("../components/PlantationScene.js")
+      .then(({ startPlantation }) => { if (alive && ref.current) stop = startPlantation(ref.current, { still }); })
+      .catch(() => setFailed(true));
+    return () => { alive = false; stop?.(); };
+  }, []);
+  if (failed) return null;
+  return <canvas ref={ref} className="ls-scene" aria-hidden="true" />;
 }
 
 const rise = (i) => ({ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 },
@@ -54,9 +58,12 @@ export default function Login() {
     else navigate(returnTo(params.get("next") || "/"), { replace: true });
   };
 
-  const farmers = state ? state.farmers.filter((f) => f.type !== "supplier").length : null;
-  const weeks = state ? state.forecast.length : null;
-  const gap = state ? [...state.forecast].sort((a, b) => a.week - b.week).find((r) => r.is_gap) : null;
+  // The main campaign's figures (the forecast holds every campaign's weeks; counting them all said "17 weeks").
+  const camp = campaignsOf(state)[0];
+  const rows = state && camp ? inCampaign(state, state.forecast, camp.id).sort((a, b) => a.week - b.week) : [];
+  const farmers = state && camp ? inCampaign(state, state.farmers, camp.id).filter((f) => f.type !== "supplier").length : null;
+  const weeks = rows.length;
+  const gap = rows.find((r) => r.is_gap);
 
   return (
     <main className="login-split">

@@ -1185,3 +1185,15 @@ table.answers tr:focus-visible td { background: var(--leaf-soft); outline: none;
 .price-more summary { cursor: pointer; font-weight: 700; color: var(--leaf-deep); font-size: 13.5px; }
 .price-more[open] { display: flex; flex-direction: column; gap: 8px; }
 .price-more-h { margin: 8px 0 0; font-size: 13.5px; }
+
+/* ---------- sign-in, the 3D plantation (replaces the dot grid and ripples) ----------
+   The canvas fills the story panel; a fade from the bottom and the top keeps the words readable over it. */
+.ls-field, .ls-call { display: none; }
+.ls-scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.login-story::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(15, 61, 42, .85) 0%, rgba(15, 61, 42, 0) 22%, rgba(15, 61, 42, 0) 38%, rgba(15, 61, 42, .92) 66%, #0F3D2A 100%); }
+.login-story > :not(.ls-scene) { position: relative; z-index: 1; }
+@media (max-width: 860px) {
+  .login-story { min-height: 260px; }
+  .login-story::after { background: linear-gradient(180deg, rgba(15, 61, 42, .8) 0%, rgba(15, 61, 42, .25) 40%, rgba(15, 61, 42, .9) 100%); }
+}
