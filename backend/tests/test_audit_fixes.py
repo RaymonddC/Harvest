@@ -103,3 +103,87 @@ def test_the_mills_clock_is_seven_hours_ahead_of_utc():
     sunday_evening_utc = dt.datetime(2026, 10, 18, 20, 0, tzinfo=dt.timezone.utc)  # Monday 03:00 in Jakarta
     assert sunday_evening_utc.astimezone(config.LOCAL_TZ).date() == dt.date(2026, 10, 19)
     assert config.today_local() in (dt.datetime.now(dt.timezone.utc).date(), dt.datetime.now(dt.timezone.utc).date() + dt.timedelta(days=1))
+
+
+# ---------- a week that is already full ----------
+
+def _fill(store, week, kg):
+    store.set("forecast", f"W{week}", {"expected_kg": kg}, merge=True)
+
+
+def _say(h, date, confirmed=False, kg=1600):
+    return h.dispatch("record_harvest", {"crop": "palm", "kg": kg, "ready_date": date, "confirmed_by_farmer": confirmed})
+
+
+def test_a_farmer_naming_a_full_week_is_offered_the_next_week_with_room(store, settings):
+    _fill(store, 2, 100_000)                                   # W2 (from 19 Oct) has what the mill asked for; W3 is short
+    h, session = make(store, settings, farmer_id="f01")
+    r = _say(h, "2026-10-21")
+    assert r["saved"] is False and r["status"] == "week_full" and r["week"] == "W2"
+    assert r["suggested_week"] == "W3" and r["suggested_from"] == "2026-10-26" and "W3" in r["say"]
+    assert store.get("harvests", "h-f01-palm") is None or store.get("harvests", "h-f01-palm")["ready_date"] != "2026-10-21"
+
+
+def test_the_farmer_can_agree_to_the_suggested_week(store, settings):
+    _fill(store, 2, 100_000)
+    h, _ = make(store, settings, farmer_id="f01")
+    _say(h, "2026-10-21")
+    assert _say(h, "2026-10-27")["status"] == "waiting_for_read_back"
+    assert _say(h, "2026-10-27", confirmed=True)["saved"] is True
+    assert store.get("harvests", "h-f01-palm")["ready_date"] == "2026-10-27"
+    assert "week_full" not in store.get("harvests", "h-f01-palm")
+
+
+def test_a_farmer_who_keeps_the_full_week_is_never_refused_and_the_planner_sees_it(store, settings):
+    _fill(store, 2, 100_000)
+    h, _ = make(store, settings, farmer_id="f01")
+    assert _say(h, "2026-10-21")["status"] == "week_full"
+    assert _say(h, "2026-10-21")["status"] == "waiting_for_read_back"   # same date again: no second warning
+    saved = _say(h, "2026-10-21", confirmed=True)
+    assert saved["saved"] is True
+    assert store.get("harvests", "h-f01-palm")["week_full"]["kept_by_farmer"] is True
+
+
+def test_a_farmers_own_harvest_is_not_counted_against_their_own_date(store, settings):
+    # b001's harvest (1,600 kg on 7 Nov) sits in W4. Make W4 exactly full with it included: confirming the same date is fine.
+    _fill(store, 4, 100_000 - 400)
+    store.set("harvests", "h-b001-palm", {"kg": 1600}, merge=True)
+    h, _ = make(store, settings, farmer_id="b001")
+    assert _say(h, "2026-11-07")["status"] == "waiting_for_read_back"
+
+
+def test_no_week_with_room_later_says_so_and_still_lets_the_farmer_decide(store, settings):
+    h, _ = make(store, settings, farmer_id="f01")
+    r = _say(h, "2026-11-10")                                    # W5 is over the target and the horizon ends there
+    assert r["status"] == "week_full" and r["suggested_week"] is None and "no later week" in r["say"]
+
+
+def test_approving_an_offer_into_a_week_that_filled_meanwhile_is_refused_unless_forced(store, settings):
+    farmer = store.get("farmers", "b001")
+    offer = services.create_offer(store, settings, farmer=farmer, crop="palm", kg=1600, price=3300, deliver_week=3, call_id=None)
+    services.recompute_forecast(store, settings)
+    _fill(store, 3, 100_000)                                      # other supply filled W3 while the offer waited
+    with pytest.raises(services.WeekFull) as e:
+        services.decide_offer(store, settings, offer["id"], approve=True)
+    assert e.value.status == 409 and "W3" in str(e.value) and "approve it anyway" in str(e.value)
+    assert store.get("offers", offer["id"])["status"] == "pending"
+    assert services.decide_offer(store, settings, offer["id"], approve=True, allow_full=True)["status"] == "approved"
+
+
+def test_an_offer_into_a_week_that_still_has_a_gap_approves_normally(store, settings):
+    farmer = store.get("farmers", "b001")
+    offer = services.create_offer(store, settings, farmer=farmer, crop="palm", kg=1600, price=3300, deliver_week=3, call_id=None)
+    assert services.decide_offer(store, settings, offer["id"], approve=True)["status"] == "approved"
+
+
+def test_the_approve_endpoint_answers_409_and_accepts_allow_full(store, settings):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+
+    farmer = store.get("farmers", "b001")
+    offer = services.create_offer(store, settings, farmer=farmer, crop="palm", kg=1600, price=3300, deliver_week=3, call_id=None)
+    _fill(store, 3, 100_000)
+    with TestClient(create_app(settings, store)) as c:
+        r = c.post(f"/api/offers/{offer['id']}/approve")
+        assert r.status_code == 409 and "already filled" in r.json()["detail"]
+        assert c.post(f"/api/offers/{offer['id']}/approve?allow_full=true").json()["status"] == "approved"

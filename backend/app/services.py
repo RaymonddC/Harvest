@@ -755,6 +755,39 @@ def first_gap_week(store: Store, crop: str | None = None) -> dict | None:
     return next((r for r in rows if r.get("is_gap")), None)
 
 
+FULL_WEEK_LOOKAHEAD = 3  # fruit cannot wait more than three weeks (see mill_ops.reschedule_harvest)
+
+
+def week_fill(store: Store, settings: Settings, camp_id: str | None, week: int, *,
+              own_kg: float = 0.0, own_pending_kg: float = 0.0) -> dict | None:
+    """How full one forecast week of a campaign is. A week is full when the supply already counted for it (expected, plus
+    offers waiting for approval) has reached the week's target, or the mill's weekly capacity.
+    own_kg / own_pending_kg: this farmer's or offer's own part of that week, taken out first so that confirming
+    one's own date or approving one's own offer is not judged against itself. None when the week is not in the forecast."""
+    row = next((r for r in store.list("forecast") if r.get("week") == week and camp_id and _row_matches(r, camp_id)), None)
+    if not row:
+        return None
+    target = float(row.get("target_kg") or 0)
+    base = max(float(row.get("expected_kg", 0)) - own_kg, 0) + max(float(row.get("pending_kg", 0)) - own_pending_kg, 0)
+    capacity = float(row.get("capacity_kg") or 0)
+    full = bool(target) and base >= target
+    room = max(target - base, 0)
+    if capacity:
+        full = full or base >= capacity
+        room = min(room, max(capacity - base, 0))
+    return {"week": week, "label": fc.week_label(week), "week_start": row.get("week_start"), "full": full,
+            "room_kg": 0 if full else round(room)}
+
+
+def next_week_with_room(store: Store, settings: Settings, camp_id: str | None, after_week: int) -> dict | None:
+    """The nearest later week (within three weeks) that still has room."""
+    for week in range(after_week + 1, after_week + FULL_WEEK_LOOKAHEAD + 1):
+        fill = week_fill(store, settings, camp_id, week)
+        if fill and not fill["full"]:
+            return fill
+    return None
+
+
 def gap_week_for_farmer(store: Store, settings: Settings, farmer: dict) -> dict | None:
     camp = campaign_of_farmer(store, settings, farmer)
     return first_gap_week(store, camp["id"] if camp else farmer_crop(settings, farmer))
@@ -898,7 +931,28 @@ def create_offer(store: Store, settings: Settings, *, farmer: dict, crop: str, k
     return {**doc, "id": offer_id}
 
 
-def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool, actor=None) -> dict:
+class WeekFull(ServiceError):
+    """The offer's delivery week no longer has room. The planner may still approve it on purpose (allow_full)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, status=409)
+
+
+def _refuse_if_week_full(store: Store, settings: Settings, offer: dict) -> None:
+    week = fc.week_of_offer(offer, "deliver_week", settings.plan_start, settings.weeks)
+    if not week:
+        return
+    farmers = {f["id"]: f for f in store.list("farmers")}
+    camp_id = doc_campaign(settings, offer, farmers, list_campaigns(store, settings))
+    own = float(offer.get("kg", 0)) if offer.get("status") == "pending" else 0.0
+    fill = week_fill(store, settings, camp_id, week, own_pending_kg=own)
+    if fill and fill["full"]:
+        later = next_week_with_room(store, settings, camp_id, week)
+        hint = f" {later['label']} (from {later['week_start']}) still has room." if later else ""
+        raise WeekFull(f"{fill['label']} is already filled by other supply and offers.{hint} Reject this offer, or approve it anyway.")
+
+
+def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool, actor=None, allow_full: bool = False) -> dict:
     offer = store.get("offers", offer_id)
     if not offer:
         raise ServiceError("Offer not found.")
@@ -906,6 +960,8 @@ def decide_offer(store: Store, settings: Settings, offer_id: str, approve: bool,
         raise ServiceError(f"Offer is already {offer['status']}.")
     changes = {}
     if approve:
+        if not allow_full:
+            _refuse_if_week_full(store, settings, offer)
         # An escalated offer is approved at the price the farmer asked for, not the ceiling
         # the agent quoted, so the limits must cover that request.
         escalated = offer["status"] == "escalated" and offer.get("requested_price") is not None

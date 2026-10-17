@@ -160,6 +160,7 @@ class CallSession:
     saved_kg: dict[str, float] = field(default_factory=dict)  # per crop: the volume saved on this call
     price_warned: set[tuple[str, float]] = field(default_factory=set)  # (crop, number) already refused as a price
     checked_kg: dict[str, float] = field(default_factory=dict)  # per crop: the volume check_offer last priced
+    full_warned: set[tuple[str, str]] = field(default_factory=set)  # (crop, date) the farmer was already told is a full week
 
 
 def _weekday_label(date: dt.date, settings: Settings) -> str:
@@ -257,6 +258,9 @@ class ToolHandlers:
                              "Do not change the harvest. If the farmer named a price, use it as farmer_counter_price "
                              "in check_offer. Only if they clearly said a NEW volume in kilograms, ask them to "
                              "confirm it and call this again."}
+        full = self._full_week_warning(crop_id, kg, date)
+        if full:
+            return full
         self.last_ui = {"captured": {"crop": crop_label(crop_id), "kg": round(kg),
                                      "ready": _weekday_label(date, self.settings),
                                      "confidence": confidence.title(),
@@ -297,7 +301,47 @@ class ToolHandlers:
                                          kg, date.isoformat(), self.session.call_id, confidence, every)
         self.session.saved_kg[crop_id] = kg
         self.store.set("calls", self.session.call_id, {"harvest_read_back": None}, merge=True)
+        if (crop_id, date.isoformat()) in self.session.full_warned and result.get("harvest_id"):
+            # The farmer was told the week is full and kept the date: the planner sees it on the harvest.
+            self.store.set("harvests", result["harvest_id"], {"week_full": {"week": result.get("week_label"),
+                                                                           "kept_by_farmer": True}}, merge=True)
         return {"saved": True, **result}
+
+    def _full_week_warning(self, crop_id: str, kg: float, date: dt.date) -> dict | None:
+        """First time the farmer names a week the mill already has enough for, nothing is saved: the agent tells the
+        farmer and offers the nearest later week with room. If the farmer keeps the date, the second try saves it
+        (flagged for the planner), so a farmer can never be refused."""
+        key = (crop_id, date.isoformat())
+        if key in self.session.full_warned or self.session.farmer.get("type") == "supplier":
+            return None
+        camp = services.campaign_of_farmer(self.store, self.settings, self.session.farmer)
+        if not camp:
+            return None
+        weeks = services.campaign_weeks(self.settings, camp)
+        week = fc.week_index(date, self.settings.plan_start, weeks)
+        if not week:
+            return None
+        old = self.store.get("harvests", f"h-{self.session.farmer['id']}-{crop_id}")
+        own = 0.0
+        if old and fc.week_index(old["ready_date"], self.settings.plan_start, weeks) == week:
+            own = float(old.get("kg", 0)) * fc.harvest_weight(old)  # the farmer's current record is not "other supply"
+        fill = services.week_fill(self.store, self.settings, camp["id"], week, own_kg=own)
+        if not fill or not fill["full"]:
+            return None
+        self.session.full_warned.add(key)
+        later = services.next_week_with_room(self.store, self.settings, camp["id"], week)
+        if later:
+            ask = (f"Tell the farmer, kindly, that the mill already has enough fruit for {fill['label']} and ask whether they "
+                   f"could deliver around {later['week_start']} ({later['label']}) instead; fruit can wait a few days but not "
+                   "longer than three weeks. If they agree, call record_harvest with that new date. If they want to keep "
+                   "their date, call record_harvest again with the same date and it will be saved for the planner to sort out.")
+        else:
+            ask = (f"Tell the farmer that the mill already has enough fruit for {fill['label']} and no later week within three "
+                   "weeks has room right now. Ask what they prefer; if they keep their date, call record_harvest again "
+                   "with the same date and it will be saved for the planner to sort out. Do not promise anything.")
+        return {"saved": False, "status": "week_full", "week": fill["label"],
+                "suggested_week": later["label"] if later else None,
+                "suggested_from": later["week_start"] if later else None, "say": ask}
 
     def _note_read_back(self, crop_id: str, kg: float, date: dt.date, confidence: str) -> None:
         self.store.set("calls", self.session.call_id, {"harvest_read_back": {

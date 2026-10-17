@@ -83,18 +83,19 @@ export default function Approvals() {
     const ids = easy.map((o) => o.id);
     // Keep going when one fails: count both, and undo only what was approved.
     const done = [];
-    let failed = 0, firstError = "";
+    let failed = 0, firstError = "", filled = 0;
     await act(async () => {
       for (const id of ids) {
         try { await api(`/api/offers/${id}/approve`); done.push(id); } catch (err) {
           if (err.status === 401) throw err;
+          if (err.status === 409) { filled += 1; continue; } // its week is already filled: left for the planner to decide one by one
           failed += 1; firstError = firstError || err.message;
         }
       }
-      if (!done.length) throw new Error(`None of the ${ids.length} offers could be approved: ${firstError}`);
+      if (!done.length) throw new Error(filled && !failed ? `None approved: ${filled === 1 ? "its week is" : "their weeks are"} already filled. Open ${filled === 1 ? "it" : "them"} one by one to approve anyway.` : `None of the ${ids.length} offers could be approved: ${firstError || "their weeks are already filled"}`);
     },
-      () => failed
-        ? `Approved ${done.length} of ${ids.length}. ${failed} failed: ${firstError}`
+      () => failed || filled
+        ? `Approved ${done.length} of ${ids.length}.${filled ? ` ${filled} left waiting: the week is already filled (open them to approve anyway).` : ""}${failed ? ` ${failed} failed: ${firstError}` : ""}`
         : `${ids.length} offers approved. Confirmation calls are queued.`,
       { fn: async () => {
         // An offer whose confirmation call already started cannot be undone; undo the rest and say how many stayed.

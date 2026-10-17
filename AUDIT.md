@@ -52,3 +52,10 @@ the `consent=false` end to end (nothing written to the audio store), or `deploy.
 
 ## F. Reported by a user, not yet explained
 "The agent has not finished talking but the voice ended." See TODO item 15.
+
+## G. Added 17 Oct: a farmer names a week that is already full
+Built (not from the audit): `services.week_fill` / `next_week_with_room` (a week is full when expected supply plus waiting offers reach the target, or the mill's
+weekly capacity; the farmer's own record is not counted against them). `record_harvest` answers `week_full` once per date: nothing is saved, the agent offers the
+nearest later week within three weeks that has room, and if the farmer keeps the date the next call saves it with a `week_full` flag on the harvest.
+`decide_offer` refuses (HTTP 409) to approve an offer into a week that filled meanwhile; the planner can choose "Approve anyway" (`?allow_full=true`).
+Bulk "Approve all" skips those offers and says so. Not done: showing the `week_full` flag on the dashboard's harvest or surplus views.
