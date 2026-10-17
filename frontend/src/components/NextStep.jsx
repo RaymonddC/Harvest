@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { campaignFor, inCampaign, useCrop } from "../campaigns.jsx";
+import { toCallOf } from "../crm.js";
 import { api, followCalls, gapFillBody, gapFillToast, startUrl } from "../lib.js";
 import { useLive } from "../live.jsx";
 import { useAct } from "../toast.jsx";
@@ -19,7 +20,7 @@ export default function NextStep({ page }) {
   const waiting = inCampaign(state, state.offers, cid).filter((o) => WAITING.includes(o.status)).length;
   const gap = inCampaign(state, state.forecast, cid).sort((a, b) => a.week - b.week).find((r) => r.is_gap);
   const canFill = gap && ((gap.shortlist || []).length || state.farmers.some((f) => f.type === "supplier" && f.crop === campaign.crop));
-  const toCall = inCampaign(state, state.farmers, cid).filter((f) => f.to_call && f.type !== "supplier").length;
+  const toCall = toCallOf(state, cid).toCall.length;
 
   let step = null;
   if (waiting && page !== "approvals") {

@@ -4,6 +4,7 @@ import { api, can, cropLabel, plainPrice } from "../../lib.js";
 import { useUnsaved } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
 import { SubmitButton } from "../../ui.jsx";
+import OfficialPrice from "./OfficialPrice.jsx";
 import StepTop from "./StepTop.jsx";
 
 const FIELDS = ["floor_price", "reference_price", "ceiling_price", "first_premium_pct", "step_pct"];
@@ -111,7 +112,7 @@ export default function PriceRange({ l, crop }) {
 
   return (
     <form className={`card ${priced ? "done" : ""}`} aria-labelledby="limits-title" onSubmit={save}>
-      <StepTop n={2} done={priced} word={dirty ? "Unsaved" : priced ? "Done" : "To do"} />
+      <StepTop n={2} label="Price" done={priced} word={dirty ? "Unsaved" : priced ? "Ready" : "To do"} />
       <div className="step-head"><h2 id="limits-title">Fair price range</h2>
         <span className="sub">{l ? `${cropLabel(l.crop)}, ${l.currency} per ${l.unit}. The agent can only offer inside this range, and farmers are never offered less than the lowest price.` : `No price range for ${cropLabel(crop)} yet. Set it before any gap-fill call: the agent can only offer inside this range.`}</span></div>
       <div className="grid3">
@@ -120,9 +121,12 @@ export default function PriceRange({ l, crop }) {
         <Field label="Highest" name="ceiling_price" form={form} edit={edit} error={errs.ceiling_price} />
       </div>
       {form && l && <PriceSlider form={form} l={l} onChange={slide} />}
-      <span className="sub">{l && l.reference_source ? `Market price source: ${l.reference_source}` : ""}</span>
-      <details>
-        <summary>How the agent climbs the offer</summary>
+      {l && <span className="sub">The agent never offers below {plainPrice(Number(form?.floor_price) || l.floor_price, l.currency)} or above {plainPrice(Number(form?.ceiling_price) || l.ceiling_price, l.currency)}; it starts near the market price.</span>}
+      <details className="price-more">
+        <summary>More about the price: where the market price comes from, and how the agent raises its offer</summary>
+        {l && l.reference_source && !l.follows_official && <p className="sub">Market price source: {l.reference_source}</p>}
+        <OfficialPrice l={l} crop={crop} />
+        <h4 className="price-more-h">How the agent raises its offer</h4>
         <div className="grid2" style={{ marginTop: 10 }}>
           <Field label="First offer, % over market" name="first_premium_pct" form={form} edit={edit} error={errs.first_premium_pct} decimal />
           <Field label="Each step, % of market" name="step_pct" form={form} edit={edit} error={errs.step_pct} decimal />

@@ -10,6 +10,7 @@ import { Toasts } from "./toast.jsx";
 
 // Each page is its own chunk, loaded the first time it is opened.
 const Forecast = lazy(() => import("./pages/Forecast.jsx"));
+const Overview = lazy(() => import("./pages/Overview.jsx"));
 const Setup = lazy(() => import("./pages/Setup.jsx"));
 const Approvals = lazy(() => import("./pages/Approvals.jsx"));
 const Users = lazy(() => import("./pages/Users.jsx"));
@@ -37,7 +38,8 @@ export default function App() {
           <Alerts />
           <Suspense fallback={null}>
             <Routes>
-              <Route path="/" element={<Forecast />} />
+              <Route path="/" element={<Overview />} />
+              <Route path="/forecast" element={<Forecast />} />
               <Route path="/setup" element={<Setup />} />
               <Route path="/approvals" element={<Approvals />} />
               <Route path="/users" element={<Users />} />

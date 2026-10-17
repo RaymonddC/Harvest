@@ -6,7 +6,7 @@ import { ActButton } from "../../ui.jsx";
 const t = (kg) => `${(kg / 1000).toFixed(1)} t`;
 const pct = (x) => `${Math.round(x * 100)}%`;
 const day = (iso) => new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-const SAMPLE = "phone,date,kg\n+62 810 0000 1000,2026-10-14,1450";
+const SAMPLE = "phone,date,kg,unripe_pct,dirt_pct\n+62 810 0000 1000,2026-10-14,1450,3,1";
 
 // Closing the loop: what farmers promised against what the weighbridge recorded, how many keep their word,
 // and the supply to expect given their record (next to what they said). Deliveries come in as a CSV here,
@@ -41,7 +41,7 @@ export default function TrackRecord({ cid, rows, refreshKey }) {
       </div>
       {open && (
         <div className="track-upload">
-          <p className="small muted">Paste or pick the weighbridge CSV: <b>date</b> and <b>kg</b>, and the farmer by <b>phone</b> (best), <b>farmer_id</b> or exact <b>name</b>. Single deliveries can be added on a farmer's page.</p>
+          <p className="small muted">Paste or pick the weighbridge CSV: <b>date</b> and <b>kg</b>, and the farmer by <b>phone</b> (best), <b>farmer_id</b> or exact <b>name</b>; grading deductions in <b>unripe_pct</b>, <b>dirt_pct</b> and <b>other_pct</b> (optional). Single deliveries can be added on a farmer's page.</p>
           <input type="file" accept=".csv,text/csv" aria-label="Deliveries CSV file" onChange={readFile} />
           <textarea aria-label="Deliveries CSV" rows={4} value={csv} onChange={(e) => setCsv(e.target.value)} />
           <ActButton className="btn sm leaf" busy="Recording…" run={upload}>Record deliveries</ActButton>

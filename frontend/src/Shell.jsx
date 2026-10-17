@@ -1,30 +1,37 @@
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Link, Navigate, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { can, fmtT, getSession, PAGES } from "./lib.js";
+import { can, FLOW, fmtT, getSession, OVERVIEW, PAGES, SETTINGS } from "./lib.js";
 import AccountMenu from "./components/AccountMenu.jsx";
 import CropSwitcher from "./components/CropSwitcher.jsx";
 import { campaignFor, inCampaign, useCrop } from "./campaigns.jsx";
 import NextStep from "./components/NextStep.jsx";
+import { nextAutoText, todoItems } from "./todo.js";
 import { useUnsaved } from "./dialogs.jsx";
 import { useLive } from "./live.jsx";
 import { Dialog, DialogClose, Icon } from "./ui.jsx";
 
 // This week at a glance, under the page links: is calling on, is a week short, does anything
 // wait for a decision. Hidden on narrow screens, where the sidebar is a single row.
+// The first few items of the campaign's To do list (todo.js), each the problem and the next action, linking to
+// where it is done. The Overview page shows the whole list.
 function WeekCard({ state }) {
   const { cid } = useCrop();
   if (!state) return null;
   const campaign = campaignFor(state, cid);
-  const running = campaign.status === "running";
-  const gap = inCampaign(state, state.forecast, cid).sort((a, b) => a.week - b.week).find((r) => r.is_gap);
-  const waiting = inCampaign(state, state.offers, cid).filter((o) => ["pending", "escalated"].includes(o.status)).length;
+  const items = todoItems(state, cid);
   return (
-    <div className="week-card" aria-label="This week">
-      <span className="wc-title">This week</span>
-      <div className="wc-row"><i className={`wc-dot ${running ? "on" : ""}`} />{running ? (campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Calling farmers") : "No calls running"}</div>
-      <div className="wc-row"><i className={`wc-dot ${gap ? "amber" : "on"}`} />{gap ? `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short` : "Every week on track"}</div>
-      {waiting > 0 && <Link className="wc-row wc-link" to="/approvals"><i className="wc-dot amber" />{waiting} waiting for a decision</Link>}
+    <div className="week-card" aria-label="To do">
+      <span className="wc-title">To do · {campaign.label || "this campaign"}</span>
+      {items.length ? items.slice(0, 4).map((it) => (
+        <Link key={it.key} className={`wc-item ${it.tone}`} to={it.to}>
+          <i className="wc-dot" />
+          <span><b>{it.what}</b><small>{it.next} →</small></span>
+        </Link>
+      )) : (
+        <div className="wc-item done"><i className="wc-dot" /><span><b>Nothing waiting</b><small>Every week is on track and every farmer has answered{nextAutoText(campaign) ? `; ${nextAutoText(campaign)}` : ""}.</small></span></div>
+      )}
+      {items.length > 4 && <Link className="wc-more" to="/">All {items.length} on the Overview →</Link>}
     </div>
   );
 }
@@ -44,7 +51,7 @@ function DemoGuide({ state }) {
     ["Check the farmers and the price range", "/setup", state.farmers.length > 0 && state.limits.length > 0],
     ["Start calling", "/setup", anyRunning || calls.some((c) => c.status !== "queued")],
     ["Answer a call as the farmer", "/calls", calls.some((c) => ["done", "on_call"].includes(c.status))],
-    ["Fill the gap: gap-fill calls or the rival quote", "/", offers.length > 0],
+    ["Fill the gap: gap-fill calls or the rival quote", "/forecast", offers.length > 0],
     ["Approve the offers", "/approvals", offers.some((o) => o.status === "approved")],
     ["Answer the confirmation call", "/calls", offers.some((o) => o.confirmed_by_voice)],
   ];
@@ -69,12 +76,30 @@ function DemoGuide({ state }) {
   );
 }
 
+const OVERVIEW_PATHS = PAGES.filter((p) => p.step === OVERVIEW.id).map((p) => p.to);
+
+// Which step of the flow this page is, what it is for, and the page that usually comes next.
+function FlowLine({ pathname, go }) {
+  const page = PAGES.find((p) => p.to === pathname);
+  if (!page) return null;
+  const step = FLOW.find((g) => g.id === page.step);
+  const next = PAGES.find((p) => p.key === page.next);
+  return (
+    <div className="flow-line" role="note">
+      {step ? <span className="flow-step"><b>{step.n}</b>Step {step.n} of {FLOW.length} · {step.label}</span>
+        : <span className="flow-step settings">{page.step === OVERVIEW.id ? OVERVIEW.label : SETTINGS.label}</span>}
+      <span className="flow-text">{page.line}</span>
+      {next && <Link className="flow-next" to={next.to} onClick={(e) => go(e, next.to)}>Then: {next.label} →</Link>}
+    </div>
+  );
+}
+
 // Keyboard shortcuts for people who use the app every day. Typing in a box never triggers them.
-const SHORTCUTS = [["g then f", "Live forecast"], ["g then s", "Campaign"], ["g then m", "Farmers"], ["g then c", "Calls"],
+const SHORTCUTS = [["g then o", "Overview"], ["g then f", "Live forecast"], ["g then s", "Campaign"], ["g then m", "Farmers"], ["g then c", "Calls"],
   ["g then k", "Calendar"], ["g then g", "Agent"], ["g then a", "Approvals"], ["g then u", "Users"],
   ["/", "Search the farmer list"], ["?", "Show these shortcuts"]];
-const GO = { f: "/", s: "/setup", m: "/farmers", c: "/calls", k: "/calendar", g: "/agent", a: "/approvals", u: "/users" };
-const PAGE_OF = { "/": "forecast", "/setup": "setup", "/farmers": "farmers", "/calls": "calls", "/calendar": "calendar",
+const GO = { o: "/", f: "/forecast", s: "/setup", m: "/farmers", c: "/calls", k: "/calendar", g: "/agent", a: "/approvals", u: "/users" };
+const PAGE_OF = { "/": "overview", "/forecast": "forecast", "/setup": "setup", "/farmers": "farmers", "/calls": "calls", "/calendar": "calendar",
   "/agent": "agent", "/approvals": "approvals", "/users": "users" };
 
 // Sidebar (phone: top row plus a bottom tab bar, from app.css), a top bar holding the page
@@ -95,6 +120,12 @@ export default function Shell({ title, head, children }) {
     if (await guard()) navigate(to);
   };
   const [help, setHelp] = useState(false);
+  // Wide screens: the sidebar can shrink to its icons; the choice is remembered in this browser.
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem("harvestNavCollapsed") === "1"; } catch { return false; } });
+  const toggleNav = () => {
+    setCollapsed(!collapsed);
+    try { localStorage.setItem("harvestNavCollapsed", collapsed ? "0" : "1"); } catch { /* storage blocked: lasts this visit */ }
+  };
   useEffect(() => {
     let g = 0;
     const onKey = (e) => {
@@ -130,18 +161,44 @@ export default function Shell({ title, head, children }) {
   const waiting = state ? state.offers.filter((o) => ["pending", "escalated"].includes(o.status)).length : 0;
   return (
     <>
-      <aside className="side">
-        <Link className="brand" to="/" onClick={(e) => go(e, "/")}><span className="mark"><Icon name="leaf" /></span>Harvest-Call</Link>
+      <aside className={`side ${collapsed ? "collapsed" : ""}`}>
+        <div className="side-top">
+          <Link className="brand" to="/" onClick={(e) => go(e, "/")} title="Harvest-Call"><span className="mark"><Icon name="leaf" /></span><span className="brand-name">Harvest-Call</span></Link>
+          <button type="button" className="nav-toggle" onClick={toggleNav} aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand the menu" : "Collapse the menu"} title={collapsed ? "Expand the menu" : "Collapse the menu"}>
+            <span aria-hidden="true">{collapsed ? "»" : "«"}</span>
+          </button>
+        </div>
         <CropSwitcher />
         {/* The middle scrolls on its own when it is taller than the window; the account stays below it. */}
         <div className="side-scroll">
         <nav aria-label="Planner pages">
-          {PAGES.filter((p) => !p.need || can(p.need)).map(({ key, to, label }) => (
-            <NavLink key={key} to={to} end onClick={(e) => go(e, to)} aria-label={key === "approvals" && waiting ? `Approvals, ${waiting} waiting` : undefined}>
-              <Icon name={key} /><span className="label">{label}</span>
-              {key === "approvals" && waiting > 0 && <span className="count">{waiting}</span>}
-            </NavLink>
+          {/* One item for the Overview and its tabs (Summary, Forecast, Calendar): lit on any of them. */}
+          <div className="nav-group overview" role="group" aria-label={OVERVIEW.label}>
+            <Link to="/" onClick={(e) => go(e, "/")} title={collapsed ? OVERVIEW.label : undefined}
+              className={OVERVIEW_PATHS.includes(pathname) ? "active" : ""} aria-current={OVERVIEW_PATHS.includes(pathname) ? "page" : undefined}>
+              <Icon name="overview" /><span className="label">{OVERVIEW.label}</span>
+            </Link>
+          </div>
+          {FLOW.map((g) => (
+            <div key={g.id} className="nav-group" role="group" aria-labelledby={`nav-${g.id}`}>
+              <span className="nav-step" id={`nav-${g.id}`}><b>{g.n}</b>{g.label}</span>
+              {PAGES.filter((p) => p.step === g.id).map(({ key, to, label }) => (
+                <NavLink key={key} to={to} end onClick={(e) => go(e, to)} title={collapsed ? label : undefined} aria-label={key === "approvals" && waiting ? `Approvals, ${waiting} waiting` : undefined}>
+                  <Icon name={key} /><span className="label">{label}</span>
+                  {key === "approvals" && waiting > 0 && <span className="count">{waiting}</span>}
+                </NavLink>
+              ))}
+            </div>
           ))}
+          <div className="nav-group settings" role="group" aria-labelledby="nav-settings">
+            <span className="nav-step" id="nav-settings">{SETTINGS.label}</span>
+            {PAGES.filter((p) => p.step === SETTINGS.id).map(({ key, to, label }) => (
+              <NavLink key={key} to={to} end onClick={(e) => go(e, to)} title={collapsed ? label : undefined}>
+                <Icon name={key} /><span className="label">{label}</span>
+              </NavLink>
+            ))}
+          </div>
         </nav>
         <WeekCard state={state} />
         <DemoGuide state={state} />
@@ -162,6 +219,14 @@ export default function Shell({ title, head, children }) {
               {status === "error" ? "Cannot reach the live data. Check the backend URL in config.js, then reload." : "Reconnecting to live data…"}
             </div>
           )}
+          {OVERVIEW_PATHS.includes(pathname) && (
+            <nav className="ov-tabs" aria-label="Overview">
+              {PAGES.filter((p) => p.step === OVERVIEW.id).map((p) => (
+                <NavLink key={p.key} to={p.to} end onClick={(e) => go(e, p.to)}><Icon name={p.key} size={16} />{p.tab}</NavLink>
+              ))}
+            </nav>
+          )}
+          <FlowLine pathname={pathname} go={go} />
           {children}
         </motion.main>
       </div>

@@ -16,7 +16,7 @@ function ticks(maxKg) {
 // The bar's layers. Harvest moved out to another week by an approved deal is taken off the top,
 // so the layers always add up to the expected tonnes.
 function parts(r) {
-  const raw = [["firm", r.firm_kg || 0], ["unsure", r.unsure_weighted_kg || 0], ["approved", r.approved_in_kg || 0]];
+  const raw = [["firm", r.firm_kg || 0], ["unsure", r.unsure_weighted_kg || 0], ["projected", r.projected_kg || 0], ["approved", r.approved_in_kg || 0]];
   let over = raw.reduce((n, [, v]) => n + v, 0) - r.expected_kg;
   for (let i = raw.length - 1; i >= 0 && over > 0; i--) {
     const cut = Math.min(raw[i][1], over);
@@ -35,8 +35,10 @@ function TipBody({ r, target }) {
       <strong>{r.label} · {shortDate(r.week_start)}</strong>
       <Line label="Firm answers" kg={r.firm_kg} />
       {r.unsure_weighted_kg > 0 && <Line label={r.unsure_count ? `${r.unsure_count} unsure, counted half` : "Unsure, counted half"} kg={r.unsure_weighted_kg} />}
+      {r.projected_kg > 0 && <Line label="Later harvest rounds (projected)" kg={r.projected_kg} />}
       {r.approved_in_kg > 0 && <Line label="Approved deals" kg={r.approved_in_kg} />}
       {r.pending_kg > 0 && <Line label="Waiting for approval" kg={r.pending_kg} />}
+      {r.capacity_kg ? <Line label={r.is_surplus ? "Over the mill's capacity" : "Mill capacity"} kg={r.is_surplus ? r.surplus_kg : r.capacity_kg} /> : null}
       <div className="sum"><span>Expected</span><b className="num">{fmtT(r.expected_kg)} of {fmtT(target)} t</b></div>
       <p className={r.is_gap ? "short" : "fine"}>
         {r.is_gap ? `${fmtT(r.gap_kg)} t short of the target` : r.gap_kg ? `${fmtT(r.gap_kg)} t under target, within the gap threshold` : "At or above the target"}
@@ -52,7 +54,7 @@ function Col({ r, target, children }) {
   return (
     <Tooltip.Root open={open} onOpenChange={setOpen}>
       <Tooltip.Trigger asChild>
-        <div className={`col ${r.is_gap ? "is-gap" : ""}`} tabIndex={0} onClick={() => setOpen((o) => !o)}>{children}</div>
+        <div className={`col ${r.is_gap ? "is-gap" : ""} ${r.before_start ? "before-start" : ""}`} tabIndex={0} onClick={() => setOpen((o) => !o)}>{children}</div>
       </Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Content className="chart-tip" side="top" sideOffset={6} collisionPadding={12}>
@@ -74,7 +76,9 @@ export default function Chart({ rows }) {
     return () => { cancelAnimationFrame(f); clearTimeout(t); };
   }, []);
   const target = rows[0].target_kg;
-  const max = Math.max(target * 1.15, ...rows.map((r) => r.expected_kg + r.pending_kg));
+  const cap = rows[0].capacity_kg || 0;
+  // Headroom above the tallest bar for its label (and the pending part on top).
+  const max = Math.max(target * 1.15, cap * 1.12, ...rows.map((r) => (r.expected_kg + r.pending_kg) * 1.15));
   const pct = (kg) => (grown ? `${(kg / max) * 100}%` : "0%");
   const at = (kg) => `${(kg / max) * 100}%`;
   return (
@@ -86,17 +90,18 @@ export default function Chart({ rows }) {
           <span className="unit">t</span>
         </div>
         <div className="target" data-label={`Target ${fmtT(target)} t`} style={{ bottom: at(target) }} />
+        {cap > 0 && <div className="capacity" data-label={`Mill capacity ${fmtT(cap)} t`} style={{ bottom: at(cap) }} />}
         <div className="bars">
           {rows.map((r) => (
             <Col key={r.week} r={r} target={target}>
               <div className="val num">
                 {/* On a phone the shortfall moves out of the pill (the KPI card above still shows it). */}
-                <span>{fmtT(r.expected_kg)}{r.is_gap && <span className="short"> · {fmtT(r.gap_kg)} t short</span>}</span>
+                <span>{fmtT(r.expected_kg)}{r.is_gap && <span className="short"> · {fmtT(r.gap_kg)} t short</span>}{r.is_surplus && <span className="short over"> · {fmtT(r.surplus_kg)} t over</span>}</span>
                 {r.pending_kg > 0 && <small><span>+{fmtT(r.pending_kg)} pending</span></small>}
               </div>
               <div className="pend" hidden={!r.pending_kg} style={{ height: pct(r.pending_kg) }} title={`${fmtT(r.pending_kg)} t waiting for approval`} />
               <div className={`bar ${r.is_gap ? "gap" : ""}`} style={{ height: pct(r.expected_kg) }}>
-                {/* What the week stands on, bottom up: firm answers, unsure ones (counted half), approved deals. */}
+                {/* What the week stands on, bottom up: firm answers, unsure ones (counted half), projected later rounds, approved deals. */}
                 {parts(r).map(([k, v]) => v > 0 && <i key={k} className={`seg ${k}`} style={{ flexGrow: v }} />)}
               </div>
               {/* The missing tonnes, drawn from the top of the bar up to the target line. */}
@@ -107,7 +112,7 @@ export default function Chart({ rows }) {
         </div>
       </div>
       <div className="xlabels has-axis" aria-hidden="true">
-        {rows.map((r) => <span key={r.week} className={r.is_gap ? "gap" : ""}>{r.label}<small>{shortDate(r.week_start)}</small></span>)}
+        {rows.map((r) => <span key={r.week} className={`${r.is_gap ? "gap" : ""} ${r.before_start ? "before-start" : ""}`}>{r.label}<small>{r.before_start ? "not started" : shortDate(r.week_start)}</small></span>)}
       </div>
     </Tooltip.Provider>
   );

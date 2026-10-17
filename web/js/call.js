@@ -133,6 +133,20 @@ function handleMessage(msg) {
 
 const SAMPLE_URL = "samples/gap-fill.json";
 
+// The clips come from one JSON bundle (samples/clips.json, base64) rather than one audio file each: download managers
+// such as IDM grab every audio file a page loads, and the sample then "downloads" instead of playing. A clip missing
+// from the bundle (or no bundle) falls back to its own file.
+let clipBundle = null;
+async function clipBytes(url) {
+  if (!clipBundle) clipBundle = fetch("samples/clips.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+  const b64 = (await clipBundle)[url];
+  if (!b64) return (await fetch(url)).arrayBuffer();
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+}
+
 // The sample's clips are decoded up front (the click that starts the replay allows sound), so playback starts on time.
 async function loadSampleAudio(sample, actx) {
   const urls = [...new Set(sample.events.filter((e) => e.audio).map((e) => e.audio))];
@@ -141,7 +155,7 @@ async function loadSampleAudio(sample, actx) {
     const gain = actx.createGain();
     gain.gain.value = volumeGain(Number($("volume").value));
     gain.connect(actx.destination);
-    const buffers = new Map(await Promise.all(urls.map(async (u) => [u, await actx.decodeAudioData(await (await fetch(u)).arrayBuffer())])));
+    const buffers = new Map(await Promise.all(urls.map(async (u) => [u, await actx.decodeAudioData(await clipBytes(u))])));
     return { ctx: actx, gain, buffers, sources: [] };
   } catch {
     toast("The sample call's sound could not be loaded. It plays without sound.", true);
@@ -238,7 +252,7 @@ function parseWav(buf) {  // 16 kHz mono PCM16 WAV -> Int16Array
 async function loadFarmerLines() {
   const meta = await (await fetch(FARMER_LINES_URL)).json();
   const clips = new Map();  // several lines may share one clip
-  await Promise.all([...new Set(meta.map((l) => l.audio))].map(async (u) => clips.set(u, parseWav(await (await fetch(u)).arrayBuffer()))));
+  await Promise.all([...new Set(meta.map((l) => l.audio))].map(async (u) => clips.set(u, parseWav(await clipBytes(u)))));
   return { meta, clips };
 }
 

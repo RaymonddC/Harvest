@@ -135,7 +135,7 @@ export default function Approvals() {
               ) : (
                 <>
                   <p>No offers yet, and no week is short right now. Offers appear here when the agent agrees them on gap-fill calls.</p>
-                  <Link className="btn" to="/">Go to the live forecast</Link>
+                  <Link className="btn" to="/forecast">Go to the live forecast</Link>
                 </>
               )}
             </div>

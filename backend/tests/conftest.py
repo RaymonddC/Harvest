@@ -24,5 +24,6 @@ def settings(tmp_path):
 @pytest.fixture
 def store(settings):
     s = MemoryStore()
-    seed_data.load_seed(s, settings)
+    # The tests were written for the single-campaign demo, with the agent in each farmer's language (Indonesian).
+    seed_data.load_seed(s, settings, more_campaigns=False, english_agent=False)
     return s

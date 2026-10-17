@@ -58,7 +58,7 @@ export async function moveFarmer(act, f, from, to, label) {
 // belongs to, which adds "Remove from campaign". filters: extra controls next to the search box.
 // "Call phone" (a real Twilio call) appears next to it only when the backend has phone calls switched on;
 // "Call now" then becomes "Browser call" (the demo, answered in the call client).
-export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers", cid, showCampaign, filters, empty }) {
+export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers", cid, showCampaign, filters, empty, extraCol }) {
   const confirm = useConfirm();
   const act = useAct();
   const { state } = useLive();
@@ -81,7 +81,7 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
   const pages = Math.max(1, Math.ceil(rows.length / PAGE));
   const current = Math.min(page, pages);
   const first = (current - 1) * PAGE;
-  const go = (n) => { setPage(n); document.getElementById("farmer-list").scrollIntoView({ block: "start" }); };
+  const go = (n) => { setPage(n); document.getElementById("farmer-list")?.scrollIntoView({ block: "start" }); };
   const sortBy = (s) => { setSort(s); setPage(1); };
   const dial = async (f) => {
     const allowed = numberAllowed(state, f.phone);
@@ -102,9 +102,9 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
   };
 
   return (
-    <section className="card" id="farmer-list" aria-labelledby="list-title" style={{ padding: 0, gap: 0 }}>
-      <div className="card-head" style={{ padding: "18px 22px", borderBottom: "1px solid var(--line-2)" }}>
-        <div><h2 id="list-title">{title}</h2><div className="sub">{farmers.length} {farmers.length === 1 ? "farmer" : "farmers"}</div></div>
+    <section className={title ? "card" : "embedded-list"} id={title ? "farmer-list" : undefined} aria-label={title || "Farmer list"} style={{ padding: 0, gap: 0 }}>
+      <div className="card-head" style={{ padding: title ? "18px 22px" : "6px 0 12px", borderBottom: "1px solid var(--line-2)" }}>
+        <div>{title && <h2 id="list-title">{title}</h2>}<div className="sub">{farmers.length} {farmers.length === 1 ? "farmer" : "farmers"}</div></div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           {filters}
           <input type="search" placeholder="Search name or village" aria-label="Search farmers" style={{ width: 220 }}
@@ -120,6 +120,8 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
               <SortHead col={COLUMNS[1]} sort={sort} setSort={sortBy} />
               <SortHead col={COLUMNS[2]} sort={sort} setSort={sortBy} />
               {showCampaign && <SortHead col={{ key: "campaign", label: "Campaign" }} sort={sort} setSort={sortBy} />}
+              {showCampaign && <th>Plot</th>}
+              {extraCol && <th>{extraCol.label}</th>}
               <SortHead col={COLUMNS[3]} sort={sort} setSort={sortBy} className="r" />
               <th style={{ paddingRight: 22 }}><span className="sr-only">Actions</span></th>
             </tr>
@@ -142,6 +144,12 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
                     )}
                   </td>
                 )}
+                {showCampaign && (
+                  <td>{f.plot_lat != null && f.plot_lng != null
+                    ? <span className="small">{f.plot_ha ? `${f.plot_ha} ha` : "Mapped"}{f.certification ? ` · ${f.certification}` : ""}</span>
+                    : <span className="small muted">Not mapped</span>}</td>
+                )}
+                {extraCol && <td>{extraCol.render(f)}</td>}
                 <td className="r num">{f.usual_kg_week ? fmtKg(f.usual_kg_week) : "–"}</td>
                 <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
                   {phoneCalls && <><ActButton need="campaign.run" className="btn sm leaf" busy="Calling…" run={() => dial(f)}>Call phone</ActButton>{" "}</>}

@@ -3,6 +3,7 @@
   python scripts/sample_call.py clips    # farmer lines -> speech (Gemini TTS), web/samples/clips/*.wav (16 kHz); --all redoes every line
   python scripts/sample_call.py record   # run_call against the live model with a scripted farmer; writes OUT/recording.json
   python scripts/sample_call.py build    # recording -> web/samples/gap-fill.json + audio clips (one translation request)
+  python scripts/sample_call.py bundle   # clips -> web/samples/clips.json (what the page loads; build and clips do it too)
 
 OUT defaults to $SAMPLE_WORK_DIR or ./sample_work. Needs GOOGLE_GENAI_USE_VERTEXAI, GOOGLE_CLOUD_PROJECT,
 GOOGLE_CLOUD_LOCATION and either VERTEX_ACCESS_TOKEN (local) or application default credentials.
@@ -337,12 +338,28 @@ def build(work: Path) -> None:
     (SAMPLES / "gap-fill.json").write_text(f'{head},\n "events": [\n{events_json}\n ]\n}}\n')
     size = sum(p.stat().st_size for p in clips.iterdir())
     print(f"gap-fill.json: {len(out)} events, {len(texts)} lines translated in 1 request, clips {size / 1e6:.2f} MB")
+    bundle_clips()
+
+
+def bundle_clips() -> None:
+    """All clips in one JSON file (base64), which the page decodes itself. Download managers such as IDM grab every
+    audio file a page loads (and the sample then "downloads" instead of playing); a JSON file they leave alone."""
+    import base64
+
+    clips = SAMPLES / "clips"
+    data = {f"samples/clips/{p.name}": base64.b64encode(p.read_bytes()).decode() for p in sorted(clips.iterdir())
+            if p.suffix in (".mp3", ".wav")}
+    (SAMPLES / "clips.json").write_text(json.dumps(data, separators=(",", ":")))
+    print(f"clips.json: {len(data)} clips, {(SAMPLES / 'clips.json').stat().st_size / 1e6:.2f} MB")
 
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    if cmd == "clips":
+    if cmd == "bundle":
+        bundle_clips()
+    elif cmd == "clips":
         make_clips()
+        bundle_clips()
     elif cmd == "record":
         asyncio.run(record())
     elif cmd == "build":

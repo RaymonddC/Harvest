@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { campaignsOf, cropName, useMembership } from "../../campaigns.jsx";
+import { fmtT } from "../../lib.js";
+import { unknownSupply } from "./NeedPanel.jsx";
 import { api } from "../../lib.js";
 import { useLive } from "../../live.jsx";
 import { useAct } from "../../toast.jsx";
@@ -17,7 +19,8 @@ export default function FarmersStep({ farmers, toCall, onAdd, cid, crop }) {
   const [open, setOpen] = useState(false);
   const [picking, setPicking] = useState(false);
   const [csv, setCsv] = useState(SAMPLE_CSV);
-  const langs = [...new Set(farmers.map((f) => f.language).filter(Boolean))];
+  const { state } = useLive();
+  const unknown = state ? unknownSupply(state, cid) : { unknown: [], usualKg: 0 };
   const upload = () => act(async () => {
     const r = await api("/api/farmers/upload", { body: { csv, campaign_id: cid } });
     setOpen(false);
@@ -34,7 +37,7 @@ export default function FarmersStep({ farmers, toCall, onAdd, cid, crop }) {
 
   return (
     <section className={`card ${farmers.length ? "done" : ""}`} aria-labelledby="farmers-title">
-      <StepTop n={1} done={farmers.length > 0} word={farmers.length ? "Done" : "To do"} />
+      <StepTop n={1} label="Who" done={farmers.length > 0} word={farmers.length ? "Ready" : "To do"} />
       <div className="step-head"><h2 id="farmers-title">Farmers</h2><span className="sub">Who the agent calls in this campaign.</span></div>
       <div className="drop">
         <div className="stack" id="avatars" aria-hidden="true">
@@ -43,7 +46,9 @@ export default function FarmersStep({ farmers, toCall, onAdd, cid, crop }) {
         </div>
         <span className="big">{farmers.length ? `${farmers.length} farmers in this campaign` : "No farmers yet"}</span>
         <span className="sub">{farmers.length
-          ? `${toCall} to call this week · ${langs.join(", ") || "language not set"} · synthetic data`
+          ? (unknown.unknown.length
+            ? <><a href="#farmer-list">{toCall} need a harvest call</a> · {unknown.unknown.length} with no current answer (about {fmtT(unknown.usualKg)} t a week)</>
+            : toCall ? <><a href="#farmer-list">{toCall} need a harvest call</a> (unsure answers)</> : <>Every farmer has a current answer</>)
           : `Add ${cropName(crop)} farmers from the database, or new ones.`}</span>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
           <button className="btn" type="button" onClick={() => setPicking(true)} {...needs("farmers.manage")}>Add from database</button>

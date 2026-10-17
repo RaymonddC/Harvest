@@ -1,18 +1,20 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { campaignFor, cropName, inCampaign, useCrop } from "../campaigns.jsx";
 import Campaigns from "../components/setup/Campaigns.jsx";
 import FarmerForm from "../components/setup/FarmerForm.jsx";
-import FarmerList from "../components/setup/FarmerList.jsx";
 import FarmerSheet from "../components/setup/FarmerSheet.jsx";
 import FarmersStep from "../components/setup/FarmersStep.jsx";
+import NeedPanel from "../components/setup/NeedPanel.jsx";
+import FarmerPipeline from "../components/setup/FarmerPipeline.jsx";
+import { toCallOf } from "../crm.js";
 import PriceRange from "../components/setup/PriceRange.jsx";
 import StartCalling from "../components/setup/StartCalling.jsx";
 import { api } from "../lib.js";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 import { useAct } from "../toast.jsx";
-import { ActButton, Icon } from "../ui.jsx";
+import { ActButton } from "../ui.jsx";
 
 // One campaign: pick or edit it, then its three steps (its farmers, the crop's price range, start calling).
 export default function Setup() {
@@ -20,19 +22,22 @@ export default function Setup() {
   const act = useAct();
   const [farmerForm, setFarmerForm] = useState(null); // {} to add, a farmer to edit, null when closed
   const [openFarmer, setOpenFarmer] = useState(null); // the farmer whose page is open
+  const [chartFilter, setChartFilter] = useState(null); // { ids: Set, label } from a click on the chart above
   const { cid, crop } = useCrop();
+  const { hash } = useLocation();
+  // Links to /setup#need (the sidebar's To do list) open at the mill's need.
+  useEffect(() => { if (hash === "#need" && state) document.getElementById("need")?.scrollIntoView({ block: "start" }); }, [hash, !!state]); // eslint-disable-line react-hooks/exhaustive-deps
   const campaign = state ? campaignFor(state, cid) : {};
   const farmers = state ? inCampaign(state, state.farmers, cid).filter((f) => f.type !== "supplier")
-    .sort((a, b) => Number(!!b.to_call) - Number(!!a.to_call) || a.id.localeCompare(b.id)) : [];
-  const toCall = farmers.filter((f) => f.to_call).length;
+    .sort((a, b) => a.id.localeCompare(b.id)) : [];
+  const toCall = state ? toCallOf(state, cid).toCall.length : 0;
   const l = state ? state.limits.find((x) => (x.crop || x.id) === crop) || null : null; // none yet for a new crop: the form starts blank
-  const persona = campaign.persona || {};
 
   const head = (
     <div className="page-head">
       <div>
-        <h1>Campaigns</h1>
-        <p>Pick a campaign, then three quick steps for it. Once the price range is set, one click calls its farmers.</p>
+        <h1>Campaign</h1>
+        <p>Who the agent calls, at what price, and when.</p>
       </div>
     </div>
   );
@@ -40,25 +45,16 @@ export default function Setup() {
   return (
     <Shell title="Campaign" head={head}>
       {state && <Campaigns state={state} />}
+      {state && campaign.id && <NeedPanel state={state} cid={cid} campaign={campaign} onPick={(f) => { setChartFilter(f); setTimeout(() => document.getElementById("farmer-list")?.scrollIntoView({ block: "start", behavior: "smooth" }), 50); }} />}
       {/* "linked": on a wide screen a line joins each step to the next, green once the step is done. */}
       <div className="steps linked">
         <FarmersStep farmers={farmers} toCall={toCall} cid={cid} crop={crop} onAdd={() => setFarmerForm({ crop, campaign_id: cid })} />
         <PriceRange key={crop} l={l} crop={crop} />
         {state ? <StartCalling state={state} toCall={toCall} /> : <section className="card dark"><div className="stats" id="campaign-lines" /></section>}
       </div>
-      {state && campaign.id && (
-        <section className="card agent-link" aria-label="The agent">
-          <span className="agent-link-icon"><Icon name="agent" size={20} /></span>
-          <div>
-            <b>{persona.name || "The agent"}</b>
-            <span className="sub">{persona.preset || persona.style ? `${persona.style || persona.preset} · ` : ""}{(campaign.questions || []).length} extra question{(campaign.questions || []).length === 1 ? "" : "s"} on harvest calls</span>
-          </div>
-          <Link className="btn" to="/agent">Set up the agent</Link>
-        </section>
-      )}
       {state && (
-        <FarmerList farmers={farmers} onEdit={setFarmerForm} onOpen={setOpenFarmer} cid={cid}
-          title={`Farmers in ${campaign.label || cropName(crop)}`}
+        <FarmerPipeline state={state} cid={cid} onEdit={setFarmerForm} onOpen={setOpenFarmer}
+          title={`Farmers in ${campaign.label || cropName(crop)}`} filter={chartFilter} onClearFilter={() => setChartFilter(null)}
           empty={<>No farmers in this campaign yet. Use <b>Add from database</b> above, or the <Link to="/farmers">Farmers</Link> page.</>} />
       )}
       <FarmerSheet farmer={openFarmer} state={state} onClose={() => setOpenFarmer(null)} />

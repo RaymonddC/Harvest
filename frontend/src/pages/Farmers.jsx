@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { campaignsOf, CROPS, useMembership } from "../campaigns.jsx";
+import { campaignsOf, CROPS, useCrop, useMembership } from "../campaigns.jsx";
 import FarmerForm from "../components/setup/FarmerForm.jsx";
 import FarmerList from "../components/setup/FarmerList.jsx";
 import FarmerSheet from "../components/setup/FarmerSheet.jsx";
-import { api, can, maskPhone } from "../lib.js";
+import { api, apiUrl, can, fmtKg, maskPhone } from "../lib.js";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 import { useAct } from "../toast.jsx";
@@ -81,6 +81,7 @@ export default function Farmers() {
 
   return (
     <Shell title="Farmers" head={head}>
+      {state && <Traceability />}
       {state && <FarmerList farmers={list} onEdit={setFarmerForm} onOpen={setOpenFarmer} showCampaign title={kind === "suppliers" ? "Suppliers" : "All farmers"} filters={filters}
         empty={all.length ? "No farmer matches these filters." : "No farmers yet. Add one, or upload a CSV."} />}
       <FarmerSheet farmer={openFarmer} state={state} onClose={() => setOpenFarmer(null)} />
@@ -149,5 +150,42 @@ function Allowlist({ state, onClose }) {
       <p className="small muted" style={{ marginTop: 10 }}>{mine.length} of {max} numbers added here. A number that belongs to a farmer is linked to them.</p>
       <DialogClose>Close</DialogClose>
     </Dialog>
+  );
+}
+
+// Where the fruit comes from: how many of the campaign's farmers have a mapped plot and a certification, who
+// delivers more than their plot can grow, and the traceability file for buyers (EUDR, RSPO, ISPO).
+function Traceability() {
+  const { state } = useLive();
+  const { cid, campaign } = useCrop();
+  const [t, setT] = useState(null);
+  const key = JSON.stringify(state.farmers.map((f) => [f.id, f.plot_lat, f.plot_ha, f.certification, f.campaign_id]));
+  useEffect(() => {
+    let live = true;
+    api(`/api/traceability?campaign=${encodeURIComponent(cid)}`, { method: "GET" }).then((r) => { if (live) setT(r); }).catch(() => {});
+    return () => { live = false; };
+  }, [cid, key]);
+  if (!t) return null;
+  const pct = (n) => (t.farmers ? Math.round((n / t.farmers) * 100) : 0);
+  return (
+    <section className="card trace-card" aria-labelledby="trace-title">
+      <div className="card-head">
+        <h2 id="trace-title">Traceability · {campaign.label}</h2>
+        <a className="btn sm" href={apiUrl(`/api/traceability.csv?campaign=${encodeURIComponent(cid)}`)} download="traceability.csv">Traceability CSV</a>
+      </div>
+      <div className="trace-stats">
+        <div><b>{pct(t.mapped)}%</b><span>{t.mapped} of {t.farmers} plots mapped</span><i style={{ width: `${pct(t.mapped)}%` }} /></div>
+        <div><b>{pct(t.certified)}%</b><span>{t.certified} certified (ISPO or RSPO)</span><i style={{ width: `${pct(t.certified)}%` }} /></div>
+        <div className={t.over_plot_yield.length ? "warn" : ""}><b>{t.over_plot_yield.length}</b><span>{t.over_plot_yield.length === 1 ? "farmer delivers" : "farmers deliver"} more than the plot can grow</span></div>
+      </div>
+      {t.over_plot_yield.length > 0 && (
+        <ul className="small trace-flags">
+          {t.over_plot_yield.slice(0, 5).map((x) => (
+            <li key={x.farmer_id}><b>{x.name}</b>: {fmtKg(x.delivered_kg_year)} kg in a year from a plot that grows about {fmtKg(x.max_kg_year)} kg. Check where the fruit comes from.</li>
+          ))}
+        </ul>
+      )}
+      <p className="small muted" style={{ margin: 0 }}>Each delivery in the CSV carries the farmer's plot location, area and certification. Add a plot on the farmer's Edit form.</p>
+    </section>
   );
 }

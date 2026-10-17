@@ -201,5 +201,55 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     planning weeks, calls made and planned, Monday calls, harvests with projected rounds, deal weeks, deliveries). Setup is
     now "Campaign". Price ranges stay per crop (campaigns of one crop share them).
 
+19. **Simpler dashboard and campaign dates (code done 17 Oct, branch `claude/flow-nav`).** The sidebar follows the
+    planner's flow (1 Prepare, 2 Call, 3 Watch, 4 Decide), with Agent under Settings and Users in the account menu; each
+    page opens with its step and the next page; the menu collapses to icons. Campaigns run from a start date to an end
+    date (`start_date`, `end_date`): the forecast shows week 1 (next week) up to the end, at most 12 weeks; weeks before a
+    later start are greyed out and never short. Older campaigns with only `weeks` still work. Fixed: chart bar layers drawn
+    as white pills (CSS class clash with the calendar toggle), projected rounds not drawn, phone pages scrolling sideways.
+
+20. **Mill operations (code done 17 Oct, branch `claude/mill-operations`).** The forecast shows supply by day, week,
+    month or year (`GET /api/supply`: expected, net deliveries, target, capacity, truck loads). Campaigns have the mill's
+    capacity per day, working days and truck load; weeks over capacity are a surplus with the farmers to move a week
+    later (texted). Deliveries carry weighbridge grading (unripe, dirt, other), the net weight and the price from the
+    matched purchase order, with a goods receipt and payment PDF. Official farmgate prices (Disbun) can drive the price
+    range. Farmers have plot location, area and certification; a traceability summary and CSV flag farmers who deliver
+    more than their plot can grow. Still to do: real Disbun price import (no public API found; entered by hand), voice
+    calls that ask farmers to deliver later (today the planner agrees it and the farmer gets a text), plot polygons.
+
+21. **Adjustable automatic calls, clearer Campaign page, more demo campaigns (17 Oct, same branch).** Each campaign's
+    automatic calls run on chosen weekdays at a chosen hour (Asia/Jakarta); Cloud Scheduler now calls
+    `/api/jobs/weekly` every hour (`scheduled_calls`), which does the weekly bookkeeping once a week from Monday 06:00
+    and starts the campaigns due that hour (`/api/jobs/run-all` runs everything by hand). The redeploy updates the
+    scheduler job. Wording now says calls are outbound and the browser is a demo phone. Demo data adds "Palm, Kampar"
+    and "Rubber" with their own farmers, history and a waiting offer (`load_seed(..., more_campaigns=True)`; tests use
+    the single-campaign demo).
+
+22. **Farmers as a CRM pipeline (17 Oct, same branch).** Who gets a harvest call is a rule now (`services.call_reason`,
+    mirrored in `frontend/src/crm.js`): no harvest answer, an unsure answer, a harvest date that has passed, or marked to
+    call (`to_call` is the planner's "always call"). Farmers with a firm, current answer are not called. Each farmer has
+    a stage (To call, Calling, No answer, Answered, Offer, Deal, Delivered) shown as a board or a list on the Campaign
+    page; the farmer page opens with the stage and next action and an activity timeline. The target chart shows each
+    week's dates, links to the calendar (`/calendar?date=`), and a click on a part lists the farmers behind it. Deals
+    carry `delivered_kg`. Not built yet: follow-up tasks with due dates, an owner per farmer.
+
+23. **Overview home and three steps (17 Oct, same branch).** `/` is now the Overview: the chain from farmers to
+    deliveries with a count at each link, have and lack against the target (total and per week, click a part to filter
+    the board), the full To do list (`frontend/src/todo.js`, shared with the sidebar) and the farmer pipeline board.
+    The Live forecast moved to `/forecast`. Sidebar: Overview, Live forecast, Calendar; then 1 Prepare (Farmers,
+    Campaign), 2 Call (Calls), 3 Decide (Approvals); Settings (Agent).
+
+24. **The agent's languages (17 Oct, same branch).** Per campaign (Agent page, persona fields `language_mode`,
+    `language`, `switch`, `also_speaks`): start in each farmer's own language or one language for every call; switch
+    when the farmer answers in another language (any on the list, or only the ones ticked), or never. The prompt's
+    language rule and the speech-to-text hint follow it (the hint lists extra languages only when ticked). Still to
+    check on a real call: switching mid-call, and the fixed opening wording for Thai, Vietnamese and Filipino.
+
+25. **Calls page shows answers; board drag and drop; clearer Campaign cards (17 Oct, same branch).** The Calls page
+    is a table of what each farmer said (harvest, firm or unsure, cycle, offer, extra answers) with filters; the demo
+    phone is a side panel. The pipeline board accepts drops that are real actions (To call: `PUT
+    /api/farmers/{id}/to-call`; Calling: call now; Offer to Deal: approve) and explains the others. The Campaign
+    step cards say Ready, fold the price details away, and the call card follows the running round.
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

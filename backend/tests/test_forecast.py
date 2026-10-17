@@ -19,8 +19,11 @@ def test_week_index_bounds():
 
 def test_seed_matches_wireframe(store):
     rows = sorted(store.list("forecast"), key=lambda r: r["week"])
-    assert [r["expected_kg"] for r in rows] == [t * 1000 for t in BASELINE_TONNES]
+    # The wireframe's weeks, plus a late week 5 with more fruit than the mill can press (the surplus demo).
+    assert [r["expected_kg"] for r in rows][:4] == [t * 1000 for t in BASELINE_TONNES[:4]]
+    assert rows[4]["expected_kg"] > BASELINE_TONNES[4] * 1000
     assert [r["is_gap"] for r in rows] == [False, False, True, False, False]
+    assert [r["is_surplus"] for r in rows] == [False, False, False, False, True]
     w3 = rows[2]
     assert w3["gap_kg"] == 39_000
     assert w3["unsure_count"] == 6
