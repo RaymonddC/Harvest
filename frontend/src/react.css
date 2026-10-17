@@ -1740,3 +1740,22 @@ body.app .steps.linked .drop { flex: 1; }
 
 /* Calls page: the live line above the answers */
 .live-now { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; font-size: 14px; }
+
+/* ---------- Calls on now: one live card per call ---------- */
+.live-calls { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin: 0 0 16px; }
+.live-card { padding: 14px 16px; gap: 10px; outline: none; }
+.live-card:focus-visible { box-shadow: 0 0 0 3px var(--g-action, #16774E); }
+.live-head { display: flex; align-items: center; gap: 10px; }
+.live-head div { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.live-head small { color: var(--muted); font-size: 12.5px; }
+.live-time { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--g-text, #12573A); }
+.live-lines { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-top: 1px solid var(--hairline, #E5E4DD); border-bottom: 1px solid var(--hairline, #E5E4DD); }
+.live-line { margin: 0; font-size: 14px; line-height: 1.45; }
+.live-line span { display: block; font-size: 12px; font-weight: 700; color: var(--muted); }
+.live-line.agent span { color: var(--g-text, #12573A); }
+.live-notes { display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.live-notes b { font-weight: 700; }
+tr.is-live td { background: #F2F8F4; }
+.dot-live { animation: live-pulse 1.6s ease-in-out infinite; }
+@keyframes live-pulse { 50% { box-shadow: 0 0 0 5px rgba(22, 119, 78, .15); } }
+@media (prefers-reduced-motion: reduce) { .dot-live { animation: none; } }

@@ -218,3 +218,14 @@ def test_a_new_round_replaces_old_calls_that_never_started(store, settings):
     r = services.start_campaign(store, settings, "collect", "current")
     assert r["replaced"] >= 1 and store.get("calls", old)["outcome"] == "withdrawn"
     assert any(c["farmer_id"] == fid and c["status"] == "queued" and c.get("campaign_id") == "current" for c in store.list("calls"))
+
+
+
+def test_the_live_view_is_cleared_when_a_call_ends(store, settings):
+    from app import services
+    farmer = next(f for f in store.list("farmers") if f.get("type", "farmer") == "farmer")
+    cid = services.queue_call(store, farmer, "collect")
+    store.set("calls", cid, {"status": "on_call", "live": [{"who": "agent", "text": "Halo"}], "live_notes": {"captured": {"kg": 1}}}, merge=True)
+    services.finish_call(store, settings, cid, ended_cleanly=True, outcome="completed", summary="ok", consent=False, transcript=[])
+    call = store.get("calls", cid)
+    assert call["live"] is None and call["live_notes"] is None and call["transcript"] is None

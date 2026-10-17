@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { inCampaign, useCrop } from "../campaigns.jsx";
 import CallRecap from "../components/forecast/CallRecap.jsx";
 import { apiUrl, callChip, fmtKg, KIND_WORD, plainPrice } from "../lib.js";
@@ -23,6 +23,62 @@ const when = (c) => c.ended_at || c.started_at || c.created_at;
 const fmtWhen = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
 const day = (iso) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) : "");
 
+const showLive = (id) => {
+  const el = document.getElementById(`live-${id}`);
+  if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); el.focus({ preventScroll: true }); }
+};
+const mmss = (from) => {
+  const s = Math.max(0, Math.round((Date.now() - new Date(from).getTime()) / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
+// The calls the agent is on right now: who, how long, the conversation as it happens (the service saves it about
+// once a second) and what the agent has noted so far. The text is dropped when the call ends; the recap keeps the
+// transcript only if the farmer agreed.
+function LiveCalls({ calls, farmers }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!calls.length) return undefined;
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [calls.length]);
+  if (!calls.length) return null;
+  return (
+    <section className="live-calls" aria-label="Calls on now">
+      {calls.map((c) => <LiveCard key={c.id} c={c} f={farmers.get(c.farmer_id) || {}} />)}
+    </section>
+  );
+}
+
+function LiveCard({ c, f }) {
+  const box = useRef(null);
+  const lines = c.live || [];
+  useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight; }, [lines.length, lines[lines.length - 1]?.text]);
+  const n = c.live_notes || {};
+  const cap = n.captured;
+  return (
+    <article className="live-card card" id={`live-${c.id}`} tabIndex={-1} aria-label={`Live call with ${c.farmer_name}`}>
+      <header className="live-head">
+        <Avatar name={c.farmer_name} id={c.farmer_id} cls="sm" />
+        <div><b>{c.farmer_name}</b><small>{[f.village, KIND_WORD[c.kind], c.channel === "twilio" ? "on their phone" : "on the demo phone"].filter(Boolean).join(", ")}</small></div>
+        <span className="live-time"><span className="dot-live" aria-hidden="true" />{c.started_at ? mmss(c.started_at) : "connecting"}</span>
+      </header>
+      <div className="live-lines" ref={box} aria-live="polite">
+        {lines.length ? lines.map((l, i) => (
+          <p key={i} className={`live-line ${l.who}`}><span>{l.who === "agent" ? "Agent" : c.farmer_name}</span>{l.text}</p>
+        )) : <p className="muted small">The call has just started. The conversation appears here as they speak.</p>}
+      </div>
+      {(cap || n.rail || n.offer_saved) && (
+        <footer className="live-notes">
+          {cap && <span><b>Harvest:</b> {cap.kg != null ? `${Number(cap.kg).toLocaleString("en-US")} kg` : ""}{cap.ready ? `, ${cap.ready}` : ""}{cap.status === "saved" ? ", saved" : ", being checked with the farmer"}</span>}
+          {n.rail && <span><b>Offer:</b> {n.rail.offer ? `${plainPrice(n.rail.offer, n.rail.currency || "IDR")}/kg` : "working it out"}{n.rail.counter ? `, farmer asks ${plainPrice(n.rail.counter, n.rail.currency || "IDR")}` : ""}</span>}
+          {n.offer_saved && <span><b>Deal:</b> {n.offer_saved.status === "escalated" ? "sent to you to decide" : "agreed, waiting for your approval"}</span>}
+        </footer>
+      )}
+    </article>
+  );
+}
+
 // What is on the phone right now, in one line: calls on now and phones ringing, and what is waiting.
 function LiveNow({ calls }) {
   const on = calls.filter((c) => c.status === "on_call").length;
@@ -33,7 +89,8 @@ function LiveNow({ calls }) {
   const waiting = [demo && `${n(demo, "demo call", "demo calls")} waiting on the demo phone`, callBack && `${n(callBack, "missed call", "missed calls")} to call back`].filter(Boolean).join(", ");
   return (
     <p className="live-now" aria-live="polite">
-      {on || ringing ? <><span className="dot-live" aria-hidden="true" /><b>{[on && `${n(on, "call", "calls")} on now`, ringing && `${n(ringing, "phone", "phones")} ringing`].filter(Boolean).join(", ")}</b></>
+      {on || ringing ? <><span className="dot-live" aria-hidden="true" /><b>{[on && `${n(on, "call", "calls")} on now`, ringing && `${n(ringing, "phone", "phones")} ringing`].filter(Boolean).join(", ")}</b>
+          {on > 0 && <span className="muted">: {calls.filter((c) => c.status === "on_call").map((c) => c.farmer_name).slice(0, 4).join(", ")}{on > 4 ? " and others" : ""}</span>}</>
         : <b>No call is on right now.</b>}
       {waiting && <span className="muted"> {waiting}.</span>}
     </p>
@@ -57,9 +114,9 @@ export default function Calls() {
     const answers = Object.values(c.answers || {});
     const missed = NOT_REACHED.includes(c.outcome) || c.status === "dropped";
     return { c, h, o, answers, missed, f: farmers.get(c.farmer_id) || {} };
-  }).sort((a, b) => {  // answered calls first (newest on top), calls still waiting at the end
-    const wa = ["queued", "on_call"].includes(a.c.status), wb = ["queued", "on_call"].includes(b.c.status);
-    return wa - wb || (when(b.c) || "").localeCompare(when(a.c) || "");
+  }).sort((a, b) => {  // calls on now first, then finished calls (newest on top), calls still waiting at the end
+    const rank = (c) => (c.status === "on_call" ? 0 : c.status === "queued" ? 2 : 1);
+    return rank(a.c) - rank(b.c) || (when(b.c) || "").localeCompare(when(a.c) || "");
   });
   const count = (fn) => rows.filter(fn).length;
   const is = {
@@ -102,6 +159,7 @@ export default function Calls() {
         </div>
       )}
       <LiveNow calls={calls} />
+      <LiveCalls calls={calls.filter((c) => c.status === "on_call")} farmers={farmers} />
       <div className="call-stats" role="group" aria-label="Filter calls">
         {stats.map((s) => (
           <button key={s.key} type="button" className={`call-stat ${filter === s.key ? "on" : ""} ${s.warn && s.n ? "warn" : ""}`} aria-pressed={filter === s.key} onClick={() => setFilter(s.key)}>
@@ -128,10 +186,11 @@ export default function Calls() {
               <tbody>
                 {list.map(({ c, h, o, answers, f }) => {
                   const chip = callChip(c);
-                  const open = !["queued", "on_call"].includes(c.status);
+                  const live = c.status === "on_call";
+                  const open = !["queued", "on_call"].includes(c.status) || live;
                   return (
-                    <tr key={c.id} className={open ? "clickable" : ""} onClick={open ? () => setShown(c) : undefined}
-                      tabIndex={open ? 0 : undefined} onKeyDown={open ? (e) => { if (e.key === "Enter") setShown(c); } : undefined}>
+                    <tr key={c.id} className={`${open ? "clickable" : ""} ${live ? "is-live" : ""}`} onClick={open ? () => (live ? showLive(c.id) : setShown(c)) : undefined}
+                      tabIndex={open ? 0 : undefined} onKeyDown={open ? (e) => { if (e.key === "Enter") (live ? showLive(c.id) : setShown(c)); } : undefined}>
                       <td>
                         <div className="who-cell"><Avatar name={c.farmer_name} cls="sm" /><div><b>{c.farmer_name}</b><span>{f.village || ""}{f.language ? `, ${f.language}` : ""}</span></div></div>
                       </td>

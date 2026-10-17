@@ -1430,6 +1430,8 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
         "summary": summary, "consent": bool(consent),
         # Consent notice: the transcript is kept only when the farmer agreed.
         "transcript": transcript if consent else None, "ended_at": now_iso(),
+        # The live view (the conversation while it ran) goes; only the transcript above is kept, and only with consent.
+        "live": None, "live_notes": None,
     }, merge=True)
     if (status == "done" and outcome == "completed" and call.get("kind") == "confirm"
             and call.get("offer_id")):
