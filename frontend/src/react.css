@@ -1594,3 +1594,68 @@ body.app .btn:active:not(:disabled) { transform: scale(.97); }
   .hc-menu[data-state="open"], details[open] > :not(summary) { animation: hc-fade .12s ease-out; }
   body.app .btn:active:not(:disabled) { transform: none; }
 }
+
+/* ==================== Fixes from the impeccable review of every page ==================== */
+/* Danger buttons stay red (the design-system pass painted every non-solid button white) */
+body.app .btn.danger-solid { background: #B3261E; border-color: #B3261E; color: #fff; }
+body.app .btn.danger-solid:hover:not(:disabled) { background: #8F1D17; border-color: #8F1D17; color: #fff; }
+
+/* A focus ring you can see on light and dark: action green on light surfaces (5.5:1), mint on the dark sidebar */
+body.app :focus-visible { outline: 3px solid var(--g-action, #16774E); outline-offset: 2px; }
+body.app .side :focus-visible { outline-color: #7FE0B4; }
+body.app .side .account:focus-visible { outline: 3px solid #7FE0B4; outline-offset: 2px; background: rgba(255, 255, 255, .11); }
+
+/* Form controls: borders at 3:1 against white */
+body.app input[type="text"], body.app input[type="search"], body.app input[type="date"], body.app input[type="number"],
+body.app select, body.app textarea, body.app .filter-select { border-color: #8E8D84; }
+body.app input[type="checkbox"], body.app input[type="radio"] { width: 18px; height: 18px; accent-color: var(--g-action, #16774E); }
+
+/* Sidebar labels in sentence case, readable */
+.nav-step { text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 700; }
+body.app .guide-toggle { text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.step-label, .tbd-week { text-transform: none; letter-spacing: 0; }
+body.app .guide-steps li.done > span { color: #A9C6B6; }
+
+/* The step line under the tabs: a plain line, not a tinted box */
+body.app .flow-line { background: none; border: 0; box-shadow: none; padding: 0 0 4px; border-bottom: 1px solid var(--hairline, #E5E4DD); border-radius: 0; }
+
+/* Campaign context next to a page title */
+.h1-ctx { margin-left: 10px; font-size: .6em; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+.h-ctx { margin-left: 6px; font-weight: 600; color: var(--muted); }
+.og-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+
+/* Stage chips: a soft wash, no coloured left edge */
+.stage-chip { border-left: 0 !important; background: var(--g-wash, #E4F1E9); color: var(--g-text, #12573A); }
+.stage-chip.st-to_call, .stage-chip.st-no_reply { background: #FBF0D9; color: #8A5605; }
+.stage-chip.st-calling { background: #E3EEF8; color: #23598A; }
+.stage-chip.st-offer { background: #F3E8D6; color: #6E4A10; }
+.stage-chip.st-delivered { background: #EEEFEF; color: #4B5563; }
+.next-action { border: 0; }
+.next-action::before { display: none !important; }
+
+/* Calls: filter chips with counts, not stat tiles */
+.call-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.call-stat { flex-direction: row; align-items: baseline; gap: 6px; padding: 0 14px; min-height: 40px; border-radius: 999px; background: #fff; border: 1px solid #CFCEC5; box-shadow: none; }
+.call-stat b { font-size: 15px; }
+.call-stat span { font-size: 13.5px; }
+.call-stat small { font-size: 12px; color: var(--muted); }
+.call-stat.on { background: var(--g-deep, #0F3D2A); border-color: var(--g-deep, #0F3D2A); color: #fff; }
+.call-stat.on span, .call-stat.on small { color: #D7E9DF; }
+.call-stat.warn b { color: #8A5605; }
+.call-stat.on.warn b { color: #FFD48A; }
+
+/* Campaign's dark Call card: columns split by a hairline, not three tiles; the time select readable */
+body.app .start-card .stats { gap: 0; }
+body.app .start-card .stats div { background: none; border-left: 1px solid rgba(255, 255, 255, .14); border-radius: 0; padding: 2px 14px; }
+body.app .start-card .stats div:first-child { border-left: 0; padding-left: 0; }
+body.app .start-card select { color: #1B231F; background: #fff; }
+
+/* Agent: the unsaved note */
+.unsaved-note { font-size: 13px; font-weight: 700; color: #8A5605; align-self: center; }
+
+/* Phones: tap targets at least 44px, content clear of the bottom bar, calendar chips as counts */
+@media (max-width: 860px) {
+  body.app .btn.sm, body.app .seg-toggle button, .call-stat { min-height: 44px; }
+  body.app main.page { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .cal-chip { font-size: 0 !important; width: 8px; height: 8px; min-height: 0; padding: 0 !important; border-radius: 50%; overflow: hidden; display: inline-block; margin: 1px; }
+}

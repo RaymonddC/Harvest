@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { useLive } from "../../live.jsx";
 import { DeliveryBox } from "../setup/FarmerSheet.jsx";
-import { Dialog } from "../../ui.jsx";
+import { Dialog, DialogClose } from "../../ui.jsx";
 import { api, apiUrl, offerPoUrl, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar, Pill } from "../../ui.jsx";
@@ -71,6 +71,8 @@ function RecordDelivery({ o }) {
       <Dialog open={open} onClose={() => setOpen(false)} title={`Delivery from ${farmer.name}`}>
         <p className="small muted" style={{ margin: "4px 0 10px" }}>Deal: {Math.round(o.kg).toLocaleString("en-US")} kg at {plainPrice(o.price_per_kg, o.currency || "IDR")}/kg. Enter what the weighbridge weighed; the receipt (PDF) is under All deliveries.</p>
         <DeliveryBox farmer={farmer} stateKey={String(o.delivered_kg || 0)} />
+        <p className="small muted" style={{ margin: "10px 0" }}>Enter the gross kg to add the delivery.</p>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}><DialogClose>Done</DialogClose></div>
       </Dialog>
     </>
   );

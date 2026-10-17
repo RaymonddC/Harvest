@@ -89,7 +89,7 @@ export default function Approvals() {
       }, ok: "Back to pending." });
   };
   const gap = [...view.forecast].sort((a, b) => a.week - b.week).find((r) => r.is_gap);
-  const group = (title, n, extra) => <div className="offer-group"><h3>{title}<span className="count">{n}</span></h3>{extra}</div>;
+  const group = (title, n, extra) => <div className="offer-group"><h2 className="og-title">{title} <span className="count">{n}</span></h2>{extra}</div>;
 
   return (
     <Shell title="Approvals" head={head}>

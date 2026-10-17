@@ -64,6 +64,12 @@ export default function Calendar() {
   const [shownTypes, setShownTypes] = useState(() => new Set(TYPES.map((t) => t.key)));
   const [data, setData] = useState(null);
   const [day, setDay] = useState(() => iso(asked || new Date()));
+  // A day outside the month on screen has no data loaded: move the selection into the month (today if it is there).
+  useEffect(() => {
+    if (new Date(`${day}T00:00:00`).getMonth() === month.getMonth()) return;
+    const now = new Date();
+    setDay(iso(now.getMonth() === month.getMonth() && now.getFullYear() === month.getFullYear() ? now : month));
+  }, [month]); // eslint-disable-line react-hooks/exhaustive-deps
   const [error, setError] = useState("");
 
   const gridStart = mondayOf(month);

@@ -26,6 +26,7 @@ function UserForm({ user, roles, onClose, onSaved }) {
     setSaving(false);
     onSaved();
   };
+  const self = editing && user.id === getSession()?.id;  // editing yourself: keep your own role and sign-in
   return (
     <Dialog open={!!user} onClose={onClose} title={editing ? `Edit ${user.name}` : "Add a user"}>
       <form onSubmit={save}>
@@ -43,14 +44,14 @@ function UserForm({ user, roles, onClose, onSaved }) {
             {editing && user.demo_login && <span className="hint">This account still uses the demo password. A new one takes it off the sign-in page's demo list.</span>}
           </label>
           <label className="field">Role
-            <select required value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}>
+            <select required value={f.role} disabled={self} title={self ? "You cannot change your own role" : undefined} onChange={(e) => setF({ ...f, role: e.target.value })}>
               {roles.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
             </select>
           </label>
           <p className="sub" style={{ margin: 0 }}>{help}</p>
           {editing && (
             <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
-              <input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Can sign in
+              <input type="checkbox" checked={f.active} disabled={self} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Can sign in{self ? " (you cannot turn yourself off)" : ""}
             </label>
           )}
         </div>

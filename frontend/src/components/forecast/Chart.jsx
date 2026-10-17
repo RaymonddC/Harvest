@@ -54,7 +54,9 @@ function Col({ r, target, children }) {
   return (
     <Tooltip.Root open={open} onOpenChange={setOpen}>
       <Tooltip.Trigger asChild>
-        <div className={`col ${r.is_gap ? "is-gap" : ""} ${r.before_start ? "before-start" : ""}`} tabIndex={0} onClick={() => setOpen((o) => !o)}>{children}</div>
+        <div className={`col ${r.is_gap ? "is-gap" : ""} ${r.before_start ? "before-start" : ""}`} tabIndex={0} role="button" aria-expanded={open}
+          aria-label={`${r.label}: ${Math.round(r.expected_kg / 100) / 10} of ${Math.round(r.target_kg / 100) / 10} t expected${r.is_gap ? ", short" : ""}. Show the breakdown`}
+          onClick={() => setOpen((o) => !o)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}>{children}</div>
       </Tooltip.Trigger>
       <Tooltip.Portal>
         <Tooltip.Content className="chart-tip" side="top" sideOffset={6} collisionPadding={12}>

@@ -58,7 +58,7 @@ export default function Overview() {
   const head = (
     <div className="page-head">
       <div>
-        <h1>Overview{campaign.label ? ` · ${campaign.label}` : ""}</h1>
+        <h1>Overview{campaign.label ? <span className="h1-ctx">{campaign.label}</span> : null}</h1>
         <p>What we have, what we lack, and what to do next. Every number links to where it comes from.</p>
       </div>
     </div>

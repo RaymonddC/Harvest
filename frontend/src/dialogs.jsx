@@ -44,7 +44,7 @@ export function UnsavedProvider({ children }) {
   // Moving to another page inside the app: resolves true when it is fine to go.
   const guard = useCallback(async () => {
     if (!ref.current) return true;
-    const go = await confirm({ title: "Leave without saving?", body: "You changed the price range but did not save it. Leaving drops those changes.",
+    const go = await confirm({ title: "Leave without saving?", body: "You have changes on this page that are not saved. Leaving drops them.",
       confirm: "Leave without saving", cancel: "Stay on this page", danger: true });
     if (go) setUnsaved(false);
     return go;

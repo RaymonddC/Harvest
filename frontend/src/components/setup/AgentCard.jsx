@@ -171,6 +171,7 @@ export default function AgentCard({ state, cid }) {
         {allowed ? <SubmitButton busy={saving} disabled={!dirty} busyText="Saving…">Save agent</SubmitButton>
           : <button type="button" className="btn solid" disabled title="Your role cannot change the agent.">Save agent</button>}
         {dirty && <button type="button" className="btn ghost" onClick={() => setDirty(false)}>Discard changes</button>}
+        {dirty && <span className="unsaved-note">Unsaved changes</span>}
       </div>
     </form>
   );

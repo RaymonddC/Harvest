@@ -67,7 +67,7 @@ export default function Calls() {
   const head = (
     <div className="page-head">
       <div>
-        <h1>Calls{campaign.label ? ` · ${campaign.label}` : ""}</h1>
+        <h1>Calls{campaign.label ? <span className="h1-ctx">{campaign.label}</span> : null}</h1>
         <p>What each farmer told the agent. Click a call for the full recap and transcript.</p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -87,7 +87,7 @@ export default function Calls() {
       <div className="call-stats" role="group" aria-label="Filter calls">
         {stats.map((s) => (
           <button key={s.key} type="button" className={`call-stat ${filter === s.key ? "on" : ""} ${s.warn && s.n ? "warn" : ""}`} aria-pressed={filter === s.key} onClick={() => setFilter(s.key)}>
-            <b>{s.n}</b><span>{s.label}</span>{s.sub && <small>{s.sub}</small>}
+            <span>{s.label}</span><b>{s.n}</b>{s.sub && s.n > 0 && <small>{s.sub}</small>}
           </button>
         ))}
       </div>

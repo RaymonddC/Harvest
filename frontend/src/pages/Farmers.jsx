@@ -127,7 +127,7 @@ function Traceability() {
   return (
     <section className="card trace-card" aria-labelledby="trace-title">
       <div className="card-head">
-        <h2 id="trace-title">Traceability · {campaign.label}</h2>
+        <h2 id="trace-title">Traceability <span className="h-ctx">{campaign.label}</span></h2>
         <a className="btn sm" href={apiUrl(`/api/traceability.csv?campaign=${encodeURIComponent(cid)}`)} download="traceability.csv">Traceability CSV</a>
       </div>
       <dl className="trace-rows">
