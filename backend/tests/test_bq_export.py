@@ -44,3 +44,14 @@ def test_export_loads_every_table_and_saves_the_ml_forecast(store, settings):
     assert set(bq.loaded) == set(bq_export.TABLES) and bq.loaded["deliveries"] == len(store.list("deliveries"))
     assert "ARIMA_PLUS" in bq.queries[0] and out["ml_forecast"]["days"] == 1
     assert store.get("ml_forecast", "palm-2026-10-20")["kg"] == 6100
+
+
+def test_no_delivery_history_is_saved_as_such(store, settings):
+    s = dataclasses.replace(settings, bigquery_dataset="harvest")
+    bq = FakeBQ()
+
+    def query(sql):
+        raise RuntimeError("400 Input data doesn't contain any rows.")
+    bq.query = query
+    out = bq_export.export(store, s, client=bq)
+    assert out["ml_forecast"]["no_history"] and store.get("campaigns", "current")["bigquery_export"]["ml_no_history"]

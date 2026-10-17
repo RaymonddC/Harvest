@@ -17,6 +17,7 @@ export default function MlForecast({ state, crop, rows }) {
     return { label: r.label, said: r.expected_kg, ml: inWeek.length ? kg : null, low: inWeek.reduce((n, d) => n + d.low, 0), high: inWeek.reduce((n, d) => n + d.high, 0) };
   });
   const made = days[0]?.made_at;
+  const exp = (state.campaigns || []).find((c) => c.id === "current")?.bigquery_export;
   return (
     <section className="card ml-card" aria-labelledby="ml-title">
       <div className="card-head"><h2 id="ml-title">What the history says</h2></div>
@@ -37,7 +38,11 @@ export default function MlForecast({ state, crop, rows }) {
           </table>
           <p className="small muted" style={{ margin: 0 }}>Trained {made ? new Date(made).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}. A big difference means the answers or the history need a second look.</p>
         </>
-      ) : <p className="small muted" style={{ margin: 0 }}>The first BigQuery run has not finished yet. It runs every hour.</p>}
+      ) : (
+        <p className="small muted" style={{ margin: 0 }}>{exp?.ml_no_history
+          ? "BigQuery has the data, but no weighbridge deliveries are recorded yet, so there is no history to learn from. Record deliveries (Approvals, Record delivery) and the forecast appears on the next hourly run."
+          : "The first BigQuery run has not finished yet. It runs every hour."}</p>
+      )}
       {on && can("campaign.run") && (
         <ActButton className="btn sm" busy="Sending to BigQuery…" run={() => act(() => api("/api/bigquery/export", { body: {} }),
           (r) => `Sent to BigQuery${r.ml_forecast?.days ? `; forecast for ${r.ml_forecast.days} days` : ""}.`)}>Refresh from BigQuery</ActButton>

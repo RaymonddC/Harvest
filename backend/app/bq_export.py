@@ -119,8 +119,10 @@ def export(store: Store, settings: Settings, client=None) -> dict:
         out["ml_forecast"] = ml_forecast(store, settings, client)
     except Exception as e:  # noqa: BLE001 - the export stands even if the model cannot train yet
         log.warning("BigQuery ML forecast failed", exc_info=True)
-        out["ml_forecast"] = {"error": str(e)[:300]}
-    store.set("campaigns", "current", {"bigquery_export": {k: v for k, v in out.items() if k != "ml_forecast"}}, merge=True)
+        text = str(e)
+        out["ml_forecast"] = {"error": text[:300], **({"no_history": True} if "doesn't contain any rows" in text or "too few" in text.lower() else {})}
+    store.set("campaigns", "current", {"bigquery_export": {**{k: v for k, v in out.items() if k != "ml_forecast"},
+                                                           "ml_no_history": bool(out["ml_forecast"].get("no_history"))}}, merge=True)
     return out
 
 
