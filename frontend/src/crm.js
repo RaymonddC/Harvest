@@ -55,7 +55,8 @@ export function crmOf(state, cid) {
   const list = state.farmers.filter((f) => f.type !== "supplier" && farmerCampaign(f, camps) === cid).map((f) => {
     const h = harvests.get(f.id) || null;
     const mine = (calls.get(f.id) || []).sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
-    const open = mine.find((c) => ["queued", "on_call"].includes(c.status));
+    // An undialled retry of a missed phone call waits for the planner: the farmer is "No answer", not "Calling".
+    const open = mine.find((c) => c.status === "on_call" || (c.status === "queued" && !(c.channel === "twilio" && (c.attempt || 1) > 1 && !c.dialed_at)));
     const last = mine.find((c) => !["queued", "on_call"].includes(c.status));
     const fo = offers.get(f.id) || [];
     const pending = fo.find((o) => ["pending", "escalated"].includes(o.status));
@@ -67,7 +68,7 @@ export function crmOf(state, cid) {
     else if (deal) stage = deal.delivered_kg > 0 ? "delivered" : "deal";
     else if (reason && last && (last.kind === "collect" || last.kind === "gap_fill") && NOT_REACHED.includes(last.outcome)) stage = "no_reply";
     else if (reason) stage = "to_call";
-    return { farmer: f, harvest: h, reason, stage, open, last, pending, deal };
+    return { farmer: f, harvest: h, reason, stage, open, last, pending, deal, byHand: !!state.settings?.phone_calls && !f.agent_calls };
   });
   const counts = Object.fromEntries(STAGES.map((s) => [s.key, 0]));
   const reasons = Object.fromEntries(Object.keys(REASONS).map((k) => [k, 0]));
@@ -81,8 +82,9 @@ export function crmOf(state, cid) {
 // The farmers who need a harvest call, and the ones the forecast has nothing current from (no answer, or out of date).
 export function toCallOf(state, cid) {
   const { farmers } = crmOf(state, cid);
-  const toCall = farmers.filter((x) => x.reason);
+  const toCall = farmers.filter((x) => x.reason && !x.byHand);  // the agent's list; by-hand farmers are the planner's
+  const byHand = farmers.filter((x) => x.reason && x.byHand);
   const unknown = toCall.filter((x) => x.reason === "no_answer" || x.reason === "date_passed");
-  return { toCall: toCall.map((x) => x.farmer), unknown: unknown.map((x) => x.farmer),
+  return { toCall: toCall.map((x) => x.farmer), byHand: byHand.map((x) => x.farmer), unknown: unknown.map((x) => x.farmer),
     usualKg: unknown.reduce((n, x) => n + (x.farmer.usual_kg_week || 0), 0) };
 }

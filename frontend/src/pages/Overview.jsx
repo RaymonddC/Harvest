@@ -41,14 +41,16 @@ export default function Overview() {
   const c = crm.counts;
   const offersKg = state ? inCampaign(state, state.offers, cid).filter((o) => ["pending", "escalated"].includes(o.status)).reduce((n, o) => n + o.kg, 0) : 0;
   const deals = state ? inCampaign(state, state.offers, cid).filter((o) => o.status === "approved") : [];
+  // Where the campaign's farmers stand, left to right. "bar" is how many farmers sit in that stage now (the strip on
+  // top); the figure under each label is what that stage holds in tonnes.
   const chain = [
-    { label: "Farmers", n: crm.farmers.length, sub: "in this campaign", to: "/setup#farmer-list" },
-    { label: "Need a call", n: (c.to_call || 0) + (c.no_reply || 0) + (c.calling || 0), sub: "no current answer", to: "/setup#farmer-list", warn: true },
-    { label: "Answered", n: c.answered || 0, sub: `${fmtT(have)} t counted`, to: "/forecast" },
-    { label: "Offers", n: c.offer || 0, sub: `${fmtT(offersKg)} t waiting`, to: "/approvals", warn: (c.offer || 0) > 0 },
-    { label: "Deals", n: deals.length, sub: `${fmtT(deals.reduce((n, o) => n + o.kg, 0))} t agreed`, to: "/approvals" },
-    { label: "Delivered", n: c.delivered || 0, sub: `${fmtT(deals.reduce((n, o) => n + (o.delivered_kg || 0), 0))} t in`, to: "/forecast" },
+    { key: "call", label: "Need a call", n: (c.to_call || 0) + (c.no_reply || 0) + (c.calling || 0), sub: "no current answer", to: "/setup#farmer-list", warn: true },
+    { key: "answered", label: "Answered", n: c.answered || 0, sub: `${fmtT(have)} t counted`, to: "/forecast" },
+    { key: "offer", label: "Offers", n: c.offer || 0, sub: `${fmtT(offersKg)} t waiting`, to: "/approvals", warn: (c.offer || 0) > 0 },
+    { key: "deal", label: "Deals", n: c.deal || 0, sub: `${fmtT(deals.reduce((n, o) => n + o.kg, 0))} t agreed`, to: "/approvals" },
+    { key: "delivered", label: "Delivered", n: c.delivered || 0, sub: `${fmtT(deals.reduce((n, o) => n + (o.delivered_kg || 0), 0))} t in`, to: "/forecast" },
   ];
+  const total = Math.max(1, crm.farmers.length);
   const items = todoItems(state, cid);
   const pick = (f) => { setFilter(f); setTimeout(() => document.getElementById("farmer-list")?.scrollIntoView({ block: "start", behavior: "smooth" }), 50); };
 
@@ -64,12 +66,22 @@ export default function Overview() {
     <Shell title="Overview" head={head}>
       {state && (
         <>
-          <section className="card chain-card" aria-label="From farmers to deliveries">
+          <section className="card chain-card" aria-labelledby="chain-title">
+            <div className="chain-top">
+              <h2 id="chain-title"><Link to="/setup#farmer-list">{crm.farmers.length} farmers</Link> in this campaign</h2>
+              <span className="small muted">where each one stands</span>
+            </div>
+            <div className="chain-bar" aria-hidden="true">
+              {chain.filter((s) => s.n).map((s) => <span key={s.key} className={`cb-${s.key}`} style={{ flexGrow: s.n }} title={`${s.label}: ${s.n}`} />)}
+            </div>
             <ol className="chain">
-              {chain.map((s, i) => (
-                <li key={s.label} className={s.warn && s.n ? "warn" : ""}>
-                  <Link to={s.to}><b>{s.n}</b><span>{s.label}</span><small>{s.sub}</small></Link>
-                  {i < chain.length - 1 && <i aria-hidden="true">→</i>}
+              {chain.map((s) => (
+                <li key={s.key} className={`cb-${s.key} ${s.warn && s.n ? "warn" : ""}`}>
+                  <Link to={s.to}>
+                    <span className="ch-label"><i aria-hidden="true" />{s.label}</span>
+                    <span className="ch-n num">{s.n}<small> of {total}</small></span>
+                    <small>{s.sub}</small>
+                  </Link>
                 </li>
               ))}
             </ol>
@@ -78,21 +90,23 @@ export default function Overview() {
           <div className="ov-grid">
             <section className="card" aria-labelledby="have-title">
               <div className="card-head">
-                <h2 id="have-title">Have and lack · {data.length} weeks, target {fmtT(target)} t</h2>
+                <div>
+                  <h2 id="have-title" className="have-say"><b className="num">{fmtT(have)} t</b> of the {fmtT(target)} t target is in hand</h2>
+                  <span className="sub">Next {data.length} weeks. {sum("missing") > 0 ? `${fmtT(sum("missing"))} t still has to be found` : "Nothing left to find"}{sum("unknown") > 0 ? `, and about ${fmtT(sum("unknown"))} t more should come once ${supply.unknown.length} farmers answer.` : "."}</span>
+                </div>
                 <Link className="btn sm" to="/forecast">Live forecast</Link>
-              </div>
-              <div className="have-tiles">
-                {parts.map((p) => (
-                  <div key={p.key} className={`have-tile ${p.key}`}>
-                    <span><i className={p.cls} />{p.label}</span>
-                    <b>{fmtT(p.kg)} t</b>
-                    <small>{target ? `${Math.round((p.kg / target) * 100)}% of the target · ` : ""}{p.note}</small>
-                  </div>
-                ))}
               </div>
               <div className="have-bar" role="img" aria-label={parts.map((p) => `${p.label} ${fmtT(p.kg)} t`).join(", ")}>
                 {parts.map((p) => p.kg > 0 && <i key={p.key} className={p.cls} style={{ flexGrow: p.kg }} />)}
               </div>
+              <dl className="have-ledger">
+                {parts.map((p) => (
+                  <div key={p.key} className={p.key}>
+                    <dt><i className={p.cls} />{p.label}</dt>
+                    <dd><b className="num">{fmtT(p.kg)} t</b><small>{p.note}</small></dd>
+                  </div>
+                ))}
+              </dl>
               <TargetBreakdown rows={rows} unknownKg={supply.usualKg} compact onPick={(d, part) => pick(farmersBehind(state, cid, d, part, supply.unknown))} />
             </section>
 
@@ -100,11 +114,10 @@ export default function Overview() {
               <h2 id="todo-title">What to do next</h2>
               {items.length ? (
                 <ol className="todo-list">
-                  {items.map((it, i) => (
+                  {items.map((it) => (
                     <li key={it.key} className={it.tone}>
-                      <span className="todo-n">{i + 1}</span>
                       <div><b>{it.what}</b><small>{it.next}</small></div>
-                      <Link className="btn sm" to={it.to}>Go</Link>
+                      <Link className="btn sm" to={it.to}>{it.verb || "Open"}</Link>
                     </li>
                   ))}
                 </ol>

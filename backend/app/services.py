@@ -603,10 +603,17 @@ def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_w
 def update_campaign(store: Store, settings: Settings, ref: str, name: str | None = None,
                     target_kg_per_week: float | None = None, weeks: int | None = None,
                     start_date: str | None = None, end_date: str | None = None, daily_capacity_kg: float | None = None,
-                    working_days: int | None = None, truck_kg: float | None = None) -> dict:
-    """Rename a campaign, or change its weekly target or its dates (or weeks). Fields left out stay as they are."""
+                    working_days: int | None = None, truck_kg: float | None = None, segment: dict | None = None) -> dict:
+    """Rename a campaign, or change its weekly target, its dates (or weeks) or the segment of farmers it calls.
+    Fields left out stay as they are; segment {} calls everyone again."""
     camp = need_campaign(store, settings, ref)
-    from . import mill_ops
+    from . import crm, mill_ops
+
+    if segment is not None:
+        try:
+            segment = crm.check_segment(segment) or {}
+        except crm.CrmError as e:
+            raise ServiceError(str(e)) from None
 
     dates = _check_dates(settings, start_date, end_date)
     _check_campaign_fields(target_kg_per_week, weeks, name)
@@ -620,6 +627,8 @@ def update_campaign(store: Store, settings: Settings, ref: str, name: str | None
     if dates:
         changes.update(dates)
         changes["weeks"] = campaign_weeks(settings, dates)
+    if segment is not None:
+        changes["segment"] = segment or None
     store.set("campaigns", camp["id"], changes, merge=True)
     recompute_forecast(store, settings)
     return {**camp, **changes}
@@ -1183,9 +1192,28 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
     else:
         raise ServiceError("Campaign kind must be collect or gap_fill.")
     targets = [f for f in targets if not f.get("do_not_call")]
+    # Real phone calls go only to farmers with Agent calls on; the rest are the planner's to call by hand. The demo
+    # phone rings no real phone, so a demo round can use every farmer on the list.
+    by_hand = [f for f in targets if not f.get("agent_calls")] if channel == "twilio" else []
+    targets = [f for f in targets if f.get("agent_calls")] if channel == "twilio" else targets
+    if camp.get("segment"):  # the campaign is aimed at one segment of its farmers
+        from . import crm, track_record
+
+        rel = track_record.reliabilities(store)
+        outside = [f for f in targets if not crm.in_segment(crm.segment_of(f, rel.get(f["id"])), camp["segment"])]
+        targets = [f for f in targets if f not in outside]
+        if not targets and outside:
+            raise ServiceError(f"No {label} farmer to call is in this campaign's segment. Change the segment or call everyone.")
     if not targets:
+        if by_hand:
+            raise ServiceError(f"None of the {len(by_hand)} {label} farmers to call has Agent calls on, so they are yours "
+                               "to call. Turn Agent calls on for the farmers the agent should phone.")
         raise ServiceError(f"No {label} farmers are ready to call. Add farmers to this campaign first.")
     queued = 0
+    target_ids = {f["id"] for f in targets}
+    # Leftovers from another campaign, from before campaigns, or undialled retries; this round's own calls stay.
+    replaced = withdraw_calls(store, lambda c: c["farmer_id"] in target_ids and c.get("kind") == kind
+                              and (c.get("campaign_id") != camp["id"] or (c.get("attempt") or 1) > 1))
     for farmer in sorted(targets, key=lambda f: f["id"]):
         if not _open_call_for(store, farmer["id"], kind):
             queue_call(store, farmer, kind, gap_week=gap_week, channel=channel, campaign_id=camp["id"],
@@ -1195,13 +1223,72 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
                                         "gap_week": gap_week, "crop": crop, "channel": channel}, merge=True)
     dialled = dial_next(store, settings) if channel == "twilio" else None
     return {"queued": queued, "kind": kind, "gap_week": gap_week, "crop": crop, "campaign_id": camp["id"],
-            "channel": channel, "dialled": dialled}
+            "channel": channel, "dialled": dialled, "by_hand": len(by_hand), "replaced": replaced}
 
 
 def stop_campaign(store: Store, settings: Settings, crop: str | None = None) -> dict:
+    """Stop a campaign and withdraw its calls that have not started (a phone already ringing or a call on now is
+    left to finish)."""
     camp = need_campaign(store, settings, crop)
     store.set("campaigns", camp["id"], {"status": "stopped", "stopped_at": now_iso()}, merge=True)
-    return {"status": "stopped", "crop": campaign_crop(settings, camp), "campaign_id": camp["id"]}
+    members = {f["id"] for f in campaign_members(store, settings, camp["id"])}
+    withdrawn = withdraw_calls(store, lambda c: c.get("campaign_id") == camp["id"]
+                               or (not c.get("campaign_id") and c["farmer_id"] in members))
+    return {"status": "stopped", "crop": campaign_crop(settings, camp), "campaign_id": camp["id"],
+            "calls_withdrawn": withdrawn}
+
+
+def withdraw_calls(store: Store, which=None) -> int:
+    """End calls that are waiting and have not started: never answered in the call client, or a retry nobody dialled.
+    They stay in the history as "withdrawn" (no retry), so a farmer no longer shows as being called."""
+    n = 0
+    for c in store.list("calls"):
+        if c["status"] != "queued" or c.get("dialed_at") or c.get("kind") == "confirm":
+            continue
+        if which and not which(c):
+            continue
+        store.set("calls", c["id"], {"status": "dropped", "outcome": "withdrawn", "summary": "Withdrawn before it started.",
+                                     "ended_at": now_iso()}, merge=True)
+        n += 1
+    return n
+
+
+def withdraw_farmer_calls(store: Store, settings: Settings, farmer_id: str) -> dict:
+    if not store.get("farmers", farmer_id):
+        raise ServiceError("Farmer not found.")
+    n = withdraw_calls(store, lambda c: c["farmer_id"] == farmer_id)
+    refresh_campaign_status(store, settings)
+    return {"farmer_id": farmer_id, "calls_withdrawn": n}
+
+
+STALE_AFTER = dt.timedelta(minutes=20)
+
+
+def heal_stale_calls(store: Store, settings: Settings, now: dt.datetime | None = None) -> int:
+    """A call left "on call" by a server restart (or by a channel that no longer exists) would block its farmer for
+    ever. A call still on after its time limit plus STALE_AFTER, or on a channel that is gone, is ended as dropped
+    (no retry). A phone that rang without an answer and never got Twilio's final status is ended the same way."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    limit = dt.timedelta(seconds=settings.max_call_seconds) + STALE_AFTER
+    n = 0
+    for c in store.list("calls"):
+        gone = c.get("channel") not in (None, "browser", "twilio")
+        if c["status"] == "on_call":
+            since = c.get("started_at")
+        elif c["status"] == "queued" and (c.get("dialed_at") or gone):
+            since = c.get("dialed_at") or c.get("created_at")
+        else:
+            continue
+        try:
+            old = now - dt.datetime.fromisoformat(since) > limit
+        except (TypeError, ValueError):
+            old = True
+        if gone or old:
+            store.set("calls", c["id"], {"status": "dropped", "outcome": c.get("outcome") or "dropped",
+                                         "summary": c.get("summary") or "The call ended without a result.",
+                                         "ended_at": now_iso()}, merge=True)
+            n += 1
+    return n
 
 
 def call_now(store: Store, farmer_id: str, kind: str | None = None, settings: Settings | None = None) -> str:
@@ -1231,55 +1318,19 @@ def phone_calls_ready(settings: Settings) -> bool:
     return twilio_ready(settings) and settings.real_calls_enabled
 
 
-# ---------- the real-call allowlist ----------
-# A real call (and a real text) only goes to a number on the allowlist: REAL_CALL_ALLOWLIST on the server, plus the
-# numbers planners add in the dashboard (collection allowed_numbers, at most WEB_ALLOWLIST_MAX of them).
-
-def _number_id(e164: str) -> str:
-    return "n" + e164.lstrip("+")
-
+# ---------- who real calls may reach ----------
+# A real call (and a real text) only goes to a farmer with Agent calls on (the farmer's agent_calls), or to a number in
+# REAL_CALL_ALLOWLIST on the server ("*" lets any number through).
 
 def allowed_numbers(store: Store | None, settings: Settings) -> set[str]:
     nums = {n for n in settings.real_call_allowlist if n != "*"}
     if store is not None:
-        nums |= {d["phone"] for d in store.list("allowed_numbers") if d.get("phone")}
+        nums |= {normalize_phone(f["phone"]) for f in store.list("farmers") if f.get("agent_calls") and f.get("phone")}
     return nums
 
 
 def number_allowed(store: Store | None, settings: Settings, e164: str) -> bool:
     return "*" in settings.real_call_allowlist or e164 in allowed_numbers(store, settings)
-
-
-def allow_number(store: Store, settings: Settings, phone: str, label: str = "", farmer_id: str | None = None,
-                 actor=None) -> dict:
-    """Add a number to the real-call allowlist from the dashboard."""
-    if settings.web_allowlist_max <= 0:
-        raise ServiceError("Adding numbers from the dashboard is turned off (WEB_ALLOWLIST_MAX=0). "
-                           "Add them to REAL_CALL_ALLOWLIST on the server.")
-    e164 = normalize_phone(phone or "")
-    if not 8 <= len(e164) <= 16:
-        raise ServiceError(f"The phone number {phone!r} does not look right.")
-    nid = _number_id(e164)
-    old = store.get("allowed_numbers", nid)
-    mine = store.list("allowed_numbers")
-    if not old and len(mine) >= settings.web_allowlist_max:
-        raise ServiceError(f"The dashboard allowlist is full ({settings.web_allowlist_max} numbers). Remove one first, "
-                           "or raise WEB_ALLOWLIST_MAX on the server.")
-    if farmer_id and not store.get("farmers", farmer_id):
-        raise ServiceError("Farmer not found.")
-    if not farmer_id:  # link it to the farmer with this number, when there is one
-        farmer_id = next((f["id"] for f in store.list("farmers") if normalize_phone(f.get("phone") or "") == e164), None)
-    doc = {"phone": e164, "label": (label or "").strip()[:60] or None, "farmer_id": farmer_id,
-           "added_by": actor.name if actor else "Planner", "added_at": (old or {}).get("added_at") or now_iso()}
-    store.set("allowed_numbers", nid, doc)
-    return {"id": nid, **doc}
-
-
-def disallow_number(store: Store, number_id: str) -> dict:
-    if not store.get("allowed_numbers", number_id):
-        raise ServiceError("That number is not on the dashboard allowlist.", status=404)
-    store.delete("allowed_numbers", number_id)
-    return {"deleted": number_id}
 
 
 def phone_calls_note(settings: Settings, store: Store | None = None) -> str:
@@ -1295,8 +1346,8 @@ def phone_calls_note(settings: Settings, store: Store | None = None) -> str:
     if "*" in settings.real_call_allowlist:
         return "Real phone calls are on, to any number."
     n = len(allowed_numbers(store, settings))
-    return (f"Real phone calls are on, only to the {n} number{'s' if n != 1 else ''} on the allowlist."
-            if n else "Real phone calls are on, but the allowlist is empty, so every number is refused.")
+    return (f"Real phone calls are on, only to farmers with Agent calls on ({n} number{'s' if n != 1 else ''})."
+            if n else "Real phone calls are on, but no farmer has Agent calls on yet.")
 
 
 def stream_token(settings: Settings, call_id: str) -> str:
@@ -1355,9 +1406,8 @@ def _dialable_number(store: Store, settings: Settings, farmer: dict) -> str:
     # types into the upload CSV) - Twilio's Calls API wants strict E.164, no separators.
     to_number = normalize_phone(phone)
     if not number_allowed(store, settings, to_number):
-        raise ServiceError(f"{to_number} is not on the real-call allowlist. This is a safety gate, not a bug: "
-                           "allow the number on the farmer's page or in Phone allowlist on the Farmers page "
-                           "(or in REAL_CALL_ALLOWLIST on the server).")
+        raise ServiceError(f"Agent calls is off for {farmer.get('name', 'this farmer')}, so the agent may not phone "
+                           f"{to_number}. Turn Agent calls on for this farmer first.")
     return to_number
 
 
@@ -1423,16 +1473,26 @@ _dial_lock = threading.Lock()
 
 
 def dial_next(store: Store, settings: Settings) -> str | None:
-    """Phone campaigns ring one farmer at a time: the Live API allows only a few sessions at once,
-    and a planner can follow one call. Dial the oldest waiting first-attempt phone call of a running
-    phone campaign, unless a phone call is already ringing or in progress. A farmer the safety gate
-    refuses is skipped (the call ends as dropped with the reason, no retry) and the next one is tried.
-    Retries of missed calls are left for the planner to dial (see dial_now)."""
+    """Phone campaigns ring PHONE_CALLS_AT_ONCE farmers at the same time (each call is a Gemini Live session, and the
+    Live API allows only a few at once). Dial the oldest waiting first-attempt phone calls of a running phone campaign
+    until that many are ringing or in progress. A farmer the safety gate refuses is skipped (the call ends as dropped
+    with the reason, no retry) and the next one is tried. Retries of missed calls are left for the planner to dial
+    (see dial_now). Returns the first call dialled, if any."""
+    first, seen = None, set()
+    while True:
+        placed = _dial_one(store, settings)
+        if not placed or placed in seen:  # never loop on a call that did not leave the waiting list
+            return first
+        seen.add(placed)
+        first = first or placed
+
+
+def _dial_one(store: Store, settings: Settings) -> str | None:
     with _dial_lock:
         calls = store.list("calls")
-        if any(c.get("channel") == "twilio" and (c["status"] == "on_call"
-                                                 or (c["status"] == "queued" and c.get("dialed_at")))
-               for c in calls):
+        busy = sum(1 for c in calls if c.get("channel") == "twilio" and (
+            c["status"] == "on_call" or (c["status"] == "queued" and c.get("dialed_at"))))
+        if busy >= settings.phone_calls_at_once:
             return None
         phone_crops = {normalize_crop(c.get("crop") or settings.demo_crop) for c in store.list("campaigns")
                        if c.get("status") == "running" and c.get("channel") == "twilio"}
@@ -1551,6 +1611,9 @@ def _farmer_fields(row: dict) -> tuple[str, dict]:
         "name": row["name"], "phone": row["phone"], "crop": crop,
         "language": language, "village": row.get("village", ""), "usual_kg_week": usual,
         "can_pull_forward": row.get("can_pull_forward", "").lower() in ("1", "yes", "true"),
+        # agent_calls: the AI agent phones this farmer. Off (the default), the planner calls them by hand; it is also
+        # the real-call allowlist (number_allowed).
+        "agent_calls": row.get("agent_calls", "").lower() in ("1", "yes", "true"),
         **mill_ops.plot_fields(row),
     }
 
@@ -1602,7 +1665,7 @@ def delete_farmer(store: Store, farmer_id: str) -> dict:
     if not store.get("farmers", farmer_id):
         raise ServiceError("Farmer not found.")
     for c in store.list("calls"):
-        if c["farmer_id"] == farmer_id and c["status"] == "on_call":
+        if c["farmer_id"] == farmer_id and c["status"] == "on_call" and c.get("channel", "browser") in ("browser", "twilio"):
             raise ServiceError("This farmer is on a call right now. Try again when it ends.")
     withdrawn = 0
     for c in store.list("calls"):

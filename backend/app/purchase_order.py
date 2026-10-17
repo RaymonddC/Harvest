@@ -175,6 +175,9 @@ def for_delivery(store: Store, settings: Settings, delivery_id: str) -> tuple[st
     row("Net weight paid for", _kg(d.get("net_kg", d.get("kg", 0))), bold=True)
     row("Price per kg", _money(price, cur) if price is not None else "No price set")
     row("Amount to pay", _money(d["amount"], cur) if d.get("amount") is not None else "-", bold=True)
+    paid_on = (d.get("paid_at") or "")[:10]
+    row("Payment", (f"Paid on {_day(paid_on)}" + (f", ref. {d['payment_ref']}" if d.get("payment_ref") else "")) if d.get("paid")
+        else "Not paid yet", bold=True)
     pdf.ln(6)
     pdf.set_font("Helvetica", "", 10)
     if d.get("po_number"):

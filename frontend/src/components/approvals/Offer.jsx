@@ -1,4 +1,8 @@
 import { motion } from "motion/react";
+import { useState } from "react";
+import { useLive } from "../../live.jsx";
+import { DeliveryBox } from "../setup/FarmerSheet.jsx";
+import { Dialog } from "../../ui.jsx";
 import { api, apiUrl, offerPoUrl, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { useConfirm } from "../../dialogs.jsx";
@@ -54,9 +58,25 @@ function proof(o, l, quote, price) {
 }
 
 const money = (n, cur) => (cur === "IDR" ? `Rp ${Math.round(n).toLocaleString("en-US")}` : `${n.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${cur}`);
-const TEXT_WORD = { sent: "Text sent", failed: "Text failed", not_sent: "Text not sent" };
 
 // imp: what approving this offer alone does to every week (from /api/approvals/impact), and its cost.
+// The weighbridge entry for an approved deal: the farmer's delivery form (gross kg, grading), with the receipts.
+function RecordDelivery({ o }) {
+  const [open, setOpen] = useState(false);
+  const { state } = useLive();
+  const farmer = state?.farmers.find((f) => f.id === o.farmer_id);
+  if (!farmer) return null;
+  return (
+    <>
+      <button type="button" className="btn sm leaf" onClick={() => setOpen(true)}>Record delivery</button>
+      <Dialog open={open} onClose={() => setOpen(false)} title={`Delivery from ${farmer.name}`}>
+        <p className="small muted" style={{ margin: "4px 0 10px" }}>Deal: {Math.round(o.kg).toLocaleString("en-US")} kg at {plainPrice(o.price_per_kg, o.currency || "IDR")}/kg. Enter what the weighbridge weighed; the receipt (PDF) is under All deliveries.</p>
+        <DeliveryBox farmer={farmer} stateKey={String(o.delivered_kg || 0)} />
+      </Dialog>
+    </>
+  );
+}
+
 export default function Offer({ o, l, row, quote, confirming = false, imp = null }) {
   const act = useAct();
   const confirm = useConfirm();
@@ -112,11 +132,8 @@ export default function Offer({ o, l, row, quote, confirming = false, imp = null
       )}
       {o.status === "approved" && (
         <div className="text-line">
-          <span className="small muted">{o.text_status ? TEXT_WORD[o.text_status] || o.text_status : "No written confirmation yet"}{o.text_status === "not_sent" ? " (see Messages)" : ""}</span>
-          <ActButton need="offers.decide" className="btn sm ghost" busy="Sending…"
-            run={() => act(() => api(`/api/offers/${o.id}/send-confirmation`), (m) => (m && m.status === "sent" ? "Text sent to the farmer." : `Recorded, not sent: ${m?.reason || ""}`))}>
-            {o.text_status ? "Send text again" : "Send text"}</ActButton>
           <a className="btn sm" href={apiUrl(offerPoUrl(o.id))} download>Purchase order (PDF)</a>
+          <RecordDelivery o={o} />
         </div>
       )}
       {checks.length > 0 && (

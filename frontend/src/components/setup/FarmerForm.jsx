@@ -6,7 +6,7 @@ import { useAct } from "../../toast.jsx";
 import { Dialog, DialogClose, SubmitButton } from "../../ui.jsx";
 
 const LANGUAGES = ["Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese", "Thai", "Vietnamese", "Filipino"];
-const EMPTY = { name: "", phone: "", crop: "palm", language: "Bahasa Indonesia", village: "", usual_kg_week: "", can_pull_forward: false, campaign_id: "", allow_calls: false,
+const EMPTY = { name: "", phone: "", crop: "palm", language: "Bahasa Indonesia", village: "", usual_kg_week: "", can_pull_forward: false, agent_calls: false, campaign_id: "",
   plot_lat: "", plot_lng: "", plot_ha: "", certification: "" };
 
 // Add a farmer (farmer = {}, or { crop, campaign_id } to start in a campaign) or edit one (farmer = the record);
@@ -21,7 +21,7 @@ export default function FarmerForm({ farmer, onClose }) {
     setF(editing ? {
       name: farmer.name || "", phone: farmer.phone || "", crop: farmer.crop || "palm",
       language: farmer.language || "Bahasa Indonesia", village: farmer.village || "",
-      usual_kg_week: farmer.usual_kg_week || "", can_pull_forward: !!farmer.can_pull_forward,
+      usual_kg_week: farmer.usual_kg_week || "", can_pull_forward: !!farmer.can_pull_forward, agent_calls: !!farmer.agent_calls,
       plot_lat: farmer.plot_lat ?? "", plot_lng: farmer.plot_lng ?? "", plot_ha: farmer.plot_ha ?? "", certification: farmer.certification || "",
     } : { ...EMPTY, crop: farmer.crop || EMPTY.crop, campaign_id: farmer.campaign_id || "" });
   }, [farmer, editing]);
@@ -34,7 +34,7 @@ export default function FarmerForm({ farmer, onClose }) {
     e.preventDefault();
     const body = { ...f, usual_kg_week: f.usual_kg_week ? Number(f.usual_kg_week) : null,
       plot_lat: String(f.plot_lat ?? ""), plot_lng: String(f.plot_lng ?? ""), plot_ha: String(f.plot_ha ?? "") };
-    if (editing) { delete body.campaign_id; delete body.allow_calls; }
+    if (editing) delete body.campaign_id;
     setSaving(true);
     await act(() => (editing ? api(`/api/farmers/${farmer.id}`, { method: "PUT", body }) : api("/api/farmers", { body })),
       () => { onClose(); return editing ? "Farmer saved." : "Farmer added."; });
@@ -67,11 +67,9 @@ export default function FarmerForm({ farmer, onClose }) {
           <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
             <input type="checkbox" checked={f.can_pull_forward} onChange={set("can_pull_forward")} /> Can bring the harvest forward
           </label>
-          {!editing && state?.settings?.phone_calls && can("campaign.run") && !state.settings.allow_any_number && (
-            <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
-              <input type="checkbox" checked={f.allow_calls} onChange={set("allow_calls")} /> Allow real phone calls to this number (adds it to the allowlist)
-            </label>
-          )}
+          <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
+            <input type="checkbox" checked={!!f.agent_calls} onChange={set("agent_calls")} disabled={!can("campaign.run")} /> The AI agent calls this farmer (off: you call them yourself)
+          </label>
           <fieldset className="plot-fields">
             <legend>Plot, for traceability <small className="muted">(optional)</small></legend>
             <div className="grid3">

@@ -46,13 +46,13 @@ export const gapFillBody = (state) => ({ kind: "gap_fill", channel: state?.setti
 // The real-call allowlist: the server's numbers (REAL_CALL_ALLOWLIST) plus the ones added in the dashboard.
 // Same comparison as the backend: "+" and the digits.
 export const e164 = (phone) => `+${String(phone || "").replace(/\D/g, "")}`;
+// Real calls reach farmers with Agent calls on, and the numbers in REAL_CALL_ALLOWLIST on the server.
 export const numberAllowed = (state, phone) => {
   const s = state?.settings || {};
   if (s.allow_any_number) return true;
   const n = e164(phone);
-  return (s.server_allowlist || []).includes(n) || (state?.allowed_numbers || []).some((x) => x.phone === n);
+  return (s.server_allowlist || []).includes(n) || (state?.farmers || []).some((f) => f.agent_calls && e164(f.phone) === n);
 };
-export const allowedEntry = (state, phone) => (state?.allowed_numbers || []).find((x) => x.phone === e164(phone)) || null;
 // Purchase orders (PDF): an approved deal, or what a finished call agreed (a draft when only a harvest was saved).
 export const offerPoUrl = (id) => `/api/offers/${encodeURIComponent(id)}/purchase-order.pdf`;
 export const callPoUrl = (id) => `/api/calls/${encodeURIComponent(id)}/purchase-order.pdf`;

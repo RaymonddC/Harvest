@@ -43,15 +43,13 @@ export default function TargetBreakdown({ rows, unknownKg, compact = false, onPi
   const focus = data.find((d) => d.is_gap) || data.find((d) => d.missing > 0 && !d.before_start) || data[0];
   return (
     <div className={`tbd ${compact ? "compact" : ""}`}>
-      <div className="tbd-head" aria-live="polite">
-        <span className="tbd-week">{focus.label} · target {fmtT(focus.target_kg)} t</span>
-        <div className="tbd-figs">
-          <span><i className="tb-there" /><b>{fmtT(focus.there)} t</b> there</span>
-          {focus.waiting > 0 && <span><i className="tb-waiting" /><b>{fmtT(focus.waiting)} t</b> waiting for you</span>}
-          {focus.unknown > 0 && <span><i className="tb-unknown" /><b>{fmtT(focus.unknown)} t</b> not answered yet</span>}
-          <span className={focus.missing ? "need" : "ok"}><i className="tb-missing" /><b>{focus.missing ? `${fmtT(focus.missing)} t` : "Nothing"}</b> still to add</span>
-        </div>
-      </div>
+      {!compact && (
+        <p className="tbd-say" aria-live="polite">
+          {focus.missing
+            ? <>Week {focus.week} ({span(focus.week_start)}) still needs <b>{fmtT(focus.missing)} t</b>: {fmtT(focus.there)} t is there{focus.waiting ? `, ${fmtT(focus.waiting)} t waits for your approval` : ""}{focus.unknown ? `, and about ${fmtT(focus.unknown)} t should come from farmers who have not answered` : ""}.</>
+            : <>Every week is covered once the farmers answer.</>}
+        </p>
+      )}
       <div className="tbd-legend small" aria-hidden="true">
         {PARTS.map((p) => <span key={p.key}><i className={p.cls} />{p.label}</span>)}
         <span><i className="tb-target" />Target</span>

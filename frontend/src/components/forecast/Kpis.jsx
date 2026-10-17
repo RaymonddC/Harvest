@@ -1,12 +1,10 @@
 import { fmtT } from "../../lib.js";
 
-// A figure, a line of context under it, and (optionally) a bar showing how far it has got.
-const Kpi = ({ label, cls = "", value, note, share }) => (
-  <div className={`kpi ${cls}`}>
-    <span className="label">{label}</span>
-    <span className="value">{value}</span>
-    {share !== undefined && <div className="bar" aria-hidden="true"><i style={{ width: `${Math.min(Math.max(share, 0), 1) * 100}%` }} /></div>}
-    {note && <span className="kpi-note">{note}</span>}
+// One figure in the line under the notice: a label, the figure, and a few words of context.
+const Kpi = ({ label, value, note }) => (
+  <div className="fact">
+    <dt>{label}</dt>
+    <dd><b>{value}</b>{note && <small>{note}</small>}</dd>
   </div>
 );
 
@@ -19,7 +17,7 @@ export default function Kpis({ rows, calls, toCall }) {
   const done = calls.filter((c) => ["done", "declined"].includes(c.status)).length;
   const onTrack = rows.filter((r) => !r.is_gap).length;
   return (
-    <div className="kpis" id="kpis" aria-live="polite">
+    <dl className="facts-line" id="kpis" aria-live="polite">
       <Kpi label="Weekly target" value={`${fmtT(target)} t`} note={`${onTrack} of ${rows.length} weeks on track`} share={onTrack / rows.length} />
       <Kpi label={`Week ${focus.week} expected`} value={`${fmtT(focus.expected_kg)} t`}
         note={`${Math.round((focus.expected_kg / target) * 100)}% of the target`} share={focus.expected_kg / target} />
@@ -27,6 +25,6 @@ export default function Kpis({ rows, calls, toCall }) {
         ? <Kpi label="Calls" value={<span>{done} <small>of {calls.length} done</small></span>} share={done / calls.length}
           note={calls.length - done ? `${calls.length - done} still to go` : "Every farmer answered"} />
         : <Kpi label="Calls" value={toCall ? `${toCall} ready` : "None yet"} note={toCall ? "Start calling on the Campaign page" : "Add farmers on the Setup page"} />}
-    </div>
+    </dl>
   );
 }

@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import Messages from "../components/approvals/Messages.jsx";
 import Meter from "../components/approvals/Meter.jsx";
 import Offer from "../components/approvals/Offer.jsx";
 import { api, gapFillBody, gapFillToast, plainPrice, startUrl } from "../lib.js";
@@ -170,7 +169,6 @@ export default function Approvals() {
             {impact.all_pending.new_gaps.length > 0 && <p className="warn">Approving every waiting offer would open a gap in {impact.all_pending.new_gaps.join(" and ")}.</p>}
           </section>
         )}
-        <Messages state={state} />
       </div>
       </div>
     </Shell>

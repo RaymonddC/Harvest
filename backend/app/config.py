@@ -88,9 +88,9 @@ class Settings:
     plan_start_auto: bool = False
     job_token: str | None = None  # protects POST /api/jobs/weekly (Cloud Scheduler sends it as X-Job-Token)
     messaging_channel: str = "off"  # "sms" or "whatsapp" sends texts over Twilio; "off" only records them
+    phone_calls_at_once: int = 3  # a phone campaign rings this many farmers at the same time (each is a Live session)
     twilio_whatsapp_from: str | None = None  # the WhatsApp sender, when messaging_channel is "whatsapp"
     planner_alert_to: tuple[str, ...] = ()  # numbers that get the planner's alerts (gaps, waiting offers)
-    web_allowlist_max: int = 20  # numbers planners may add to the real-call allowlist from the dashboard; 0 turns it off
 
 
 def _load_dotenv(folders: tuple[Path, ...] | None = None) -> None:
@@ -160,12 +160,12 @@ def get_settings() -> Settings:
         twilio_whatsapp_from=os.environ.get("TWILIO_WHATSAPP_FROM") or None,
         planner_alert_to=tuple(normalize_phone(n) for n in (os.environ.get("PLANNER_ALERT_TO") or "").split(",")
                                if n.strip()),
-        web_allowlist_max=max(0, int(os.environ.get("WEB_ALLOWLIST_MAX") or "20")),
         twilio_account_sid=os.environ.get("TWILIO_ACCOUNT_SID") or None,
         twilio_auth_token=os.environ.get("TWILIO_AUTH_TOKEN") or None,
         twilio_from_number=os.environ.get("TWILIO_FROM_NUMBER") or None,
         public_base_url=os.environ.get("PUBLIC_BASE_URL") or None,
         real_calls_enabled=_bool("REAL_CALLS_ENABLED", False),
+        phone_calls_at_once=max(1, min(10, int(os.environ.get("PHONE_CALLS_AT_ONCE", "3") or 3))),
         real_call_allowlist=tuple(
             n if n == "*" else normalize_phone(n)
             for n in (n.strip() for n in os.environ.get("REAL_CALL_ALLOWLIST", "").split(","))

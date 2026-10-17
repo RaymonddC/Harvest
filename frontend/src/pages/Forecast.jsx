@@ -106,7 +106,7 @@ export default function Forecast() {
           {state && rows.find((r) => r.is_surplus) && <SurplusCard row={rows.find((r) => r.is_surplus)} cid={cid} />}
           <section className="card" aria-labelledby="calls-title">
             <div className="card-head">
-              <h2 id="calls-title">Live calls</h2>
+              <h2 id="calls-title">Calls</h2>
               <Link to="/calls">Open the calls</Link>
             </div>
             {state ? <Calls calls={view.calls} onShow={setShown} /> : <div className="rows" id="calls" />}

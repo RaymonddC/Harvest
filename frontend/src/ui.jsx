@@ -2,6 +2,7 @@ import * as RDialog from "@radix-ui/react-dialog";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { can, getSession, ICON_PATHS, initials, roleLabel } from "./lib.js";
+import FarmerFace from "./components/FarmerFace.jsx";
 
 // Props that switch a control off, with the reason, when the signed-in role lacks the right.
 // The server still checks every request.
@@ -19,9 +20,13 @@ export function Icon({ name, size = 18 }) {
 // person: a soft colour picked from the name, the same every time, so people are easy to tell apart.
 const TINTS = 6;
 const tintOf = (name = "") => [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % TINTS;
-export const Avatar = ({ name, cls = "", person = false }) => (
-  <span className={`avatar ${cls} ${person ? `person-tint t${tintOf(name)}` : ""}`.replace(/\s+/g, " ").trim()} aria-hidden="true">{initials(name)}</span>
-);
+export const Avatar = ({ name, id, cls = "", person = false }) => {
+  if (!/\bink\b/.test(cls)) {  // a person: their drawn portrait (FarmerFace); "ink" marks an organisation (a supplier)
+    const size = /\blg\b/.test(cls) ? 44 : /\bsm\b/.test(cls) ? 30 : person ? 42 : 34;
+    return <FarmerFace name={name} id={id} size={size} className={`avatar-face ${/\bgrey\b/.test(cls) ? "quiet" : ""}`} />;
+  }
+  return <span className={`avatar ${cls} ${person ? `person-tint t${tintOf(name)}` : ""}`.replace(/\s+/g, " ").trim()} aria-hidden="true">{initials(name)}</span>;
+};
 
 export const Pill = ({ children, cls = "" }) => <span className={`pill ${cls}`.trim()}>{children}</span>;
 

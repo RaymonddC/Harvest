@@ -87,10 +87,10 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
     const allowed = numberAllowed(state, f.phone);
     const body = allowed
       ? `This places a real phone call to ${maskPhone(f.phone)}. The AI agent talks to whoever answers.`
-      : `${maskPhone(f.phone)} is not on the real-call allowlist yet. Allowing it lets the agent phone this number (and send texts to it) from now on. The AI agent talks to whoever answers.`;
-    if (await confirm({ title: `Call ${f.name}'s phone?`, body, confirm: allowed ? "Call by phone" : "Allow and call" })) {
+      : `Agent calls is off for ${f.name}. Turning it on lets the agent phone ${maskPhone(f.phone)} from now on, also in campaigns. The AI agent talks to whoever answers.`;
+    if (await confirm({ title: `Have the agent call ${f.name}?`, body, confirm: allowed ? "Call by phone" : "Turn on and call" })) {
       act(async () => {
-        if (!allowed) await api("/api/allowed-numbers", { body: { phone: f.phone, label: f.name, farmer_id: f.id } });
+        if (!allowed) await api(`/api/farmers/${f.id}/agent-calls`, { method: "PUT", body: { agent_calls: true } });
         return api(`/api/farmers/${f.id}/dial`, { body: {} });
       }, `Calling ${f.name}'s phone…`);
     }
@@ -122,6 +122,7 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
               {showCampaign && <SortHead col={{ key: "campaign", label: "Campaign" }} sort={sort} setSort={sortBy} />}
               {showCampaign && <th>Plot</th>}
               {extraCol && <th>{extraCol.label}</th>}
+              <th title="On: the AI agent phones this farmer. Off: you call them yourself.">Agent calls</th>
               <SortHead col={COLUMNS[3]} sort={sort} setSort={sortBy} className="r" />
               <th style={{ paddingRight: 22 }}><span className="sr-only">Actions</span></th>
             </tr>
@@ -129,7 +130,7 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
           <tbody id="farmer-rows">
             {rows.slice(first, first + PAGE).map((f) => (
               <tr key={f.id}>
-                <td style={{ paddingLeft: 22 }}><button type="button" className="who-cell who-link" onClick={() => onOpen?.(f)} aria-label={`Open ${f.name}`}><Avatar name={f.name} cls="sm" /><div><b>{f.name}</b><span>{f.village || ""}</span></div></button></td>
+                <td style={{ paddingLeft: 22 }}><button type="button" className="who-cell who-link" onClick={() => onOpen?.(f)} aria-label={`Open ${f.name}`}><Avatar name={f.name} id={f.id} cls="sm" /><div><b>{f.name}</b><span>{f.village || ""}</span></div></button></td>
                 <td className="num">{maskPhone(f.phone)}</td>
                 <td>{f.language}</td>
                 <td>{cropLabel(f.crop)}</td>
@@ -150,6 +151,14 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
                     : <span className="small muted">Not mapped</span>}</td>
                 )}
                 {extraCol && <td>{extraCol.render(f)}</td>}
+                <td>
+                  <label className={`mini-switch ${f.agent_calls ? "on" : ""}`} title={f.agent_calls ? "The agent calls this farmer" : "You call this farmer"}>
+                    <input type="checkbox" role="switch" checked={!!f.agent_calls} disabled={!can("campaign.run")} aria-label={`Agent calls ${f.name}`}
+                      onChange={() => act(() => api(`/api/farmers/${f.id}/agent-calls`, { method: "PUT", body: { agent_calls: !f.agent_calls } }),
+                        f.agent_calls ? `${f.name} is yours to call now.` : `The agent will phone ${f.name}.`)} />
+                    <span className="track" aria-hidden="true"><i /></span>
+                  </label>
+                </td>
                 <td className="r num">{f.usual_kg_week ? fmtKg(f.usual_kg_week) : "–"}</td>
                 <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
                   {phoneCalls && <><ActButton need="campaign.run" className="btn sm leaf" busy="Calling…" run={() => dial(f)}>Call phone</ActButton>{" "}</>}
@@ -159,6 +168,10 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
                     <Menu.Portal>
                       <Menu.Content className="hc-menu" align="end" sideOffset={4}>
                         <Menu.Item className="hc-menu-item" disabled={!can("farmers.manage")} onSelect={() => onEdit(f)}>Edit</Menu.Item>
+                        {state.calls.some((c) => c.farmer_id === f.id && c.status === "queued" && !c.dialed_at && c.kind !== "confirm") && (
+                          <Menu.Item className="hc-menu-item" disabled={!can("campaign.run")}
+                            onSelect={() => act(() => api(`/api/farmers/${f.id}/withdraw-calls`, { body: {} }), (r) => `${r.calls_withdrawn} waiting call${r.calls_withdrawn === 1 ? "" : "s"} for ${f.name} cancelled.`)}>Cancel waiting calls</Menu.Item>
+                        )}
                         {cid && <Menu.Item className="hc-menu-item" disabled={!can("farmers.manage")} onSelect={() => moveFarmer(act, f, cid, "")}>Remove from campaign</Menu.Item>}
                         <Menu.Item className="hc-menu-item danger" disabled={!can("farmers.manage")} onSelect={() => remove(f)}>Delete…</Menu.Item>
                       </Menu.Content>

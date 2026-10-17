@@ -1,6 +1,7 @@
 import * as RDialog from "@radix-ui/react-dialog";
 import { useEffect, useState } from "react";
-import { allowedEntry, api, apiUrl, callChip, can, cropLabel, fmtKg, KIND_WORD, maskPhone, numberAllowed, offerPoUrl, plainPrice } from "../../lib.js";
+import { api, apiUrl, callChip, can, cropLabel, fmtKg, KIND_WORD, maskPhone, offerPoUrl, plainPrice } from "../../lib.js";
+import { AgentToggle, Notes, Standing, useCrmOf } from "./Relationship.jsx";
 import { useConfirm } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar, needs, Pill } from "../../ui.jsx";
@@ -113,7 +114,7 @@ function AnswerRow({ call, qid, a }) {
 }
 
 // What the farmer promised against what they delivered, and adding or removing a delivery.
-function DeliveryBox({ farmer, stateKey }) {
+export function DeliveryBox({ farmer, stateKey }) {
   const act = useAct();
   const confirm = useConfirm();
   const [rec, setRec] = useState(null);
@@ -138,9 +139,17 @@ function DeliveryBox({ farmer, stateKey }) {
       setTick((n) => n + 1);
     }
   };
+  const markPaid = async (d) => {
+    const ref = window.prompt(`Mark ${fmtKg(d.net_kg ?? d.kg)} kg (${d.amount != null ? plainPrice(d.amount, d.currency || "IDR") : "no amount"}) as paid. Transfer reference (optional):`, "");
+    if (ref === null) return;
+    await act(() => api(`/api/deliveries/${d.id}/payment`, { method: "PUT", body: { paid: true, ref } }), "Marked as paid.");
+    setTick((n) => n + 1);
+  };
   if (!rec) return null;
+  const unpaid = rec.deliveries.filter((d) => !d.paid);
   return (
     <div className="delivery-box">
+      {unpaid.length > 0 && <p className="unpaid-line"><b>{unpaid.length} {unpaid.length === 1 ? "delivery" : "deliveries"} not paid yet</b>{unpaid.some((d) => d.amount != null) ? `: ${plainPrice(unpaid.reduce((n, d) => n + (d.amount || 0), 0), unpaid[0].currency || "IDR")}` : ""}</p>}
       <p>{rec.reliability != null
         ? <><b>{Math.round(rec.reliability * 100)}%</b> of promised kg delivered, over {rec.weeks.length} recorded weeks.</>
         : rec.weeks.length ? `${rec.weeks.length} recorded week so far; a reliability score needs 2.` : "No deliveries recorded against a promise yet."}</p>
@@ -163,12 +172,16 @@ function DeliveryBox({ farmer, stateKey }) {
         </div>
       )}
       {rec.deliveries.length > 0 && (
-        <details style={{ marginTop: 8 }}>
+        <details style={{ marginTop: 8 }} open={unpaid.length > 0}>
           <summary>All deliveries ({rec.deliveries.length})</summary>
           <ul className="fs-list">
             {rec.deliveries.map((d) => (
               <li key={d.id} className="row"><span className="name">{day(d.date)} · {fmtKg(d.kg)} kg{d.deduction_pct ? ` − ${d.deduction_pct}% = ${fmtKg(d.net_kg)} kg net` : ""}
                 {d.amount != null && <small className="muted"> · {plainPrice(d.amount, d.currency || "IDR")}{d.po_number ? ` (${d.po_number})` : " (reference price)"}</small>}</span>
+                {d.paid
+                  ? <span className="paid-tag" title={d.payment_ref ? `Ref. ${d.payment_ref}` : undefined}>Paid {day(d.paid_at)}</span>
+                  : can("offers.decide") ? <ActButton className="btn sm" busy="Saving…" run={() => markPaid(d)}>Mark paid</ActButton>
+                  : <span className="unpaid-tag">Not paid yet</span>}
                 <a className="btn sm ghost" href={apiUrl(`/api/deliveries/${d.id}/receipt.pdf`)} download>Receipt</a>
                 {can("farmers.manage") && <button type="button" className="btn sm ghost" onClick={() => remove(d)}>Remove</button>}</li>
             ))}
@@ -179,28 +192,9 @@ function DeliveryBox({ farmer, stateKey }) {
   );
 }
 
-// Whether real phone calls may reach this farmer's number, with Allow or Remove (the allowlist).
-function PhoneAllow({ f, state }) {
-  const act = useAct();
-  if (!state?.settings?.phone_calls) return null;
-  const allowed = numberAllowed(state, f.phone);
-  const entry = allowedEntry(state, f.phone);
-  return (
-    <span className="phone-allow">
-      <Pill cls={allowed ? "mint" : ""}>{allowed ? "Real phone calls allowed" : "Real phone calls not allowed"}</Pill>
-      {!allowed && can("campaign.run") && (
-        <ActButton className="btn sm" busy="Allowing…" run={() => act(() => api("/api/allowed-numbers", { body: { phone: f.phone, label: f.name, farmer_id: f.id } }), `${f.name}'s number can now be called.`)}>Allow</ActButton>
-      )}
-      {entry && can("campaign.run") && (
-        <ActButton className="btn sm ghost" busy="Removing…" run={() => act(() => api(`/api/allowed-numbers/${entry.id}`, { method: "DELETE" }), "Number removed from the allowlist.")}>Remove</ActButton>
-      )}
-      {allowed && !entry && <span className="small muted">set on the server</span>}
-    </span>
-  );
-}
 
 // The farmer's history as one timeline, newest first (a CRM contact's activity): calls, harvest answers and edits,
-// offers and decisions, deliveries and texts.
+// offers and decisions, and deliveries.
 function activityOf(state, f) {
   const out = [];
   const when = (iso) => (iso ? new Date(iso) : null);
@@ -219,9 +213,6 @@ function activityOf(state, f) {
     out.push({ t: o.created_at, kind: "offer", what: `Offer: ${fmtKg(o.kg)} kg at ${plainPrice(o.price_per_kg, o.currency || "IDR")}/kg`, detail: o.deliver_week_start ? `for the week of ${o.deliver_week_start}` : "" });
     if (o.decided_at) out.push({ t: o.decided_at, kind: o.status === "approved" ? "deal" : "offer", what: `Offer ${o.status} by ${o.decided_by || "Planner"}`, detail: o.delivered_kg ? `${fmtKg(o.delivered_kg)} kg delivered so far` : "" });
   }
-  for (const m of (state.messages || []).filter((x) => x.farmer_id === f.id)) {
-    out.push({ t: m.created_at, kind: "message", what: `Text (${(m.kind || "").replace(/_/g, " ")}): ${m.status === "sent" ? "sent" : "recorded, not sent"}`, detail: m.body || "" });
-  }
   return out.filter((x) => x.t).sort((a, b) => when(b.t) - when(a.t));
 }
 
@@ -239,6 +230,7 @@ export default function FarmerSheet({ farmer, state, onClose }) {
   const cid = f && state ? farmerCampaign(f, campaignsOf(state)) : null;
   const crm = f && state && cid ? crmOf(state, cid).byId.get(f.id) : null;
   const activity = f && state ? activityOf(state, f) : [];
+  const rel = useCrmOf(f?.id, JSON.stringify([state?.notes?.length, state?.calls?.length, state?.offers?.length, f?.usual_kg_week, f?.certification]));
 
   return (
     <RDialog.Root open={!!farmer} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -247,12 +239,12 @@ export default function FarmerSheet({ farmer, state, onClose }) {
         <RDialog.Content className="hc-sheet" aria-describedby={undefined}>
           {f && <>
             <header className="sheet-head">
-              <Avatar name={f.name} person />
+              <Avatar name={f.name} id={f.id} person />
               <div>
                 <RDialog.Title className="sheet-title">{f.name}</RDialog.Title>
                 <span className="sub">{[f.village, cropLabel(f.crop), f.language, maskPhone(f.phone)].filter(Boolean).join(" · ")}</span>
                 {f.do_not_call && <Pill cls="">Asked not to be called</Pill>}
-                <PhoneAllow f={f} state={state} />
+                <AgentToggle f={f} />
                 <span className="plot-line small">
                   {f.plot_lat != null && f.plot_lng != null
                     ? <>Plot <a href={`https://www.google.com/maps?q=${f.plot_lat},${f.plot_lng}`} target="_blank" rel="noopener">{f.plot_lat}, {f.plot_lng}</a>{f.plot_ha ? ` · ${f.plot_ha} ha` : ""}</>
@@ -273,6 +265,13 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                     : <><b>Nothing to do:</b> a firm, current harvest is on record.</>}</span>
                 </div>
               )}
+              <Standing crm={rel} />
+
+              <section aria-labelledby="fs-notes">
+                <h3 id="fs-notes">Notes and follow-ups</h3>
+                <Notes f={f} notes={(state?.notes || []).filter((n) => n.farmer_id === f.id)} />
+              </section>
+
               <section aria-labelledby="fs-activity">
                 <h3 id="fs-activity">Activity <span className="sub">({activity.length})</span></h3>
                 {activity.length ? (

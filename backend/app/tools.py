@@ -277,8 +277,10 @@ class ToolHandlers:
             self._note_read_back(crop_id, kg, date, confidence)
             return {"saved": False, "status": "waiting_for_read_back",
                     "read_back": f"{round(kg):,} kg of {crop_label(crop_id)}, ready on {date:%A %d %B}.",
-                    "say": "Read this back in the farmer's language and ask if it is right. If they "
-                           "say yes, call record_harvest again with confirmed_by_farmer true."}
+                    "say": "Check it with the farmer in one natural sentence in their language, the way a person "
+                           "says it (for example \"Jadi sekitar dua ton, besok hari Sabtu ya, Pak?\"), with the crop "
+                           "in their own word, not read out like a record. If they say yes, call record_harvest again "
+                           "with confirmed_by_farmer true."}
         if self.session.read_back.get(crop_id) != (kg, date.isoformat()):
             # Enforced here, not only in the prompt: nothing is saved until these exact numbers were read back.
             # The call that skipped the read-back becomes the read-back step, so there is nothing to retry.
@@ -287,8 +289,9 @@ class ToolHandlers:
             self.last_ui = {"captured": {**self.last_ui["captured"], "status": "waiting"}}
             return {"saved": False, "status": "read_back_required",
                     "read_back": f"{round(kg):,} kg of {crop_label(crop_id)}, ready on {date:%A %d %B}.",
-                    "say": "Not saved yet: the farmer has not heard these numbers back. Read this sentence to the "
-                           "farmer in their language and ask if it is right. If they say yes, call record_harvest "
+                    "say": "Not saved yet: the farmer has not heard these numbers back. Check them with the farmer "
+                           "in one natural sentence in their language (the way a person says it, not like a record) "
+                           "and ask if it is right. If they say yes, call record_harvest "
                            "again with the same numbers and confirmed_by_farmer true. This is the normal next "
                            "step, not an error; do not apologise."}
         try:

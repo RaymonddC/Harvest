@@ -49,3 +49,22 @@ def test_recording_wording_says_what_is_kept_and_for_how_long():
         t = notice_for(lang, "Koperasi Sawit Maju", "Pak Wahyu", recording=True)["consent"]
         assert "90" in t and "Koperasi Sawit Maju" in t, lang
         assert t != notice_for(lang, "Koperasi Sawit Maju", "Pak Wahyu")["consent"], lang
+
+
+def test_the_notice_addresses_the_farmer_not_bapak_slash_ibu():
+    """Read aloud, the written "Bapak/Ibu" sounded like a form; the notice uses the farmer's own form of address."""
+    def consent(name, lang="Bahasa Indonesia"):
+        return notice_for(lang, "Koperasi Sawit Maju", name, recording=True)["consent"]
+
+    assert "izin Bapak," in consent("Pak Slamet") and "Apakah Bapak setuju?" in consent("Pak Slamet")
+    assert "izin Ibu," in consent("Bu Sari") and "Apakah Ibu setuju?" in consent("Bu Sari")
+    assert "Anda" in consent("Gary")
+    for lang in services.LANGUAGES:
+        assert "/" not in consent("Pak Wahyu", lang) and "/" not in consent("Gary", lang), lang
+
+
+def test_the_opening_is_two_turns_and_the_agent_talks_like_a_person(settings):
+    text = instruction(settings, "Bahasa Indonesia")
+    assert "in two turns" in text and "Then stop and wait for the answer" in text
+    assert "Never start your sentence again from the beginning" in text  # no restarting when the farmer cuts in
+    assert "Never say \"FFB\"" in text and "how can I help you" in text
