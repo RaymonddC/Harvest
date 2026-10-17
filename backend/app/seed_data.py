@@ -128,6 +128,39 @@ def build_seed(plan_start: dt.date, language: str, crop: str = "palm",
     limits_doc = {**default_limits(crop).to_doc(),
                   "reference_source": "Illustrative. Replace with the published provincial FFB price and its date."}
     promises, deliveries = _history(plan_start, crop, [fid for fid in farmers if fid.startswith("b")][:40], rng)
+    # Mill operations, from their own random stream so the numbers above stay as they were.
+    ops = random.Random(rng_seed + 101)
+    late = []  # a late week with more fruit than the mill can press: the surplus to spread out
+    for i in range(14):
+        fid = f"x{i + 1:02d}"
+        add_farmer(fid, unique_name(), ops.choice(VILLAGES), 1800)
+        ready = week_start(5, plan_start) + dt.timedelta(days=ops.randint(0, 4))
+        harvests[f"h-{fid}-{crop}"] = {"farmer_id": fid, "crop": crop, "kg": ops.randrange(1600, 2401, 50),
+                                       "ready_date": ready.isoformat(), "confidence": "firm", "source": "previous_call"}
+        late.append(fid)
+    for n, (fid, f) in enumerate(sorted(farmers.items())):
+        if f["type"] == "supplier" or n % 7 == 6:  # about one in seven plots not mapped yet
+            continue
+        f.update(plot_lat=round(ops.uniform(0.25, 1.15), 5), plot_lng=round(ops.uniform(101.0, 102.1), 5),
+                 plot_ha=round(ops.uniform(1.2, 4.0), 1))
+        if n % 3 == 0:
+            f["certification"] = "ISPO"
+        elif n % 11 == 0:
+            f["certification"] = "RSPO"
+    if "b013" in farmers:  # delivers far more than a plot this size can grow: fruit bought from elsewhere?
+        farmers["b013"]["plot_ha"] = 0.1
+    reference = float(limits_doc["reference_price"])
+    for d in deliveries.values():
+        unripe, dirt = round(ops.uniform(0, 6), 1), round(ops.uniform(0, 3), 1)
+        pct = round(unripe + dirt, 1)
+        net = round(d["kg"] * (1 - pct / 100))
+        d.update(deductions={k: v for k, v in (("unripe", unripe), ("dirt", dirt)) if v}, deduction_pct=pct, net_kg=net,
+                 price_per_kg=reference, currency=limits_doc.get("currency", "IDR"), amount=round(net * reference),
+                 price_basis="reference price", offer_id=None, po_number=None)
+    official = {f"op-{crop}-riau-{(plan_start - dt.timedelta(days=12)).isoformat()}": {
+        "crop": crop, "province": "Riau", "valid_from": (plan_start - dt.timedelta(days=12)).isoformat(),
+        "price_per_kg": reference, "source": "Illustrative: replace with the published Disbun price", "url": None,
+        "added_by": "Seed"}}
     return {
         "farmers": farmers,
         "harvests": harvests,
@@ -135,7 +168,9 @@ def build_seed(plan_start: dt.date, language: str, crop: str = "palm",
         "deliveries": deliveries,
         "limits": {crop: limits_doc},
         "rival_quotes": rival_quotes,
-        "campaigns": {"current": {"status": "idle", "kind": None, "crop": crop, "target_kg_per_week": target_kg}},
+        "campaigns": {"current": {"status": "idle", "kind": None, "crop": crop, "target_kg_per_week": target_kg,
+                                  "daily_capacity_kg": 17_000, "working_days": 6, "truck_kg": 8_000}},
+        "official_prices": official,
     }
 
 
@@ -168,7 +203,7 @@ def load_seed(store, settings) -> None:
     data = build_seed(settings.plan_start, settings.demo_language, settings.demo_crop,
                       settings.target_kg_per_week)
     for coll in ("farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes",
-                 "campaigns", "promises", "deliveries", "messages"):
+                 "campaigns", "promises", "deliveries", "messages", "official_prices"):
         store.clear(coll)
     for coll, docs in data.items():
         for doc_id, doc in docs.items():

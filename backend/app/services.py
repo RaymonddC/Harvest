@@ -451,7 +451,8 @@ def _check_dates(settings: Settings, start_date: str | None, end_date: str | Non
 
 def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_week: float, weeks: int | None = None,
                     name: str | None = None, farmer_ids: list[str] | None = None, start_date: str | None = None,
-                    end_date: str | None = None) -> dict:
+                    end_date: str | None = None, daily_capacity_kg: float | None = None,
+                    working_days: int | None = None, truck_kg: float | None = None) -> dict:
     """A new campaign for a crop (a crop can have several), from a start date to an end date (or, older callers,
     a number of weeks). farmer_ids: farmers of that crop to move into it."""
     if not settings.multi_crop:
@@ -459,7 +460,10 @@ def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_w
     key = normalize_crop(crop)
     if key not in CROP_LABELS:
         raise ServiceError(f"Unknown crop {crop!r}. Use one of: {', '.join(CROP_LABELS)}.")
+    from . import mill_ops
+
     dates = _check_dates(settings, start_date, end_date)
+    ops = mill_ops.check_capacity_fields(daily_capacity_kg, working_days, truck_kg)
     if not dates and weeks is None:
         raise ServiceError("Give the campaign's start and end dates.")
     _check_campaign_fields(target_kg_per_week, None if dates else weeks, name)
@@ -468,7 +472,7 @@ def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_w
     if any(c["id"] == cid for c in camps):
         cid = f"{key}-{hashlib.sha1(now_iso().encode() + str(len(camps)).encode()).hexdigest()[:6]}"
     doc = {"crop": key, "name": (name or "").strip() or None, "kind": None, "status": "idle",
-           "target_kg_per_week": round(target_kg_per_week), "created_at": now_iso(), **dates}
+           "target_kg_per_week": round(target_kg_per_week), "created_at": now_iso(), **dates, **ops}
     doc["weeks"] = campaign_weeks(settings, {**doc, "weeks": weeks})
     store.set("campaigns", cid, doc)
     if farmer_ids:
@@ -479,12 +483,15 @@ def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_w
 
 def update_campaign(store: Store, settings: Settings, ref: str, name: str | None = None,
                     target_kg_per_week: float | None = None, weeks: int | None = None,
-                    start_date: str | None = None, end_date: str | None = None) -> dict:
+                    start_date: str | None = None, end_date: str | None = None, daily_capacity_kg: float | None = None,
+                    working_days: int | None = None, truck_kg: float | None = None) -> dict:
     """Rename a campaign, or change its weekly target or its dates (or weeks). Fields left out stay as they are."""
     camp = need_campaign(store, settings, ref)
+    from . import mill_ops
+
     dates = _check_dates(settings, start_date, end_date)
     _check_campaign_fields(target_kg_per_week, weeks, name)
-    changes: dict = {"updated_at": now_iso()}
+    changes: dict = {"updated_at": now_iso(), **mill_ops.check_capacity_fields(daily_capacity_kg, working_days, truck_kg)}
     if name is not None:
         changes["name"] = name.strip() or None
     if target_kg_per_week is not None:
@@ -566,8 +573,11 @@ def recompute_forecast(store: Store, settings: Settings) -> list[dict]:
         mine = by_camp.get(camp["id"], {"harvests": [], "offers": []})
         harvests, offers = mine["harvests"], mine["offers"]
         crop_farmers = [f for f in farmer_list if farmer_campaign(settings, f, camps) == camp["id"]]
+        from . import mill_ops
+
         computed = fc.compute_forecast(harvests, offers, settings.plan_start, weeks, target, settings.gap_tolerance)
-        for row in _before_start(settings, camp, computed):
+        computed = mill_ops.mark_surplus(camp, _before_start(settings, camp, computed))
+        for row in computed:
             row["crop"] = crop
             row["campaign_id"] = camp["id"]
             row["shortlist"] = (fc.shortlist(row["week"], crop_farmers, harvests, offers,
@@ -1297,10 +1307,13 @@ def _farmer_fields(row: dict) -> tuple[str, dict]:
         usual = max(0, int(float(row.get("usual_kg_week") or 0)))
     except ValueError:
         raise ServiceError("usual_kg_week must be a number.") from None
+    from . import mill_ops
+
     return digits, {
         "name": row["name"], "phone": row["phone"], "crop": crop,
         "language": language, "village": row.get("village", ""), "usual_kg_week": usual,
         "can_pull_forward": row.get("can_pull_forward", "").lower() in ("1", "yes", "true"),
+        **mill_ops.plot_fields(row),
     }
 
 
@@ -1335,6 +1348,9 @@ def update_farmer(store: Store, farmer_id: str, row: dict) -> dict:
     if not store.get("farmers", farmer_id):
         raise ServiceError("Farmer not found.")
     _, fields = _farmer_fields(row)
+    for keys in (("plot_lat", "plot_lng"), ("plot_ha",), ("certification",)):  # a field left empty clears it
+        if keys[0] in row and keys[0] not in fields:
+            fields.update({k: None for k in keys})
     store.set("farmers", farmer_id, fields, merge=True)
     return store.get("farmers", farmer_id)
 

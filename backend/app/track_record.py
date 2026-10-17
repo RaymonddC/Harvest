@@ -87,8 +87,57 @@ def snapshot_promises(store: Store, settings: Settings, week: dt.date, farmer_id
     return saved
 
 
+GRADES = ("unripe", "dirt", "other")  # weighbridge deductions, in percent of the gross weight
+MAX_DEDUCTION_PCT = 50.0
+
+
+def grading(deductions: dict | None) -> tuple[dict, float]:
+    """Deductions by kind (percent of gross): unripe bunches, dirt and trash, other (long stalks, water...)."""
+    out = {}
+    for k in GRADES:
+        v = (deductions or {}).get(k)
+        if v in (None, ""):
+            continue
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            raise TrackRecordError(f"The {k} deduction must be a number (percent).") from None
+        if not 0 <= v <= MAX_DEDUCTION_PCT:
+            raise TrackRecordError(f"The {k} deduction must be 0 to {MAX_DEDUCTION_PCT:.0f}%.")
+        if v:
+            out[k] = round(v, 2)
+    total = round(sum(out.values()), 2)
+    if total > MAX_DEDUCTION_PCT:
+        raise TrackRecordError(f"Deductions add up to more than {MAX_DEDUCTION_PCT:.0f}%.")
+    return out, total
+
+
+def match_order(store: Store, settings: Settings, farmer_id: str, crop: str, week: dt.date) -> dict:
+    """The price a delivery is paid at: the approved deal for that farmer and week (its purchase order), else the
+    crop's reference price that day (no purchase order)."""
+    from . import forecast as fc_
+    from . import purchase_order, services
+
+    for o in store.list("offers"):
+        if o.get("farmer_id") != farmer_id or o.get("status") != "approved":
+            continue
+        ws = o.get("deliver_week_start") or (fc_.week_start(int(o["deliver_week"]), settings.plan_start).isoformat()
+                                             if o.get("deliver_week") else None)
+        if ws == week.isoformat():
+            return {"offer_id": o["id"], "price_per_kg": float(o["price_per_kg"]), "currency": o.get("currency", "IDR"),
+                    "po_number": purchase_order._number("PO", o.get("decided_at") or o.get("created_at"), o["id"]),
+                    "ordered_kg": float(o.get("kg", 0)), "price_basis": "purchase order"}
+    try:
+        lim = services.get_limits(store, crop)
+        return {"offer_id": None, "price_per_kg": float(lim.reference), "currency": lim.currency, "po_number": None,
+                "ordered_kg": None, "price_basis": "reference price"}
+    except services.ServiceError:
+        return {"offer_id": None, "price_per_kg": None, "currency": "IDR", "po_number": None, "ordered_kg": None,
+                "price_basis": "no price set"}
+
+
 def record_delivery(store: Store, settings: Settings, farmer_id: str, kg: float, date: str,
-                    recorded_by: str | None = None, source: str = "manual") -> dict:
+                    recorded_by: str | None = None, source: str = "manual", deductions: dict | None = None) -> dict:
     farmer = store.get("farmers", farmer_id)
     if not farmer:
         raise TrackRecordError("Farmer not found.")
@@ -105,7 +154,14 @@ def record_delivery(store: Store, settings: Settings, farmer_id: str, kg: float,
     # No Monday snapshot for this week (the job was not running, or the week is older): save one now, from the
     # records as they are, so the delivery has something to be compared with.
     snapshot_promises(store, settings, week, farmer_id)
-    doc = {"farmer_id": farmer_id, "farmer_name": farmer.get("name", farmer_id), "crop": crop, "kg": round(float(kg)),
+    graded, pct = grading(deductions)
+    gross = round(float(kg))
+    net = round(gross * (1 - pct / 100))
+    order = match_order(store, settings, farmer_id, crop, week)
+    amount = round(net * order["price_per_kg"]) if order["price_per_kg"] is not None else None
+    # "kg" stays the gross weight (promises are compared with what arrived); net_kg is what is paid for.
+    doc = {"farmer_id": farmer_id, "farmer_name": farmer.get("name", farmer_id), "crop": crop, "kg": gross,
+           "deductions": graded, "deduction_pct": pct, "net_kg": net, **order, "amount": amount,
            "date": day.isoformat(), "week_start": week.isoformat(), "source": source,
            "recorded_by": recorded_by or "Planner", "recorded_at": _now()}
     did = store.add("deliveries", doc)
@@ -131,7 +187,10 @@ def upload_deliveries(store: Store, settings: Settings, text: str, recorded_by: 
             problems.append(f"line {n}: no farmer matches")
             continue
         try:
-            record_delivery(store, settings, f["id"], float(row["kg"].replace(",", "")), row["date"], recorded_by, "csv")
+            ded = {k: row.get(f"{k}_pct") for k in GRADES}
+            if row.get("deduction_pct") and not any(ded.values()):
+                ded["other"] = row["deduction_pct"]
+            record_delivery(store, settings, f["id"], float(row["kg"].replace(",", "")), row["date"], recorded_by, "csv", ded)
             added += 1
         except (TrackRecordError, ValueError) as e:
             problems.append(f"line {n}: {e}")
