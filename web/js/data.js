@@ -6,7 +6,7 @@
 export const cfg = Object.assign({ apiBase: "", firebase: null, millName: "the cooperative" },
   window.HARVEST_CONFIG || {});
 
-const COLLECTIONS = ["farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns", "messages", "official_prices", "notes"];
+const COLLECTIONS = ["farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns", "messages", "official_prices", "notes", "ml_forecast"];
 
 export function apiUrl(path) {
   return (cfg.apiBase || "").replace(/\/$/, "") + path;

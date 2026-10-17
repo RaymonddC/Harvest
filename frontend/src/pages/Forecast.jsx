@@ -6,6 +6,7 @@ import Chart from "../components/forecast/Chart.jsx";
 import { FillList, Hero } from "../components/forecast/GapCard.jsx";
 import GapNote from "../components/forecast/GapNote.jsx";
 import Kpis from "../components/forecast/Kpis.jsx";
+import MlForecast from "../components/forecast/MlForecast.jsx";
 import SupplyChart from "../components/forecast/SupplyChart.jsx";
 import SurplusCard from "../components/forecast/SurplusCard.jsx";
 import TargetBreakdown from "../components/forecast/TargetBreakdown.jsx";
@@ -99,6 +100,7 @@ export default function Forecast() {
           {state && <TrackRecord cid={cid} rows={rows} refreshKey={JSON.stringify(rows.map((r) => r.expected_kg))} />}
         </div>
         <div className="col-side">
+          {state && <MlForecast state={state} crop={crop} rows={rows} />}
           {state && gap && <FillList gap={gap} state={view} />}
           {state && rows.find((r) => r.is_surplus) && <SurplusCard row={rows.find((r) => r.is_surplus)} cid={cid} />}
         </div>

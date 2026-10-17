@@ -330,6 +330,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "server_allowlist": sorted(n for n in settings.real_call_allowlist if n != "*"),
                             "agent_options": agent_profile.options(),
                             "messaging_note": messaging.channel_note(settings),
+                            "bigquery": settings.bigquery_dataset,
                             "weekly_job": bool(settings.job_token)}
         return data
 
@@ -502,6 +503,15 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             camp = services.need_campaign(store, settings, campaign)
             ids = {f["id"] for f in services.campaign_members(store, settings, camp["id"])}
         return crm.overview(store, ids)
+
+    @app.post("/api/bigquery/export", dependencies=[Depends(need("campaign.run"))])
+    def bigquery_export():
+        """Copy the supply data to BigQuery now and refresh the BigQuery ML forecast (the hourly job does it too)."""
+        from . import bq_export
+
+        if not settings.bigquery_dataset:
+            raise HTTPException(400, "BigQuery is off: set BIGQUERY_DATASET on the server.")
+        return bq_export.export(store, settings)
 
     @app.post("/api/calls/{call_id}/insights", dependencies=[Depends(need("campaign.run"))])
     def call_insights_run(call_id: str):

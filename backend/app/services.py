@@ -454,6 +454,13 @@ def scheduled_calls(store: Store, settings: Settings, now: dt.datetime | None = 
     local = (now or dt.datetime.now(dt.timezone.utc)).astimezone(SCHEDULE_TZ)
     camps = list_campaigns(store, settings)
     out: dict = {"now": local.isoformat(timespec="minutes"), "started": [], "skipped": []}
+    if settings.bigquery_dataset:  # the supply data for Looker Studio and the BigQuery ML forecast, once an hour
+        from . import bq_export
+
+        try:
+            out["bigquery"] = bq_export.export(store, settings)
+        except Exception as e:  # noqa: BLE001 - a BigQuery problem must not stop the calls
+            out["bigquery"] = {"error": str(e)[:300]}
     week = (local.date() - dt.timedelta(days=local.weekday())).isoformat()
     marker = next((c for c in camps if c["id"] == "current"), camps[0] if camps else None)
     if marker is not None and (local.weekday() > 0 or local.hour >= 6) and marker.get("bookkeeping_week") != week:

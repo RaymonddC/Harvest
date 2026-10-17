@@ -77,6 +77,8 @@ jobs:
           TWILIO_FROM_NUMBER: ${{ vars.TWILIO_FROM_NUMBER }}
           REAL_CALLS_ENABLED: ${{ vars.REAL_CALLS_ENABLED }}
           PHONE_CALLS_AT_ONCE: ${{ vars.PHONE_CALLS_AT_ONCE }}
+          BIGQUERY_DATASET: ${{ vars.BIGQUERY_DATASET }}
+          BIGQUERY_LOCATION: ${{ vars.BIGQUERY_LOCATION }}
           REAL_CALL_ALLOWLIST: ${{ vars.REAL_CALL_ALLOWLIST }}
           # Text messages and planner alerts (optional).
           MESSAGING_CHANNEL: ${{ vars.MESSAGING_CHANNEL }}

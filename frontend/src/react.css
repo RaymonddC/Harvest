@@ -1766,3 +1766,8 @@ tr.is-live td { background: #F2F8F4; }
 .ins-sum { margin: 0; font-size: 14.5px; }
 .pill.red { background: #FBE9E4; color: #8A2E0D; }
 .insights-none { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Forecast: BigQuery ML next to the farmers' answers */
+.ml-card { gap: 10px; }
+.ml-table { width: 100%; }
+.ml-table th, .ml-table td { padding: 7px 4px; font-size: 13.5px; }

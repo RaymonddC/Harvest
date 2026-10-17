@@ -89,6 +89,8 @@ class Settings:
     job_token: str | None = None  # protects POST /api/jobs/weekly (Cloud Scheduler sends it as X-Job-Token)
     messaging_channel: str = "off"  # "sms" or "whatsapp" sends texts over Twilio; "off" only records them
     phone_calls_at_once: int = 3  # a phone campaign rings this many farmers at the same time (each is a Live session)
+    bigquery_dataset: str | None = None  # BigQuery dataset the hourly job copies the supply data into (off when unset)
+    bigquery_location: str = "asia-southeast1"
     twilio_whatsapp_from: str | None = None  # the WhatsApp sender, when messaging_channel is "whatsapp"
     planner_alert_to: tuple[str, ...] = ()  # numbers that get the planner's alerts (gaps, waiting offers)
 
@@ -157,6 +159,8 @@ def get_settings() -> Settings:
         plan_start_auto=not plan_start_raw,
         job_token=os.environ.get("JOB_TOKEN") or None,
         messaging_channel=(os.environ.get("MESSAGING_CHANNEL") or "off").strip().lower(),
+        bigquery_dataset=os.environ.get("BIGQUERY_DATASET") or None,
+        bigquery_location=os.environ.get("BIGQUERY_LOCATION") or "asia-southeast1",
         twilio_whatsapp_from=os.environ.get("TWILIO_WHATSAPP_FROM") or None,
         planner_alert_to=tuple(normalize_phone(n) for n in (os.environ.get("PLANNER_ALERT_TO") or "").split(",")
                                if n.strip()),
