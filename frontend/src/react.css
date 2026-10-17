@@ -1423,7 +1423,7 @@ body.app .hero, .hero { background: none !important; border: 0; border-bottom: 1
 .hero.ok h2 .num { color: var(--leaf-deep); }
 .hero h2 small { font-size: 15px; font-weight: 500; }
 .hero p { margin: 0; color: var(--muted); }
-.hero .hero-mark { display: none; }
+.hero.gap .hero-mark { display: none; }
 .todo-list li { padding-left: 0; }
 .todo-list li::before { display: none; }
 .todo-list li b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 8px 1px 0; background: var(--line-strong); }
@@ -1544,7 +1544,6 @@ body.app table.farmers .who-cell span { white-space: nowrap; }
 /* cards and rows answer the pointer */
 body.app .board .pcard { transition: background-color .15s ease, transform .15s ease; }
 body.app .board .pcard:active { transform: scale(.98); }
-body.app .note-list li, body.app .fs-list li { animation: hc-fade .2s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   .chain-bar span, .have-bar i, .tbd-bar > *, .meter i { transition: none; }
   body.app .board .pcard:active { transform: none; }
@@ -1552,3 +1551,46 @@ body.app .note-list li, body.app .fs-list li { animation: hc-fade .2s ease-out; 
 
 /* Space held for a card that is still loading, so the page below does not jump when it arrives */
 .trace-wait { min-height: 266px; background: linear-gradient(90deg, #fff 0%, #FAFAF6 50%, #fff 100%); }
+
+/* ---------- Motion, after the find-animation-opportunities gate (see DESIGN.md) ----------
+   One curve everywhere; transform and opacity only; reduced motion keeps a gentle fade instead of movement. */
+:root { --ease-out: cubic-bezier(.2, .8, .2, 1); --ease-in: cubic-bezier(.5, 0, .75, 0); }
+
+/* 1. Panels leave the way they came (Radix waits for the closing animation before removing them) */
+.hc-sheet[data-state="closed"] { animation: hc-sheet-out .2s var(--ease-in) forwards; }
+.hc-overlay[data-state="closed"] { animation: hc-fade-out .15s ease-in forwards; }
+@keyframes hc-sheet-out { to { transform: translateX(100%); opacity: 0; } }
+@keyframes hc-fade-out { to { opacity: 0; } }
+@media (max-width: 640px) {
+  .hc-sheet[data-state="closed"] { animation-name: hc-sheet-down; }
+  @keyframes hc-sheet-down { to { transform: translateY(100%); opacity: 0; } }
+}
+.hc-dialog[data-state="closed"] { animation: hc-dialog-out .15s ease-in forwards; }
+@keyframes hc-dialog-out { to { opacity: 0; transform: translate(-50%, calc(-50% + 6px)); } }
+
+/* 2. Menus grow from the button that opened them */
+.hc-menu { transform-origin: var(--radix-dropdown-menu-content-transform-origin); }
+.hc-menu[data-state="open"] { animation: hc-menu-in .15s var(--ease-out); }
+.hc-menu[data-state="closed"] { animation: hc-fade-out .1s ease-in forwards; }
+@keyframes hc-menu-in { from { opacity: 0; transform: scale(.97); } }
+
+/* 3. Folded sections settle in when opened */
+details[open] > :not(summary) { animation: hc-unfold .18s var(--ease-out); }
+@keyframes hc-unfold { from { opacity: 0; transform: translateY(-4px); } }
+
+/* 4. The rare "all done" mark (motion in GapCard and Overview) */
+.todo-done .done-mark { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--leaf); color: #fff; vertical-align: middle; margin-right: 6px; }
+
+/* 5. Press feedback: subtle, on the shared curve */
+body.app .btn { transition: transform 160ms var(--ease-out), background-color .15s, border-color .15s, color .15s; }
+body.app .btn:active:not(:disabled) { transform: scale(.97); }
+
+/* Data bars change only when the numbers do, and quickly */
+.chain-bar span, .have-bar i { transition: flex-grow .3s var(--ease-out); }
+.tbd-bar > *, .meter i, .trace-rows .meter i { transition: width .3s var(--ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hc-sheet[data-state="closed"], .hc-dialog[data-state="closed"] { animation: hc-fade-out .15s ease-in forwards; }
+  .hc-menu[data-state="open"], details[open] > :not(summary) { animation: hc-fade .12s ease-out; }
+  body.app .btn:active:not(:disabled) { transform: none; }
+}

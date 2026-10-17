@@ -126,7 +126,8 @@ export default function Overview() {
                   </AnimatePresence>
                 </ol>
               ) : (
-                <p className="todo-done"><Icon name="check" size={18} /> Nothing waiting: every week is on track and every farmer has answered{nextAutoText(campaign) ? `; ${nextAutoText(campaign)}` : ""}.</p>
+                <p className="todo-done"><motion.span className="done-mark" initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", duration: 0.5, bounce: 0.25 }}><Icon name="check" size={18} /></motion.span> Nothing waiting: every week is on track and every farmer has answered{nextAutoText(campaign) ? `; ${nextAutoText(campaign)}` : ""}.</p>
               )}
             </section>
           </div>

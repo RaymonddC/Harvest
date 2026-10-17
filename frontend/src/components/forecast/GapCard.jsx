@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import { Link } from "react-router-dom";
 import { campaignFor, useCrop } from "../../campaigns.jsx";
 import { api, fmtPrice, fmtT, followCalls, gapFillBody, gapFillToast, startUrl } from "../../lib.js";
@@ -27,7 +28,8 @@ export function Hero({ gap, rows, state }) {
     const covered = approved.length ? approved[approved.length - 1].deliver_week : null;
     return (
       <section className="hero ok" aria-live="polite">
-        <span className="hero-mark"><Icon name="check" size={22} /></span>
+        <motion.span className="hero-mark" initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", duration: 0.5, bounce: 0.25 }}><Icon name="check" size={22} /></motion.span>
         <div className="hero-text">
           <h2>{covered ? `Week ${covered} is covered` : "Every week is on track"}</h2>
           <p>{covered ? "Approved offers filled the gap. Every week is now within the gap threshold of the target."
