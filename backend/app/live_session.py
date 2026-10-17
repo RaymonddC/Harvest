@@ -26,7 +26,7 @@ from google.genai import types
 from . import agent_profile, forecast as fc
 from . import services
 from .config import Settings
-from .call_audio import CallRecorder, make_audio_store
+from .call_audio import CallRecorder, make_audio_store, recording_enabled
 from .prompt import KICKOFF, build_system_instruction
 from .store import Store
 from .tools import TOOL_DECLARATIONS, CallSession, ToolHandlers
@@ -469,7 +469,10 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
         try:
             services.finish_call(store, settings, call_id, ended_cleanly=session.ended,
                                  outcome=session.outcome, summary=session.summary,
-                                 consent=session.consent, transcript=transcript.cleaned())
+                                 consent=session.consent, transcript=transcript.cleaned(),
+                                 consent_proof={"at": session.consent_at, "language": call_lang,
+                                                "notice": "recording" if recording_enabled(settings) else "transcript",
+                                                "days": settings.call_audio_retention_days})
         except Exception:  # noqa: BLE001  the browser still has to be told, and the socket closed
             log.exception("call %s: finishing the call failed", call_id)
         if recorder and session.consent:

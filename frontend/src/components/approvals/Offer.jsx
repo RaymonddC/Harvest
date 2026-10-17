@@ -3,10 +3,10 @@ import { useState } from "react";
 import { useLive } from "../../live.jsx";
 import { DeliveryBox } from "../setup/FarmerSheet.jsx";
 import { Dialog } from "../../ui.jsx";
-import { api, apiUrl, offerPoUrl, plainPrice } from "../../lib.js";
+import { api, offerPoUrl, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { useConfirm } from "../../dialogs.jsx";
-import { ActButton, Avatar, Pill } from "../../ui.jsx";
+import { ActButton, Avatar, DownloadLink, Pill } from "../../ui.jsx";
 import PriceSpot from "./PriceSpot.jsx";
 
 function detail(o) {
@@ -132,7 +132,7 @@ export default function Offer({ o, l, row, quote, confirming = false, imp = null
       )}
       {o.status === "approved" && (
         <div className="text-line">
-          <a className="btn sm" href={apiUrl(offerPoUrl(o.id))} download>Purchase order (PDF)</a>
+          <DownloadLink className="btn sm" path={offerPoUrl(o.id)} filename={`purchase-order-${o.id}.pdf`}>Purchase order (PDF)</DownloadLink>
           <RecordDelivery o={o} />
         </div>
       )}

@@ -187,6 +187,29 @@ def _parse_time(iso: str | None) -> dt.datetime | None:
     return t if t is None or t.tzinfo else t.replace(tzinfo=dt.timezone.utc)
 
 
+def purge_expired_transcripts(store: Store, settings: Settings) -> int:
+    """Delete the written transcript of every call whose retention period (the number of days the farmer was told) is over."""
+    now = dt.datetime.now(dt.timezone.utc)
+    gone = 0
+    for c in store.list("calls"):
+        expires = _parse_time(c.get("transcript_expires_at"))
+        if c.get("transcript") and expires and expires < now:
+            store.set("calls", c["id"], {"transcript": None, "transcript_expired_at": now_iso()}, merge=True)
+            gone += 1
+    return gone
+
+
+def delete_transcript(store: Store, call_id: str, actor=None) -> dict:
+    """Delete one call's written transcript now (a farmer withdrew consent or asked for it to be erased)."""
+    call = store.get("calls", call_id)
+    if not call or not call.get("transcript"):
+        raise ServiceError("There is no transcript of this call.", status=404)
+    store.set("calls", call_id, {"transcript": None, "transcript_expires_at": None,
+                                 "transcript_deleted": {"by": getattr(actor, "name", None) or getattr(actor, "id", None),
+                                                        "at": now_iso()}}, merge=True)
+    return {"ok": True}
+
+
 def reap_stale_calls(store: Store, settings: Settings) -> int:
     """Close browser calls that a restart or a lost connection left "on_call" or "queued" for good: they would keep
     a campaign "running" for ever and block the farmer from being called again. Phone calls are handled by Twilio's status callback."""
@@ -428,6 +451,7 @@ def weekly_bookkeeping(store: Store, settings: Settings) -> dict:
 
     week = settings.plan_start - dt.timedelta(days=7)  # the week that starts today; week 1 is next week
     snap = track_record.snapshot_promises(store, settings, week)
+    purge_expired_transcripts(store, settings)
     messaging.check_gap_alerts(store, settings)
     waiting = [o for o in store.list("offers") if o.get("status") in ("pending", "escalated")]
     if waiting:
@@ -1350,6 +1374,12 @@ def phone_calls_note(settings: Settings, store: Store | None = None) -> str:
             if n else "Real phone calls are on, but no farmer has Agent calls on yet.")
 
 
+def browser_call_token(settings: Settings, call_id: str) -> str:
+    """Per-call secret for the browser's call socket, handed to a signed-in user by POST /api/calls/{id}/token.
+    Without it anyone who guessed a queued call id could open the socket and play the farmer."""
+    return hmac.new(settings.jwt_secret.encode(), f"ws-call:{call_id}".encode(), hashlib.sha256).hexdigest()[:32]
+
+
 def stream_token(settings: Settings, call_id: str) -> str:
     """Per-call secret for the Twilio media stream.
 
@@ -1526,7 +1556,7 @@ def _after_phone_call(store: Store, settings: Settings) -> None:
 
 def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly: bool,
                 outcome: str | None, summary: str | None, consent: bool | None,
-                transcript: list[dict]) -> None:
+                transcript: list[dict], consent_proof: dict | None = None) -> None:
     call = store.get("calls", call_id)
     if not call:
         return
@@ -1537,8 +1567,13 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
     store.set("calls", call_id, {
         "status": status, "outcome": outcome or ("dropped" if not ended_cleanly else "completed"),
         "summary": summary, "consent": bool(consent),
+        # Proof of consent (PDP Law, Art. 24): when the farmer answered and which notice was read (recording or transcript, how many days).
+        "consent_proof": consent_proof if consent else None,
         # Consent notice: the transcript is kept only when the farmer agreed.
         "transcript": transcript if consent else None, "ended_at": now_iso(),
+        # The notice told the farmer how long it is kept (PDP Law, Art. 21); purge_expired_transcripts enforces it.
+        "transcript_expires_at": ((dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=settings.call_audio_retention_days))
+                                  .isoformat(timespec="seconds") if consent and transcript else None),
     }, merge=True)
     if (status == "done" and outcome == "completed" and call.get("kind") == "confirm"
             and call.get("offer_id")):
@@ -1563,6 +1598,10 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
                        channel=call.get("channel", "browser"), campaign_id=call.get("campaign_id"),
                        gap_start=call.get("gap_week_start"))
     refresh_campaign_status(store, settings)  # after any retry was queued: the last call ending ends the campaign
+    try:
+        purge_expired_transcripts(store, settings)
+    except Exception:  # noqa: BLE001
+        log.exception("could not purge expired transcripts")
     if call.get("channel") == "twilio" and call.get("kind") in ("collect", "gap_fill"):
         _after_phone_call(store, settings)
 

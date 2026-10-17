@@ -1,6 +1,6 @@
 import { useCrop } from "../campaigns.jsx";
 import AgentCard from "../components/setup/AgentCard.jsx";
-import { apiUrl } from "../lib.js";
+import { DownloadLink } from "../ui.jsx";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 
@@ -14,7 +14,7 @@ export default function Agent() {
         <h1>The agent{campaign.label ? ` · ${campaign.label}` : ""}</h1>
         <p>Each campaign has its own agent. Pick the campaign in the sidebar to set up another.</p>
       </div>
-      <a className="btn" href={apiUrl("/api/answers.csv")} download="answers.csv">Download answers</a>
+      <DownloadLink path="/api/answers.csv" filename="answers.csv">Download answers</DownloadLink>
     </div>
   );
   return (

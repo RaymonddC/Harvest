@@ -1,5 +1,5 @@
 import { pickLine } from "./stand-in.js";
-import { cfg, cropLabel, el, fmtKg, KIND_WORD, pill, plainPrice, subscribe, toast, wsUrl } from "./data.js";
+import { api, cfg, cropLabel, el, fmtKg, getSession, KIND_WORD, pill, plainPrice, subscribe, toast, wsUrl } from "./data.js";
 
 const $ = (id) => document.getElementById(id);
 const OUTPUT_RATE = 24000;
@@ -17,6 +17,8 @@ function show(view) {
 
 // ---------- incoming list ----------
 
+// The waiting calls are only sent to a signed-in user (the farmer role signs in on the sign-in page and comes here).
+if (!getSession()) location.replace("/login");
 subscribe((s) => { state = s; if (!active) renderIncoming(); });
 
 function farmerOf(call) {
@@ -56,6 +58,13 @@ function openCallView(call) {
 
 async function answer(call) {
   if (active) return;
+  let token;
+  try {
+    ({ token } = await api(`/api/calls/${call.id}/token`));  // the call's own key: without it the socket refuses
+  } catch (err) {
+    toast(err.status === 404 ? "This call is no longer waiting." : err.message, true);
+    return;
+  }
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -80,7 +89,7 @@ async function answer(call) {
   volume.gain.value = volumeGain(Number($("volume").value));
   player.connect(volume).connect(ctx.destination);
 
-  const ws = new WebSocket(wsUrl(`/ws/call/${call.id}`));
+  const ws = new WebSocket(wsUrl(`/ws/call/${call.id}?token=${encodeURIComponent(token)}`));
   ws.binaryType = "arraybuffer";
   const f = farmerOf(call);
   active = { call, ws, ctx, stream, player, volume, micName, startedAt: Date.now(), playEnd: 0, ended: false, muted: false,

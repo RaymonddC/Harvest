@@ -12,7 +12,8 @@ import SurplusCard from "../components/forecast/SurplusCard.jsx";
 import TargetBreakdown from "../components/forecast/TargetBreakdown.jsx";
 import TrackRecord from "../components/forecast/TrackRecord.jsx";
 import { unknownSupply } from "../components/setup/NeedPanel.jsx";
-import { apiUrl, fmtT } from "../lib.js";
+import { DownloadLink } from "../ui.jsx";
+import { fmtT } from "../lib.js";
 import { campaignFor, forCrop, inCampaign, useCrop } from "../campaigns.jsx";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
@@ -45,7 +46,7 @@ export default function Forecast() {
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
         <span className={`pill lg dot ${running ? "mint running" : ""}`}>{running ? (campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Campaign running") : "No campaign running"}</span>
-        <a className="btn" href={apiUrl(`/api/forecast.csv?campaign=${encodeURIComponent(cid)}`)} download="forecast.csv">Export CSV</a>
+        <DownloadLink path={`/api/forecast.csv?campaign=${encodeURIComponent(cid)}`} filename="forecast.csv">Export CSV</DownloadLink>
       </div>
     </div>
   );

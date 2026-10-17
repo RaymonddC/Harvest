@@ -152,6 +152,7 @@ class CallSession:
     outcome: str | None = None
     summary: str | None = None
     consent: bool | None = None
+    consent_at: str | None = None  # when the farmer's answer was first recorded: part of the proof of consent (PDP Law, Art. 24)
     saved_offer_ids: list[str] = field(default_factory=list)
     questions: list[dict] = field(default_factory=list)  # the campaign's extra questions
     answers: dict[str, dict] = field(default_factory=dict)  # question id -> {question, type, answer}
@@ -475,9 +476,15 @@ class ToolHandlers:
         left = [q["id"] for q in self.session.questions if q["id"] not in self.session.answers]
         return {"saved": True, "answer": value, "questions_left": left}
 
+    def _set_consent(self, value) -> None:
+        """A refusal stays a refusal: once the farmer said no, nothing the model says later can turn it into a yes."""
+        if self.session.consent is None:
+            self.session.consent_at = services.now_iso()
+        self.session.consent = bool(value) and self.session.consent is not False
+
     def _tool_record_consent(self, transcript_consent: bool) -> dict:
         # finish_call keeps the transcript whenever session.consent is true, also when the call drops later.
-        self.session.consent = bool(transcript_consent)
+        self._set_consent(transcript_consent)
         self.last_ui = {"consent": self.session.consent}
         return {"ok": True, "say": "Carry on with the call. Do not ask the consent question again."}
 
@@ -494,6 +501,6 @@ class ToolHandlers:
         self.session.ended = True
         self.session.outcome = outcome if outcome in OUTCOMES else "completed"
         self.session.summary = summary
-        self.session.consent = bool(transcript_consent)
+        self._set_consent(transcript_consent)
         self.last_ui = {"consent": self.session.consent}
         return {"ok": True, "say": "Say goodbye in one short sentence. The line closes after it."}

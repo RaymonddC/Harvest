@@ -1,10 +1,10 @@
 import * as RDialog from "@radix-ui/react-dialog";
 import { useEffect, useState } from "react";
-import { api, apiUrl, callChip, can, cropLabel, fmtKg, KIND_WORD, maskPhone, offerPoUrl, plainPrice } from "../../lib.js";
+import { api, callChip, can, cropLabel, fmtKg, KIND_WORD, maskPhone, offerPoUrl, plainPrice } from "../../lib.js";
 import { AgentToggle, Notes, Standing, useCrmOf } from "./Relationship.jsx";
 import { useConfirm } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
-import { ActButton, Avatar, needs, Pill } from "../../ui.jsx";
+import { ActButton, Avatar, DownloadLink, needs, Pill } from "../../ui.jsx";
 import CallRecap from "../forecast/CallRecap.jsx";
 import { campaignsOf, farmerCampaign } from "../../campaigns.jsx";
 import { crmOf, REASONS, STAGES } from "../../crm.js";
@@ -182,7 +182,7 @@ export function DeliveryBox({ farmer, stateKey }) {
                   ? <span className="paid-tag" title={d.payment_ref ? `Ref. ${d.payment_ref}` : undefined}>Paid {day(d.paid_at)}</span>
                   : can("offers.decide") ? <ActButton className="btn sm" busy="Saving…" run={() => markPaid(d)}>Mark paid</ActButton>
                   : <span className="unpaid-tag">Not paid yet</span>}
-                <a className="btn sm ghost" href={apiUrl(`/api/deliveries/${d.id}/receipt.pdf`)} download>Receipt</a>
+                <DownloadLink className="btn sm ghost" path={`/api/deliveries/${d.id}/receipt.pdf`} filename={`receipt-${d.id}.pdf`}>Receipt</DownloadLink>
                 {can("farmers.manage") && <button type="button" className="btn sm ghost" onClick={() => remove(d)}>Remove</button>}</li>
             ))}
           </ul>
@@ -327,7 +327,7 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                       <li key={o.id} className="row">
                         <span className="name">{fmtKg(o.kg)} kg to week {o.deliver_week} at {plainPrice(o.price_per_kg, o.currency || "IDR")}/kg</span>
                         <Pill cls={o.status === "approved" ? "mint" : o.status === "pending" ? "amber" : ""}>{{ pending: "Waiting for you", escalated: "Above the ceiling", approved: o.confirmed_by_voice ? "Approved · confirmed" : "Approved", rejected: "Rejected" }[o.status] || o.status}</Pill>
-                        {o.status === "approved" && <a className="btn sm ghost" href={apiUrl(offerPoUrl(o.id))} download>Purchase order</a>}
+                        {o.status === "approved" && <DownloadLink className="btn sm ghost" path={offerPoUrl(o.id)} filename={`purchase-order-${o.id}.pdf`}>Purchase order</DownloadLink>}
                       </li>
                     ))}
                   </ul>

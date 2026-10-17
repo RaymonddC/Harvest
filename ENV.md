@@ -90,7 +90,7 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | `HARVEST_NO_DOTENV` | unset | No | Set to `1` to ignore `.env` files entirely. The tests set it so a developer's own `.env` cannot change results. | Not used in production |
 | `STATIC_DIR` | the repo's `web/` folder | No | Pages the backend serves. Left unset in the cloud, where Firebase Hosting serves them. | Left unset in production (Firebase Hosting serves the pages) |
 | `CORS_ORIGINS` | `*` | No | Allowed browser origins, comma-separated. Set to your Hosting URL for anything real. | Not settable from GitHub yet: the code default runs. See the rule above |
-| `FIREBASE_WEB_CONFIG` | none | No | Firebase web config JSON. Turns on live Firestore listeners in the dashboard. | GitHub variable `FIREBASE_WEB_CONFIG`, then redeploy |
+| `FIREBASE_WEB_CONFIG` | none | No | Firebase web config JSON. No longer used by the dashboard: since 17 Oct it reads live data from the backend (signed in), and `firestore.rules` denies every browser read. | GitHub variable `FIREBASE_WEB_CONFIG`, then redeploy |
 | `TWILIO_ACCOUNT_SID` | none | No | Real phone channel. | GitHub variable of the same name (Settings, Secrets and variables, Actions, Variables), or `deploy/deploy.env` when running `deploy.sh` by hand |
 | `TWILIO_AUTH_TOKEN` | none | Yes | Real phone channel. In the cloud it comes from the `twilio-auth-token` secret. | Secret Manager, secret `twilio-auth-token`, created by hand |
 | `TWILIO_FROM_NUMBER` | none | No | Real phone channel. | GitHub variable of the same name (Settings, Secrets and variables, Actions, Variables), or `deploy/deploy.env` when running `deploy.sh` by hand |

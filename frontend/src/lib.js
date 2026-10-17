@@ -1,7 +1,7 @@
 // The data layer (API, demo sign-in, live stream, formatting) is shared with the vanilla call
 // client, so both stay in step: it lives in web/js/data.js and is used here as it is.
 export {
-  api, apiUrl, callChip, cfg, clearSession, cropLabel, fmtKg, fmtPrice, fmtT, getSession, ICON_PATHS,
+  api, apiUrl, callChip, cfg, clearSession, cropLabel, download, fmtKg, fmtPrice, fmtT, getSession, ICON_PATHS,
   initials, KIND_WORD, maskPhone, plainPrice, roleLabel, can, signIn, subscribe,
 } from "../../web/js/data.js";
 

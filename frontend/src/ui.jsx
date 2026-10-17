@@ -1,8 +1,18 @@
 import * as RDialog from "@radix-ui/react-dialog";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { can, getSession, ICON_PATHS, initials, roleLabel } from "./lib.js";
+import { can, download, getSession, ICON_PATHS, initials, roleLabel } from "./lib.js";
 import FarmerFace from "./components/FarmerFace.jsx";
+
+// A download that needs the sign-in: a plain link cannot send it, so the file is fetched and then saved.
+export function DownloadLink({ path, filename, className = "btn", children }) {
+  const [busy, setBusy] = useState(false);
+  const click = async () => {
+    setBusy(true);
+    try { await download(path, filename); } catch (err) { toast.error(err?.message || "The download failed."); } finally { setBusy(false); }
+  };
+  return <button type="button" className={className} disabled={busy} aria-busy={busy || undefined} onClick={click}>{children}</button>;
+}
 
 // Props that switch a control off, with the reason, when the signed-in role lacks the right.
 // The server still checks every request.

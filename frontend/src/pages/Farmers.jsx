@@ -4,11 +4,11 @@ import { campaignsOf, CROPS, useCrop, useMembership } from "../campaigns.jsx";
 import FarmerForm from "../components/setup/FarmerForm.jsx";
 import FarmerList from "../components/setup/FarmerList.jsx";
 import FarmerSheet from "../components/setup/FarmerSheet.jsx";
-import { api, apiUrl, can, fmtKg, maskPhone } from "../lib.js";
+import { api, can, fmtKg, maskPhone } from "../lib.js";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 import { useAct } from "../toast.jsx";
-import { ActButton, Dialog, DialogClose, needs } from "../ui.jsx";
+import { ActButton, Dialog, DialogClose, DownloadLink, needs } from "../ui.jsx";
 
 const SAMPLE_CSV = "name,phone,crop,language,village,usual_kg_week,can_pull_forward\nPak Contoh,+62 812 0000 5001,palm,Bahasa Indonesia,Sungai Lala,1500,yes";
 
@@ -126,7 +126,7 @@ function Traceability() {
     <section className="card trace-card" aria-labelledby="trace-title">
       <div className="card-head">
         <h2 id="trace-title">Traceability · {campaign.label}</h2>
-        <a className="btn sm" href={apiUrl(`/api/traceability.csv?campaign=${encodeURIComponent(cid)}`)} download="traceability.csv">Traceability CSV</a>
+        <DownloadLink className="btn sm" path={`/api/traceability.csv?campaign=${encodeURIComponent(cid)}`} filename="traceability.csv">Traceability CSV</DownloadLink>
       </div>
       <dl className="trace-rows">
         <div><dt>Plot on the map</dt><dd><span className="meter" aria-hidden="true"><i style={{ width: `${pct(t.mapped)}%` }} /></span><b className="num">{t.mapped}</b> of {t.farmers} farmers</dd></div>

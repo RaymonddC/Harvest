@@ -8,6 +8,8 @@ The consent and retention behavior is there because of the PDP Law (our reading,
 in `DECISIONS.md`). Do not delete, shorten or "simplify" any of it without asking the user:
 - The consent question and notice in the call's language (`prompt.NOTICES`, `notice_for`): it must say the purpose, what is kept
   (transcript, and the recording when `CALL_AUDIO_BUCKET`/`CALL_AUDIO_DIR` is set) and for how many days (Art. 21).
+- Transcripts expire too: `calls.transcript_expires_at`, `services.purge_expired_transcripts`, and the planner's "Delete transcript" action; a refusal can never become a yes (`ToolHandlers._set_consent`); the call keeps `consent_proof`.
+- Every `/api` call needs a signed-in user and Firestore is closed to browsers (`firestore.rules`): the data holds phone numbers and transcripts. Do not reopen reads "for convenience".
 - Nothing is kept without a yes: no transcript and no recording if the farmer does not agree (Art. 22), and the stored "yes" is the proof (Art. 24).
 - The retention period: one setting (`CALL_AUDIO_RETENTION_DAYS`, 90) used by the notice, the stored expiry, the playback refusal and the
   bucket lifecycle rule (`deploy/setup-call-audio.sh`). Keep these in step.

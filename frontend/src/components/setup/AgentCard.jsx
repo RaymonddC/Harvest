@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { campaignFor, campaignsOf, farmerCampaign } from "../../campaigns.jsx";
-import { api, apiUrl, can } from "../../lib.js";
+import { api, can } from "../../lib.js";
 import { useUnsaved } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
-import { SubmitButton } from "../../ui.jsx";
+import { DownloadLink, SubmitButton } from "../../ui.jsx";
 
 const EMPTY = { persona: { preset: "", name: "", voice: "", style: "", language_mode: "farmer", language: "", switch: true, also_speaks: [] }, questions: [] };
 const fromCampaign = (c) => ({
@@ -162,7 +162,7 @@ export default function AgentCard({ state, cid }) {
           </ol>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <button type="button" className="btn sm" onClick={addQuestion} disabled={full}>+ Add question</button>
-            <a className="small" href={apiUrl("/api/answers.csv")} download="answers.csv">Download all answers (CSV)</a>
+            <DownloadLink className="small" path="/api/answers.csv" filename="answers.csv">Download all answers (CSV)</DownloadLink>
           </div>
         </fieldset>
       </div>

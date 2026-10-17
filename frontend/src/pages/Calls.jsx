@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { inCampaign, useCrop } from "../campaigns.jsx";
 import CallRecap from "../components/forecast/CallRecap.jsx";
-import { apiUrl, callChip, fmtKg, KIND_WORD, plainPrice } from "../lib.js";
+import { callChip, fmtKg, KIND_WORD, plainPrice } from "../lib.js";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
-import { Avatar, Icon, Pill } from "../ui.jsx";
+import { Avatar, DownloadLink, Icon, Pill } from "../ui.jsx";
 
 // What each farmer said on the agent's calls: one row per call with the harvest they gave (kilograms, ready date,
 // firm or unsure, how often they harvest), any offer, and their answers to the planner's own questions. A row opens
@@ -71,7 +71,7 @@ export default function Calls() {
         <p>What each farmer told the agent. Click a call for the full recap and transcript.</p>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <a className="btn" href={apiUrl("/api/answers.csv")} download="answers.csv">Answers CSV</a>
+        <DownloadLink path="/api/answers.csv" filename="answers.csv">Answers CSV</DownloadLink>
         <button type="button" className="btn" onClick={() => setPhone(true)}><Icon name="phone" size={16} />Demo phone{waitingDemo ? ` (${waitingDemo})` : ""}</button>
       </div>
     </div>

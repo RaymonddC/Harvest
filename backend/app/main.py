@@ -207,9 +207,6 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     app = FastAPI(title="Harvest-Call Agent", lifespan=lifespan)
     app.state.settings = settings
     app.state.store = store
-    app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"],
-                       allow_headers=["*"])
-
     @app.middleware("http")
     async def roll_planning_weeks(request: Request, call_next):
         """Week 1 is next week: on the first request of a new week, every handler (they all read the
@@ -220,6 +217,25 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             settings = rolled
             app.state.settings = rolled
         return await call_next(request)
+
+    # Everything under /api needs a signed-in user, except signing in itself and the scheduled job (which has its own
+    # token). Before this, anyone who reached the URL could read every farmer, phone number and transcript.
+    PUBLIC_API = {"/api/auth/login", "/api/auth/demo"}
+
+    @app.middleware("http")
+    async def require_sign_in(request: Request, call_next):
+        path = request.url.path
+        if (settings.auth_required and path.startswith("/api/") and path not in PUBLIC_API
+                and not path.startswith("/api/jobs/") and request.method != "OPTIONS"):
+            try:
+                auth.current_actor(settings, store, request.headers.get("authorization"))
+            except HTTPException as e:
+                return JSONResponse({"detail": e.detail}, status_code=e.status_code)
+        return await call_next(request)
+
+    # Added last so it is the outermost layer: even the 401 above carries the CORS headers the browser needs to read it.
+    app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["*"],
+                       allow_headers=["*"], expose_headers=["Content-Disposition"])
 
     def need(capability: str):
         return auth.require(settings, store, capability)
@@ -450,6 +466,11 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         store.set("calls", call_id, {"audio": None, "audio_deleted": {"by": getattr(actor, "name", None) or getattr(actor, "id", None),
                                                                         "at": services.now_iso()}}, merge=True)
         return {"ok": True}
+
+    @app.delete("/api/calls/{call_id}/transcript")
+    def call_transcript_delete(call_id: str, actor=Depends(need("calls.listen"))):
+        """Delete the written transcript of a call now. Planners only (the same right as listening)."""
+        return services.delete_transcript(store, call_id, actor)
 
     @app.post("/api/campaign/start", dependencies=[Depends(need("campaign.run"))])
     def campaign_start(body: CampaignIn):
@@ -755,7 +776,19 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.websocket("/ws/call/{call_id}")
     async def call_ws(ws: WebSocket, call_id: str):
+        if settings.auth_required and not hmac.compare_digest(
+                ws.query_params.get("token", "").encode(), services.browser_call_token(settings, call_id).encode()):
+            await ws.close(code=4401)  # no valid per-call token: only a signed-in user is given one
+            return
         await run_call(BrowserChannel(ws), store, settings, call_id, expected_channel="browser")
+
+    @app.post("/api/calls/{call_id}/token")
+    def call_token(call_id: str):
+        """The token the browser needs to open this call's socket. Any signed-in user may answer a waiting call."""
+        call = store.get("calls", call_id)
+        if not call or call.get("status") != "queued" or call.get("channel", "browser") != "browser":
+            raise HTTPException(404, "No call is waiting under this id.")
+        return {"token": services.browser_call_token(settings, call_id)}
 
     # ----- Twilio (VA-8): the real phone leg -----
 

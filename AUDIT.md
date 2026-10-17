@@ -5,15 +5,15 @@ re-read in the code by the person who ran the audit; the rest are the reviewers'
 Nothing here is fixed unless a line says "done". 17 Oct: the non-security, non-Twilio items marked done below were fixed (tests in `backend/tests/test_audit_fixes.py`). PDP Law items: see "Legal requirements" in `CLAUDE.md`.
 
 ## A. Before any real farmer is loaded
-1. **Live data is readable without signing in** (**checked**). `/api/state`, `/api/stream`, the CSV exports and the PDFs need no token;
+1. **Done 17 Oct.** Every `/api` call except sign-in (and the job, which has its own token) now needs a signed-in user (middleware `require_sign_in`); the dashboard gets its live data over a fetch stream that sends the token; downloads (CSV, PDF) go through `DownloadLink`; `firestore.rules` denies every browser read and write; the call page needs a session. Original finding: **Live data is readable without signing in** (**checked**). `/api/state`, `/api/stream`, the CSV exports and the PDFs need no token;
    `firestore.rules` lets anyone read `farmers`, `calls`, `messages` (phones, transcripts). Fix: sign-in on all `/api/*` reads, close the Firestore read rule.
 2. **Public planner account** (**checked in part**). `DEMO_PASSWORD` defaults to `harvest-demo` in `deploy.sh`; `GET /api/auth/demo` returns it;
    the demo planner can call `POST /api/demo/reset` (reseeds the live database). Fix: empty by default in production, demo reset off there.
-3. **`/ws/call/{call_id}` has no auth**; ids are `call-` + 8 hex characters and are listed in the public state. An outsider can take a queued call
+3. **Done 17 Oct (browser socket).** `POST /api/calls/{id}/token` (signed in, call waiting) hands a per-call token that `/ws/call/{id}?token=` requires (HMAC on `JWT_SECRET`). Not done: the Twilio stream token is still only checked on `start`; origin check; cap on sockets. Original: **`/ws/call/{call_id}` has no auth**; ids are `call-` + 8 hex characters and are listed in the public state. An outsider can take a queued call
    (fake consent, fake harvest or offer, Vertex spend). Fix: per-call token like the Twilio one, longer ids, origin check, cap on sockets.
-4. **A refusal can become consent** (**checked**). `tools.py` `end_call` overwrites `session.consent` with the model's argument.
+4. **Done 17 Oct.** A refusal is sticky (`ToolHandlers._set_consent`); the call stores `consent_proof` (time of the answer, language, notice type, days). Original: **A refusal can become consent** (**checked**). `tools.py` `end_call` overwrites `session.consent` with the model's argument.
    Fix: refusal is sticky (False never becomes True); keep the consent time and notice version as proof (Art. 24).
-5. **Transcripts are never deleted** (**checked**). The notice promises the transcript for N days; only audio expires. The transcript-only
+5. **Done 17 Oct.** Every transcript notice says the days and the purpose; calls store `transcript_expires_at`; `purge_expired_transcripts` runs when a call finishes and in the weekly job; planners can delete one now (`DELETE /api/calls/{id}/transcript`, button in the recap). Not done: erasing a farmer's calls when the farmer is deleted (decided: no). Original: **Transcripts are never deleted** (**checked**). The notice promises the transcript for N days; only audio expires. The transcript-only
    notice (used when recording is off) says no purpose and no days. Fix: retention sweep for `transcript`/`answers`, a "delete transcript" action,
    days and purpose in every notice, a test that the notice matches the retention setting.
 

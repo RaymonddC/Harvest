@@ -603,6 +603,8 @@ ul.proof li.over i { background: var(--danger); }
 /* The call recording in the call recap: the player, and the clickable time on each transcript line. */
 .recording { margin: 0 0 12px; }
 .recording audio { width: 100%; }
+.btn.sm.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+.btn.sm.danger:hover { background: var(--danger-soft); }
 .recording .btn.danger { margin-top: 4px; background: transparent; color: var(--danger); border-color: var(--danger); }
 .recording .btn.danger:hover { background: var(--danger-soft); }
 .transcript .jump { margin-left: 8px; padding: 0 6px; border: 1px solid var(--line, #cfd8d2); border-radius: 6px; background: transparent;

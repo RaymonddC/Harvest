@@ -6,7 +6,6 @@
 export const cfg = Object.assign({ apiBase: "", firebase: null, millName: "the cooperative" },
   window.HARVEST_CONFIG || {});
 
-const COLLECTIONS = ["farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns", "messages", "official_prices", "notes"];
 
 export function apiUrl(path) {
   return (cfg.apiBase || "").replace(/\/$/, "") + path;
@@ -73,45 +72,69 @@ export async function api(path, { method = "POST", body, auth = true } = {}) {
 }
 
 // subscribe(onState, onStatus) -> unsubscribe
+// The live data (farmers, calls, offers, ...) needs a signed-in user, so it comes over a fetch stream that sends the
+// sign-in token (EventSource cannot send headers). It waits for a sign-in, reconnects by itself, and stops on sign-out.
 export function subscribe(onState, onStatus = () => {}) {
-  return cfg.firebase ? firestoreSource(onState, onStatus) : sseSource(onState, onStatus);
-}
-
-function sseSource(onState, onStatus) {
-  const es = new EventSource(apiUrl("/api/stream"));
-  es.onopen = () => onStatus("live");
-  es.onmessage = (e) => { onState(JSON.parse(e.data)); onStatus("live"); };
-  es.onerror = () => onStatus("reconnecting");
-  return () => es.close();
-}
-
-function firestoreSource(onState, onStatus) {
-  const unsubs = [];
-  const state = Object.fromEntries(COLLECTIONS.map((c) => [c, []]));
   let stopped = false;
+  let ctrl = null;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   (async () => {
-    try {
-      // Settings (plan start, target, names) come from the backend once.
-      Object.assign(state, await api("/api/state", { method: "GET" }));
-      onState({ ...state });
-      const v = "11.0.2";
-      const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${v}/firebase-app.js`);
-      const { getFirestore, collection, onSnapshot } = await import(`https://www.gstatic.com/firebasejs/${v}/firebase-firestore.js`);
-      if (stopped) return;
-      const db = getFirestore(initializeApp(cfg.firebase));
-      for (const name of COLLECTIONS) {
-        unsubs.push(onSnapshot(collection(db, name), (snap) => {
-          state[name] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
-          onState({ ...state });
-          onStatus("live");
-        }, () => onStatus("reconnecting")));
+    let delay = 1000;
+    while (!stopped) {
+      const session = getSession();
+      if (!session) { onStatus("connecting"); await sleep(1000); continue; }
+      ctrl = new AbortController();
+      try {
+        const res = await fetch(apiUrl("/api/stream"), { headers: { Authorization: `Bearer ${session.token}` }, signal: ctrl.signal });
+        if (res.status === 401) { clearSession(); continue; }
+        if (!res.ok || !res.body) throw new Error(`stream ${res.status}`);
+        onStatus("live");
+        delay = 1000;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done || stopped) break;
+          if (!getSession()) { ctrl.abort(); break; }  // signed out: drop the connection at once
+          buf += decoder.decode(value, { stream: true });
+          let end;
+          while ((end = buf.indexOf("\n\n")) >= 0) {
+            const block = buf.slice(0, end);
+            buf = buf.slice(end + 2);
+            const data = block.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trimStart()).join("\n");
+            if (data) { onState(JSON.parse(data)); onStatus("live"); }
+          }
+        }
+      } catch (err) {
+        if (stopped) return;
       }
-    } catch (err) {
-      console.error(err);
-      onStatus("error");
+      if (stopped) return;
+      onStatus(getSession() ? "reconnecting" : "connecting");
+      await sleep(delay);
+      delay = Math.min(delay * 2, 15000);
     }
   })();
-  return () => { stopped = true; unsubs.forEach((u) => u()); };
+  return () => { stopped = true; ctrl?.abort(); };
+}
+
+// Download a file that needs the sign-in (a plain link cannot send it): fetch it, then hand the browser the bytes.
+export async function download(path, filename) {
+  const session = getSession();
+  const res = await fetch(apiUrl(path), { headers: session ? { Authorization: `Bearer ${session.token}` } : {} });
+  if (!res.ok) {
+    let msg = `The download failed (${res.status}).`;
+    try { const j = await res.json(); if (j && j.detail) msg = j.detail; } catch { /* not JSON */ }
+    throw new ApiError(msg, res.status);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 // ---------- formatting ----------

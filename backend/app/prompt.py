@@ -91,7 +91,8 @@ NOTICES = {
         "hello": "Halo, ini asisten AI yang menelepon untuk {mill}.",
         "hello_named": "Halo, saya {agent}, asisten AI yang menelepon untuk {mill}.",
         "ask": "Apakah saya berbicara dengan {name}?",
-        "transcript": "Dengan izin Bapak/Ibu, {mill} menyimpan catatan tertulis dari percakapan ini. Apakah Bapak/Ibu setuju?",
+        "transcript": "Dengan izin Bapak/Ibu, {mill} menyimpan catatan tertulis dari percakapan ini selama {days} hari, agar perencana dapat "
+                      "memeriksa kembali kesepakatannya. Apakah Bapak/Ibu setuju?",
         "recording": "Dengan izin Bapak/Ibu, {mill} merekam percakapan ini dan menyimpan rekaman serta catatan tertulisnya "
                      "selama {days} hari, agar perencana dapat memeriksa kembali kesepakatannya. Apakah Bapak/Ibu setuju?",
     },
@@ -99,7 +100,8 @@ NOTICES = {
         "hello": "Helo, ini pembantu AI yang menelefon untuk {mill}.",
         "hello_named": "Helo, saya {agent}, pembantu AI yang menelefon untuk {mill}.",
         "ask": "Adakah saya bercakap dengan {name}?",
-        "transcript": "Dengan kebenaran anda, {mill} menyimpan transkrip bertulis perbualan ini. Adakah anda bersetuju?",
+        "transcript": "Dengan kebenaran anda, {mill} menyimpan transkrip bertulis perbualan ini selama {days} hari, supaya perancang boleh "
+                      "menyemak semula persetujuan yang dibuat. Adakah anda bersetuju?",
         "recording": "Dengan kebenaran anda, {mill} merakam perbualan ini dan menyimpan rakaman serta transkrip bertulisnya "
                      "selama {days} hari, supaya perancang boleh menyemak semula persetujuan yang dibuat. Adakah anda bersetuju?",
     },
@@ -107,7 +109,8 @@ NOTICES = {
         "hello": "Hello, this is an AI assistant calling for {mill}.",
         "hello_named": "Hello, this is {agent}, an AI assistant calling for {mill}.",
         "ask": "Am I speaking with {name}?",
-        "transcript": "With your permission, {mill} keeps a written transcript of this call. Is that all right?",
+        "transcript": "With your permission, {mill} keeps a written transcript of this call for {days} days, so planners can check "
+                      "what was agreed. Is that all right?",
         "recording": "With your permission, {mill} records this call and keeps the recording and a written transcript "
                      "for {days} days, so planners can check what was agreed. Is that all right?",
     },
@@ -115,7 +118,8 @@ NOTICES = {
         "hello": "Halo, iki asisten AI sing nelpon kanggo {mill}.",
         "hello_named": "Halo, kula {agent}, asisten AI sing nelpon kanggo {mill}.",
         "ask": "Apa aku lagi ngomong karo {name}?",
-        "transcript": "Kanthi idin Panjenengan, {mill} nyimpen cathetan tertulis saka omongan iki. Apa Panjenengan setuju?",
+        "transcript": "Kanthi idin Panjenengan, {mill} nyimpen cathetan tertulis saka omongan iki nganti {days} dina, supaya perencana "
+                      "bisa mriksa maneh kesepakatane. Apa Panjenengan setuju?",
         "recording": "Kanthi idin Panjenengan, {mill} ngrekam omongan iki lan nyimpen rekaman sarta cathetan tertulise nganti "
                      "{days} dina, supaya perencana bisa mriksa maneh kesepakatane. Apa Panjenengan setuju?",
     },
@@ -123,7 +127,8 @@ NOTICES = {
         "hello": "Halo, ieu asisten AI nu nelepon pikeun {mill}.",
         "hello_named": "Halo, abdi {agent}, asisten AI nu nelepon pikeun {mill}.",
         "ask": "Naha abdi nuju ngobrol sareng {name}?",
-        "transcript": "Kalayan widi Bapa/Ibu, {mill} nyimpen catetan tinulis tina obrolan ieu. Naha Bapa/Ibu satuju?",
+        "transcript": "Kalayan widi Bapa/Ibu, {mill} nyimpen catetan tinulis tina obrolan ieu salila {days} dinten, supados perencana "
+                      "tiasa mariksa deui kasapukanana. Naha Bapa/Ibu satuju?",
         "recording": "Kalayan widi Bapa/Ibu, {mill} ngarékam obrolan ieu sareng nyimpen rékaman sarta catetan tinulisna salila "
                      "{days} dinten, supados perencana tiasa mariksa deui kasapukanana. Naha Bapa/Ibu satuju?",
     },
@@ -132,7 +137,8 @@ NOTICES = {
         "hello": "สวัสดี นี่คือผู้ช่วย AI ที่โทรมาในนามของ {mill}",
         "hello_named": "สวัสดี ฉันชื่อ {agent} เป็นผู้ช่วย AI ที่โทรมาในนามของ {mill}",
         "ask": "ไม่ทราบว่าใช่คุณ{name}หรือเปล่า?",
-        "transcript": "หากคุณอนุญาต {mill} จะเก็บบันทึกข้อความของการสนทนานี้ไว้ คุณยินยอมไหม?",
+        "transcript": "หากคุณอนุญาต {mill} จะเก็บบันทึกข้อความของการสนทนานี้ไว้ {days} วัน "
+                      "เพื่อให้ผู้วางแผนตรวจสอบข้อตกลงได้ คุณยินยอมไหม?",
         "recording": "หากคุณอนุญาต {mill} จะบันทึกเสียงการสนทนานี้ และเก็บไฟล์เสียงพร้อมบันทึกข้อความไว้ {days} วัน "
                      "เพื่อให้ผู้วางแผนตรวจสอบข้อตกลงได้ คุณยินยอมไหม?",
     },
@@ -140,7 +146,8 @@ NOTICES = {
         "hello": "Xin chào, đây là trợ lý AI gọi thay mặt cho {mill}.",
         "hello_named": "Xin chào, tôi là {agent}, trợ lý AI gọi thay mặt cho {mill}.",
         "ask": "Có phải tôi đang nói chuyện với {name} không ạ?",
-        "transcript": "Nếu anh/chị đồng ý, {mill} sẽ lưu bản ghi chép cuộc gọi này. Anh/chị có đồng ý không ạ?",
+        "transcript": "Nếu anh/chị đồng ý, {mill} sẽ lưu bản ghi chép cuộc gọi này trong {days} ngày để người lập kế hoạch có thể "
+                      "kiểm tra lại thỏa thuận. Anh/chị có đồng ý không ạ?",
         "recording": "Nếu anh/chị đồng ý, {mill} sẽ ghi âm cuộc gọi này và lưu bản ghi âm cùng bản ghi chép trong {days} "
                      "ngày để người lập kế hoạch có thể kiểm tra lại thỏa thuận. Anh/chị có đồng ý không ạ?",
     },
@@ -148,8 +155,8 @@ NOTICES = {
         "hello": "Magandang araw, ito ay isang AI assistant na tumatawag para sa {mill}.",
         "hello_named": "Magandang araw, ako si {agent}, isang AI assistant na tumatawag para sa {mill}.",
         "ask": "Si {name} po ba ang kausap ko?",
-        "transcript": "Kung papayag po kayo, itatago ng {mill} ang nakasulat na transcript ng tawag na ito. "
-                      "Pumapayag po ba kayo?",
+        "transcript": "Kung papayag po kayo, itatago ng {mill} ang nakasulat na transcript ng tawag na ito nang {days} araw, para "
+                      "masuri ng planner ang napagkasunduan. Pumapayag po ba kayo?",
         "recording": "Kung papayag po kayo, ire-record ng {mill} ang tawag na ito at itatago ang recording at nakasulat na "
                      "transcript nang {days} araw, para masuri ng planner ang napagkasunduan. Pumapayag po ba kayo?",
     },

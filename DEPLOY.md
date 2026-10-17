@@ -307,6 +307,6 @@ workflow's `env:` block, as `deploy.sh` already reads them.
   move it to Secret Manager and use `--set-secrets` as with the Gemini key.
 - The gateway is deployed with `--allow-unauthenticated` (the browser must reach it) and CORS
   is `*` by default. Set `CORS_ORIGINS` to your Hosting URL for anything real.
-- Firestore reads are public for the dashboard and the data is synthetic. Add Firebase Auth
-  to the read rule in `firestore.rules` before using real data.
+- Firestore is closed to browsers (`firestore.rules` denies all reads and writes). The dashboard gets its live data from the
+  gateway, which needs a sign-in on every `/api` call except sign-in itself (since 17 Oct 2026; AUDIT.md A1).
 - Never commit `.env`, `.firebaserc` or any key file. All three are already in `.gitignore`.

@@ -6,7 +6,7 @@ import { useAct } from "../../toast.jsx";
 import { useConfirm } from "../../dialogs.jsx";
 import { useLive } from "../../live.jsx";
 import { inCampaign, useMembership } from "../../campaigns.jsx";
-import { ActButton, Avatar, Icon, Pill } from "../../ui.jsx";
+import { ActButton, Avatar, DownloadLink, Icon, Pill } from "../../ui.jsx";
 import { shortDate } from "./Chart.jsx";
 
 const length = (c) => {
@@ -105,6 +105,14 @@ export default function CallRecap({ call, onClose }) {
                 <ul className="facts">
                   <Fact ok={!!c.consent} label="Consent">{c.consent ? "Farmer agreed to the transcript" : "Not agreed, so no transcript or recording is kept"}</Fact>
                   {c.consent && (
+                    <Fact ok={!!lines} label="Written transcript">
+                      {lines ? <>Saved{c.transcript_expires_at ? `, kept until ${expiry(c.transcript_expires_at)}` : ""}</>
+                        : c.transcript_deleted ? <>Deleted by {c.transcript_deleted.by || "a planner"} on {clock(c.transcript_deleted.at)}</>
+                        : c.transcript_expired_at ? "Deleted when its retention period ended"
+                        : "Not saved"}
+                    </Fact>
+                  )}
+                  {c.consent && (
                     <Fact ok={!!c.audio} label="Audio recording">
                       {c.audio ? <>Saved, kept until {expiry(c.audio.expires_at)}</>
                         : c.audio_deleted ? <>Deleted by {c.audio_deleted.by || "a planner"} on {clock(c.audio_deleted.at)}</>
@@ -144,7 +152,7 @@ export default function CallRecap({ call, onClose }) {
                 )}
                 {(offer?.status === "approved" || harvest) && (
                   <div className="po-line">
-                    <a className="btn" href={apiUrl(callPoUrl(c.id))} download>{offer?.status === "approved" ? "Purchase order (PDF)" : "Draft purchase order (PDF)"}</a>
+                    <DownloadLink path={callPoUrl(c.id)} filename={`purchase-order-${c.id}.pdf`}>{offer?.status === "approved" ? "Purchase order (PDF)" : "Draft purchase order (PDF)"}</DownloadLink>
                     <span className="small muted">{offer?.status === "approved" ? "The approved deal, ready to sign." : "At today's reference price, until a deal is approved."}</span>
                   </div>
                 )}
@@ -173,6 +181,13 @@ export default function CallRecap({ call, onClose }) {
                     )}
                   </div>
                 )}
+                {lines && can("calls.listen") && (
+                  <ActButton className="btn sm danger" busy="Deleting…" style={{ marginBottom: 8 }}
+                    run={async () => {
+                      const ok = await confirm({ title: "Delete this transcript?", body: "The written conversation is removed for good and cannot be brought back. The summary and what the agent captured stay.", confirm: "Delete transcript", danger: true });
+                      if (ok) await act(() => api(`/api/calls/${c.id}/transcript`, { method: "DELETE" }), "Transcript deleted.");
+                    }}>Delete transcript</ActButton>
+                )}
                 {lines ? (
                   <div className="transcript recap">
                     {lines.map((l, i) => (
@@ -186,7 +201,7 @@ export default function CallRecap({ call, onClose }) {
                     ))}
                   </div>
                 ) : (
-                  <p className="muted">{c.status === "dropped" ? "The call dropped before it finished. Answers saved during the call are kept above."
+                  <p className="muted">{c.transcript_deleted ? "The transcript was deleted." : c.transcript_expired_at ? "The transcript was deleted when its retention period ended." : c.status === "dropped" ? "The call dropped before it finished. Answers saved during the call are kept above."
                     : c.consent === false ? "No transcript: the farmer did not agree to one being kept." : "No transcript for this call."}</p>
                 )}
               </section>

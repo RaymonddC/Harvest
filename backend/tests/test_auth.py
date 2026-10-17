@@ -207,10 +207,23 @@ def test_every_capability_is_enforced_by_some_endpoint():
     assert used == set(access.CAPABILITIES)
 
 
-def test_reads_and_the_call_client_stay_open(client):
-    assert client.get("/api/state").status_code == 200
-    assert client.get("/api/forecast.csv").status_code == 200
-    assert client.get("/healthz").status_code == 200
+def test_every_read_needs_a_sign_in_but_any_signed_in_user_may_read(client):
+    """AUDIT.md A1: the live data holds farmer phone numbers and transcripts, so nothing under /api is open any more."""
+    for path in ("/api/state", "/api/forecast.csv", "/api/crm", "/api/calendar", "/api/track-record", "/api/answers.csv",
+                 "/api/traceability.csv", "/api/surplus?week=1", "/api/approvals/impact", "/api/supply"):
+        assert client.get(path).status_code == 401, path
+    assert client.get("/api/stream").status_code == 401
+    assert client.get("/api/state", headers={"Authorization": "Bearer nonsense"}).status_code == 401
+    viewer = login(client, "viewer")
+    assert client.get("/api/state", headers=viewer).status_code == 200
+    assert client.get("/api/forecast.csv", headers=viewer).status_code == 200
+    assert client.get("/healthz").status_code == 200 and client.get("/config.js").status_code == 200
+    assert client.post("/api/auth/login", json={"username": "x", "password": "y"}).status_code == 401  # reachable, just wrong
+
+
+def test_the_401_carries_cors_headers_so_the_browser_can_read_it(client):
+    r = client.get("/api/state", headers={"Origin": "https://example.web.app"})
+    assert r.status_code == 401 and r.headers.get("access-control-allow-origin")
 
 
 def test_me_reports_the_signed_in_role(client):
