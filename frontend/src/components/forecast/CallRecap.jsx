@@ -144,7 +144,8 @@ export default function CallRecap({ call, onClose }) {
               <section aria-labelledby="captured-title">
                 <h3 id="captured-title">What the agent captured</h3>
                 <ul className="facts">
-                  <Fact ok={!!c.consent} label="Consent">{c.consent ? "Farmer agreed to the transcript" : "Not agreed, so no transcript or recording is kept"}</Fact>
+                  <Fact ok={!!c.consent} label="Consent">{c.consent ? "Farmer agreed to the transcript"
+                    : c.status === "on_call" ? "Not answered yet" : "Not agreed, so no transcript or recording is kept"}</Fact>
                   {c.consent && (
                     <Fact ok={!!c.audio} label="Audio recording">
                       {c.audio ? <>Saved, kept until {expiry(c.audio.expires_at)}</>

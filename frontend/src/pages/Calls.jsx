@@ -110,7 +110,7 @@ export default function Calls() {
               <tbody>
                 {list.map(({ c, h, o, answers, f }) => {
                   const chip = callChip(c);
-                  const open = !["queued", "on_call"].includes(c.status);
+                  const open = !["queued", "on_call"].includes(c.status) || (c.channel === "whatsapp" && c.status === "on_call");  // an open chat can be followed live
                   return (
                     <tr key={c.id} className={open ? "clickable" : ""} onClick={open ? () => setShown(c) : undefined}
                       tabIndex={open ? 0 : undefined} onKeyDown={open ? (e) => { if (e.key === "Enter") setShown(c); } : undefined}>

@@ -52,10 +52,10 @@ function Field({ brandRef, cardRef }) {
       .then(({ startPhone }) => {
         if (!alive || !ref.current) return;
         // The phone fills the space between the logo and the text card, its lower part behind the see-through card.
-        const fit = () => {
+        const fit = () => {  // may run once more while the page closes, when the elements are already gone
           const top = (brandRef.current?.offsetTop || 0) + (brandRef.current?.offsetHeight || 0) + 16;
           const card = cardRef.current;
-          const bottom = card ? card.offsetTop + card.offsetHeight * 0.4 : ref.current.clientHeight;
+          const bottom = card ? card.offsetTop + card.offsetHeight * 0.4 : (ref.current?.clientHeight || 0);
           return { top, bottom };
         };
         stop = startPhone(ref.current, { still, fit, watch: [cardRef.current] });

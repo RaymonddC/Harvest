@@ -299,9 +299,9 @@ async def agent_reply(store: Store, settings: Settings, call_id: str, text: str 
         if not parts:
             return None
         contents.append(types.Content(role="user", parts=parts))
-        generate = generate or _generate(settings)
         reply = ""
         try:
+            generate = generate or _generate(settings)
             for _ in range(MAX_TOOL_ROUNDS):
                 resp = await generate(contents, instruction)
                 content = resp.candidates[0].content if resp.candidates else None
@@ -337,7 +337,7 @@ async def agent_reply(store: Store, settings: Settings, call_id: str, text: str 
             lines.append({"who": "agent", "text": reply, "at": now})
         store.set("calls", call_id, {"chat": lines, "chat_contents": _dump_contents(contents),
                                      "chat_state": session_state(session), "last_message_at": now,
-                                     "answers": dict(session.answers)}, merge=True)
+                                     "answers": dict(session.answers), "consent": session.consent}, merge=True)
         if session.ended:
             finish_chat(store, settings, call_id, session)
         return reply or None
