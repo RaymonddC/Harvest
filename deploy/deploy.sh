@@ -134,6 +134,7 @@ cat > "$ROOT/web/config.js" <<JS
 window.HARVEST_CONFIG = {
   apiBase: "$URL",
   millName: "$MILL_NAME",
+  mapsKey: "${MAPS_API_KEY:-}",
   firebase: $FB,
 };
 JS

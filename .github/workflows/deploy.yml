@@ -78,6 +78,7 @@ jobs:
           REAL_CALLS_ENABLED: ${{ vars.REAL_CALLS_ENABLED }}
           PHONE_CALLS_AT_ONCE: ${{ vars.PHONE_CALLS_AT_ONCE }}
           BIGQUERY_DATASET: ${{ vars.BIGQUERY_DATASET }}
+          MAPS_API_KEY: ${{ vars.MAPS_API_KEY }}
           BIGQUERY_LOCATION: ${{ vars.BIGQUERY_LOCATION }}
           REAL_CALL_ALLOWLIST: ${{ vars.REAL_CALL_ALLOWLIST }}
           # Text messages and planner alerts (optional).

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import FarmerMap from "../components/setup/FarmerMap.jsx";
 import { toast } from "sonner";
 import { campaignsOf, CROPS, useCrop, useMembership } from "../campaigns.jsx";
 import FarmerForm from "../components/setup/FarmerForm.jsx";
@@ -80,6 +81,7 @@ export default function Farmers() {
   return (
     <Shell title="Farmers" head={head}>
       {state && <Traceability />}
+      {state && <FarmerMapHere state={state} onOpen={setOpenFarmer} />}
       {state && <FarmerList farmers={list} onEdit={setFarmerForm} onOpen={setOpenFarmer} showCampaign title={kind === "suppliers" ? "Suppliers" : "All farmers"} filters={filters}
         empty={all.length ? "No farmer matches these filters." : "No farmers yet. Add one, or upload a CSV."} />}
       <FarmerSheet farmer={openFarmer} state={state} onClose={() => setOpenFarmer(null)} />
@@ -110,6 +112,11 @@ export default function Farmers() {
 
 // Where the fruit comes from: how many of the campaign's farmers have a mapped plot and a certification, who
 // delivers more than their plot can grow, and the traceability file for buyers (EUDR, RSPO, ISPO).
+function FarmerMapHere({ state, onOpen }) {
+  const { cid } = useCrop();
+  return <FarmerMap state={state} cid={cid} onOpen={onOpen} />;
+}
+
 function Traceability() {
   const { state } = useLive();
   const { cid, campaign } = useCrop();

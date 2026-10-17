@@ -1771,3 +1771,11 @@ tr.is-live td { background: #F2F8F4; }
 .ml-card { gap: 10px; }
 .ml-table { width: 100%; }
 .ml-table th, .ml-table td { padding: 7px 4px; font-size: 13.5px; }
+
+/* Farmers: plots on the map */
+.map-card { gap: 10px; }
+.gmap { width: 100%; height: 340px; border-radius: 10px; overflow: hidden; }
+.plot-map { width: 100%; height: auto; display: block; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; }
+.map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.map-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
