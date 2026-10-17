@@ -8,7 +8,8 @@ from app.tools import CallSession, ToolHandlers
 def test_preset_fills_name_voice_and_style_and_bad_values_are_refused(store, settings):
     r = services.set_agent_profile(store, settings, "palm", {"preset": "field_officer"},
                                    [{"text": "Butuh pupuk bulan ini?", "type": "yes_no"}])
-    assert r["persona"] == {"preset": "field_officer", "name": "Sari", "voice": "Aoede", "style": "friendly"}
+    assert r["persona"] == {"preset": "field_officer", "name": "Sari", "voice": "Aoede", "style": "friendly",
+                            "language_mode": "farmer", "language": "", "switch": True, "also_speaks": []}
     assert r["questions"][0]["id"].startswith("q-") and r["questions"][0]["type"] == "yes_no"
     for persona, questions, msg in (({"voice": "Robot"}, [], "Unknown voice"),
                                     ({"style": "shouty"}, [], "speaking style"),

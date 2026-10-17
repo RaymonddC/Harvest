@@ -1395,7 +1395,7 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
 
 # The languages a farmer can be called in. The agent speaks whatever the name says, so a typo here
 # would make it speak the wrong thing; the farmer form offers exactly this list.
-LANGUAGES = ("Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese", "Thai", "Vietnamese", "Filipino")
+LANGUAGES = agent_profile.LANGUAGES  # one list for the farmer form and the agent's languages
 LANGUAGE_ALIASES = {"indonesian": "Bahasa Indonesia", "indonesia": "Bahasa Indonesia",
                     "bahasa": "Bahasa Indonesia", "malay": "Bahasa Malaysia",
                     "malaysian": "Bahasa Malaysia", "bahasa melayu": "Bahasa Malaysia",

@@ -1128,3 +1128,15 @@ body.app .side .week-card a.wc-item:hover small { color: #CFE3D8; }
   color: var(--muted); font-weight: 700; font-size: 14.5px; text-decoration: none; white-space: nowrap; }
 .ov-tabs a:hover { color: var(--ink); }
 .ov-tabs a[aria-current="page"] { color: var(--leaf-deep); border-bottom-color: var(--leaf); }
+
+/* The agent's languages */
+body.app .agent-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.agent-langs { display: flex; flex-direction: column; gap: 10px; }
+.radio-row { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; cursor: pointer; }
+.radio-row input[type="radio"], .radio-row input[type="checkbox"] { margin-top: 4px; accent-color: var(--leaf); }
+.radio-row span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.radio-row b { font-size: 14px; }
+.radio-row small { color: var(--muted); font-size: 12.5px; }
+.radio-row select { min-height: 38px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); font: inherit; max-width: 240px; }
+.lang-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-left: 26px; }
+.lang-chips small { flex-basis: 100%; }

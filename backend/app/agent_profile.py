@@ -13,6 +13,9 @@ import re
 
 from .store import new_id
 
+# The languages a call can be in (the farmer form offers the same list; services.LANGUAGES).
+LANGUAGES = ("Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese", "Thai", "Vietnamese", "Filipino")
+
 # Gemini Live's built-in voices (the same names on the Gemini API and Vertex AI).
 VOICES: dict[str, str] = {
     "Kore": "Female · firm",
@@ -48,7 +51,8 @@ MAX_QUESTIONS = 5
 MAX_NAME = 30
 MAX_QUESTION_LEN = 200
 
-DEFAULT_PERSONA = {"preset": "", "name": "", "voice": "", "style": ""}
+DEFAULT_PERSONA = {"preset": "", "name": "", "voice": "", "style": "", "language_mode": "farmer", "language": "",
+                   "switch": True, "also_speaks": []}
 
 
 class AgentProfileError(ValueError):
@@ -58,7 +62,7 @@ class AgentProfileError(ValueError):
 def options() -> dict:
     """Everything the Agent page offers, so the dashboard and the server use the same lists."""
     return {"voices": VOICES, "styles": {k: v["label"] for k, v in STYLES.items()}, "presets": PRESETS,
-            "question_types": QUESTION_TYPES, "max_questions": MAX_QUESTIONS}
+            "question_types": QUESTION_TYPES, "max_questions": MAX_QUESTIONS, "languages": list(LANGUAGES)}
 
 
 def normalize_persona(raw: dict | None) -> dict:
@@ -76,7 +80,48 @@ def normalize_persona(raw: dict | None) -> dict:
     style = str(raw.get("style", base.get("style", "")) or "")
     if style and style not in STYLES:
         raise AgentProfileError(f"Unknown speaking style {style!r}. Use one of: {', '.join(STYLES)}.")
-    return {"preset": preset, "name": name, "voice": voice, "style": style}
+    # Languages: start in each farmer's own language ("farmer") or in one for every call ("fixed"); switch when the
+    # farmer answers in another language, to any of also_speaks (empty: any language on the list).
+    mode = str(raw.get("language_mode") or "farmer")
+    if mode not in ("farmer", "fixed"):
+        raise AgentProfileError("Language mode must be farmer or fixed.")
+    language = str(raw.get("language") or "")
+    if mode == "fixed" and language not in LANGUAGES:
+        raise AgentProfileError(f"Pick the call language. Use one of: {', '.join(LANGUAGES)}.")
+    also = [x for x in dict.fromkeys(raw.get("also_speaks") or []) if x]
+    bad = [x for x in also if x not in LANGUAGES]
+    if bad:
+        raise AgentProfileError(f"Unknown language {bad[0]!r}. Use one of: {', '.join(LANGUAGES)}.")
+    return {"preset": preset, "name": name, "voice": voice, "style": style, "language_mode": mode,
+            "language": language if mode == "fixed" else "", "switch": raw.get("switch", True) is not False,
+            "also_speaks": also}
+
+
+def call_language(persona: dict | None, farmer_language: str | None, default: str) -> str:
+    """The language a call starts in."""
+    p = persona or {}
+    if p.get("language_mode") == "fixed" and p.get("language") in LANGUAGES:
+        return p["language"]
+    return farmer_language or default
+
+
+def switch_languages(persona: dict | None, start: str) -> list[str] | None:
+    """The languages the agent may switch to during a call (None: it stays in the start language)."""
+    p = persona or {}
+    if p.get("switch", True) is False:
+        return None
+    return [x for x in (p.get("also_speaks") or LANGUAGES) if x != start]
+
+
+def language_rule(start: str, switch_to: list[str] | None) -> str:
+    if not switch_to:
+        return (f"- Speak only {start}, in every sentence, even if the farmer answers in another language. Never slip "
+                f"into English, not even for prices, numbers, units or the word \"reference\": say them in {start} too.")
+    return (f"- Start in {start}. Never slip into English for prices, numbers or units unless English is the language "
+            f"of the call.\n- If the farmer answers in another language, or asks for one, and it is one of these: "
+            f"{', '.join(switch_to)}, switch to it completely and stay in it for the rest of the call (prices, numbers "
+            f"and the read-back included). Do not switch for a single borrowed word; many farmers mix in a few words of "
+            f"Indonesian. If they speak a language not on this list, carry on in {start}, slowly and simply.")
 
 
 def normalize_questions(raw: list | None) -> list[dict]:

@@ -203,7 +203,7 @@ def test_prompt_has_disclosure_two_step_read_back_and_no_limits(store, settings)
     assert "Bahasa Indonesia" in text and "Palm FFB" in text
     assert "confirmed_by_farmer false" in text and "W3" in text
     # the voice rules found missing in the recorded calls
-    assert "Speak only Bahasa Indonesia" in text and "Never slip into English" in text
+    assert "Start in Bahasa Indonesia" in text and "Never slip into English" in text  # switching on by default
     assert "Ask the consent question once" in text
     assert "A number the farmer says with" in text and "PRICE per kilogram" in text
     assert "call end_call at once" in text and "BEFORE end_call" in text and "one short goodbye sentence" in text

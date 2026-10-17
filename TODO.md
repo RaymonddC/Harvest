@@ -239,5 +239,11 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     The Live forecast moved to `/forecast`. Sidebar: Overview, Live forecast, Calendar; then 1 Prepare (Farmers,
     Campaign), 2 Call (Calls), 3 Decide (Approvals); Settings (Agent).
 
+24. **The agent's languages (17 Oct, same branch).** Per campaign (Agent page, persona fields `language_mode`,
+    `language`, `switch`, `also_speaks`): start in each farmer's own language or one language for every call; switch
+    when the farmer answers in another language (any on the list, or only the ones ticked), or never. The prompt's
+    language rule and the speech-to-text hint follow it (the hint lists extra languages only when ticked). Still to
+    check on a real call: switching mid-call, and the fixed opening wording for Thai, Vietnamese and Filipino.
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.
