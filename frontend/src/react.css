@@ -1299,3 +1299,31 @@ table.answers tr:focus-visible td { background: var(--leaf-soft); outline: none;
 .board .col.st-no_reply { --stage: #C2410C; } .board .col.st-answered { --stage: var(--leaf); }
 .board .col.st-offer { --stage: #8A5605; } .board .col.st-deal { --stage: #0F3D2A; } .board .col.st-delivered { --stage: #6B7280; }
 .board .col[class*="st-"] { border-top: 0 !important; }
+
+/* Overview, where the farmers stand (second pass): one strip shows how the campaign's farmers split across the stages,
+   and the stages are plain columns under it (no tiles, no arrows). The colour of each stage is the same as on the
+   farmers board. */
+.chain-card { padding: 18px 20px 16px; }
+.chain-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.chain-top h2 { font-size: 17px; margin: 0; }
+.chain-top h2 a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.chain-bar { display: flex; gap: 2px; height: 10px; margin: 12px 0 14px; border-radius: 5px; overflow: hidden; background: var(--line); }
+.chain-bar span { min-width: 4px; }
+.chain { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; }
+.chain li { display: block; border-left: 1px solid var(--line); }
+.chain li:first-child { border-left: 0; }
+.chain li a { background: none; border: 0; border-radius: 8px; padding: 2px 14px 4px; gap: 2px; color: inherit; }
+.chain li:first-child a { padding-left: 0; }
+.chain li a:hover { background: var(--fill, #F4F6F4); }
+.chain li.warn a { background: none; }
+.chain .ch-label { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.chain .ch-label i { width: 9px; height: 9px; border-radius: 3px; background: var(--stage); flex: none; }
+.chain .ch-n { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; color: var(--ink); }
+.chain .ch-n small { margin-left: 4px; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+.chain li.warn .ch-n { color: #9A5B00; }
+.chain li > i { display: none; }
+.cb-call { --stage: var(--amber); } .cb-answered { --stage: var(--leaf); } .cb-offer { --stage: #8A5605; }
+.cb-deal { --stage: #0F3D2A; } .cb-delivered { --stage: #6B7280; }
+.chain-bar .cb-call, .chain-bar .cb-answered, .chain-bar .cb-offer, .chain-bar .cb-deal, .chain-bar .cb-delivered { background: var(--stage); }
+@media (max-width: 900px) { .chain { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 12px; } .chain li:nth-child(4) { border-left: 0; } .chain li:nth-child(4) a { padding-left: 0; } }
+@media (max-width: 520px) { .chain { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chain li:nth-child(3), .chain li:nth-child(5) { border-left: 0; } .chain li:nth-child(4) { border-left: 1px solid var(--line); } .chain li:nth-child(3) a, .chain li:nth-child(5) a { padding-left: 0; } .chain li:nth-child(4) a { padding-left: 14px; } }

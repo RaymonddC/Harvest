@@ -41,14 +41,16 @@ export default function Overview() {
   const c = crm.counts;
   const offersKg = state ? inCampaign(state, state.offers, cid).filter((o) => ["pending", "escalated"].includes(o.status)).reduce((n, o) => n + o.kg, 0) : 0;
   const deals = state ? inCampaign(state, state.offers, cid).filter((o) => o.status === "approved") : [];
+  // Where the campaign's farmers stand, left to right. "bar" is how many farmers sit in that stage now (the strip on
+  // top); the figure under each label is what that stage holds in tonnes.
   const chain = [
-    { label: "Farmers", n: crm.farmers.length, sub: "in this campaign", to: "/setup#farmer-list" },
-    { label: "Need a call", n: (c.to_call || 0) + (c.no_reply || 0) + (c.calling || 0), sub: "no current answer", to: "/setup#farmer-list", warn: true },
-    { label: "Answered", n: c.answered || 0, sub: `${fmtT(have)} t counted`, to: "/forecast" },
-    { label: "Offers", n: c.offer || 0, sub: `${fmtT(offersKg)} t waiting`, to: "/approvals", warn: (c.offer || 0) > 0 },
-    { label: "Deals", n: deals.length, sub: `${fmtT(deals.reduce((n, o) => n + o.kg, 0))} t agreed`, to: "/approvals" },
-    { label: "Delivered", n: c.delivered || 0, sub: `${fmtT(deals.reduce((n, o) => n + (o.delivered_kg || 0), 0))} t in`, to: "/forecast" },
+    { key: "call", label: "Need a call", n: (c.to_call || 0) + (c.no_reply || 0) + (c.calling || 0), sub: "no current answer", to: "/setup#farmer-list", warn: true },
+    { key: "answered", label: "Answered", n: c.answered || 0, sub: `${fmtT(have)} t counted`, to: "/forecast" },
+    { key: "offer", label: "Offers", n: c.offer || 0, sub: `${fmtT(offersKg)} t waiting`, to: "/approvals", warn: (c.offer || 0) > 0 },
+    { key: "deal", label: "Deals", n: c.deal || 0, sub: `${fmtT(deals.reduce((n, o) => n + o.kg, 0))} t agreed`, to: "/approvals" },
+    { key: "delivered", label: "Delivered", n: c.delivered || 0, sub: `${fmtT(deals.reduce((n, o) => n + (o.delivered_kg || 0), 0))} t in`, to: "/forecast" },
   ];
+  const total = Math.max(1, crm.farmers.length);
   const items = todoItems(state, cid);
   const pick = (f) => { setFilter(f); setTimeout(() => document.getElementById("farmer-list")?.scrollIntoView({ block: "start", behavior: "smooth" }), 50); };
 
@@ -64,12 +66,22 @@ export default function Overview() {
     <Shell title="Overview" head={head}>
       {state && (
         <>
-          <section className="card chain-card" aria-label="From farmers to deliveries">
+          <section className="card chain-card" aria-labelledby="chain-title">
+            <div className="chain-top">
+              <h2 id="chain-title"><Link to="/setup#farmer-list">{crm.farmers.length} farmers</Link> in this campaign</h2>
+              <span className="small muted">where each one stands</span>
+            </div>
+            <div className="chain-bar" aria-hidden="true">
+              {chain.filter((s) => s.n).map((s) => <span key={s.key} className={`cb-${s.key}`} style={{ flexGrow: s.n }} title={`${s.label}: ${s.n}`} />)}
+            </div>
             <ol className="chain">
-              {chain.map((s, i) => (
-                <li key={s.label} className={s.warn && s.n ? "warn" : ""}>
-                  <Link to={s.to}><b>{s.n}</b><span>{s.label}</span><small>{s.sub}</small></Link>
-                  {i < chain.length - 1 && <i aria-hidden="true">→</i>}
+              {chain.map((s) => (
+                <li key={s.key} className={`cb-${s.key} ${s.warn && s.n ? "warn" : ""}`}>
+                  <Link to={s.to}>
+                    <span className="ch-label"><i aria-hidden="true" />{s.label}</span>
+                    <span className="ch-n num">{s.n}<small> of {total}</small></span>
+                    <small>{s.sub}</small>
+                  </Link>
                 </li>
               ))}
             </ol>
