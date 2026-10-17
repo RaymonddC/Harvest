@@ -758,3 +758,15 @@ def test_planner_corrects_an_answer(client, store):
     assert r.status_code == 200 and a["answer"] == "120" and a["original"] == "12" and a["edited_by"]
     assert client.put(f"/api/calls/{call_id}/answers/q-abcd1234", json={"answer": "banyak"}).status_code == 400
     assert client.put(f"/api/calls/{call_id}/answers/q-nope", json={"answer": "1"}).status_code == 400
+
+
+def test_a_farmer_talking_over_the_goodbye_does_not_cut_it_off(fake_voice, store, settings):
+    """After end_call the browser must not be told to clear its audio: the goodbye plays to the end."""
+    fake_voice.turns[-1] = [audio(), content(interrupted=True), audio(), content(turn_complete=True)]
+    cid = services.queue_call(store, store.get("farmers", "b001"), "gap_fill", gap_week=3)
+    with TestClient(create_app(settings, store)) as c, c.websocket_connect(f"/ws/call/{cid}") as ws:
+        for _ in range(3):
+            ws.send_bytes(b"\1\0" * 640)
+        events, frames = drain(ws)
+    assert not any(e["type"] == "interrupted" for e in events)
+    assert frames >= 2  # the greeting and both goodbye pieces still reached the browser

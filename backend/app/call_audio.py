@@ -2,7 +2,7 @@
 
 CallRecorder collects the audio while the call runs (in memory: a call is at most a few minutes). run_call hands it
 to a CallAudioStore at the end when the farmer agreed; with no consent it is simply dropped, so nothing is ever
-written for a farmer who said no. The file is a stereo MP3: farmer on the left, agent on the right, 16 kHz.
+written for a farmer who said no. (Required by Indonesia's PDP Law, Law 27/2022: keep it; see CLAUDE.md.) The file is a stereo MP3: farmer on the left, agent on the right, 16 kHz.
 """
 
 from __future__ import annotations

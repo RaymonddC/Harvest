@@ -100,7 +100,9 @@ forecast rows `W1`..`W5`), so existing data, tests and screens need no migration
 `MULTI_CROP` is on by default (GitHub variable `MULTI_CROP=false` turns it off). The dashboard's campaign screens (Setup, Forecast, Approvals, week card, next step) use the picked crop; a crop with no price range shows a blank form, never another crop's. Demo data stays palm only; a new crop needs farmers and price limits added by the planner,
 and a gap-fill start refuses with a clear message while limits are missing.
 
-## Call audio recording (decided 15 Oct, not built yet)
+## Call audio recording (decided 15 Oct, built 15 to 16 Oct)
+**PDP Law (Law 27/2022) requirement. Do not remove or weaken the consent notice, the retention period, planners-only access or the
+delete action without asking; they exist to meet it (our reading, not legal advice, lawyer review still to do).**
 Why: the speech-to-text transcript can be wrong, so a planner needs to hear what was said.
 - **What:** record both sides of every call, but only keep it if the farmer agrees to the consent question; no consent, nothing is written.
 - **Retention:** 90 days (a lifecycle rule on the bucket deletes the files). **Who can listen:** planners only (a new `calls.listen` capability).

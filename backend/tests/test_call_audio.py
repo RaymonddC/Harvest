@@ -135,6 +135,18 @@ def test_a_call_the_farmer_agreed_to_is_recorded_with_line_times(recorded, store
     assert call["transcript"][0]["who"] == "agent" and call["transcript"][0]["t"] >= 0
 
 
+def test_a_failed_save_is_marked_on_the_call_so_planners_can_see_it(recorded, store, monkeypatch):
+    client, s = recorded()
+
+    def boom(self, call_id, data):
+        raise RuntimeError("bucket says no")
+
+    monkeypatch.setattr(LocalAudioStore, "save", boom)
+    with client:
+        call_id, call = run(client, store)
+    assert not call.get("audio") and call["audio_error"]["at"] and call["consent"]
+
+
 def test_no_consent_means_nothing_is_kept(recorded, store, tmp_path):
     client, s = recorded(consent=False)
     with client:

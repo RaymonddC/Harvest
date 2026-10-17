@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, apiUrl, callChip, callPoUrl, can, fmtT, getSession, KIND_WORD, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
+import { useConfirm } from "../../dialogs.jsx";
 import { useLive } from "../../live.jsx";
 import { inCampaign, useMembership } from "../../campaigns.jsx";
 import { ActButton, Avatar, Icon, Pill } from "../../ui.jsx";
@@ -22,6 +23,8 @@ function weekOf(rows, iso) {
   return rows.find((r) => { const s = new Date(r.week_start + "T00:00:00"); return d >= s && d < new Date(s.getTime() + 7 * 864e5); }) || null;
 }
 
+const expiry = (iso) => (iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "the end of the retention period");
+
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 // The recording of a call, for planners. The file is fetched with the planner's sign-in (an audio tag cannot send
@@ -35,7 +38,7 @@ function useRecording(c) {
     setRec({ state: "loading" });
     fetch(apiUrl(`/api/calls/${id}/audio`), { headers: { Authorization: `Bearer ${getSession()?.token || ""}` } })
       .then(async (r) => {
-        if (!r.ok) throw new Error(r.status === 410 ? "This recording was deleted when its 90 days ended." : "The recording could not be loaded.");
+        if (!r.ok) throw new Error(r.status === 410 ? "This recording was kept for its full retention period and has been deleted." : "The recording could not be loaded.");
         url = URL.createObjectURL(await r.blob());
         if (live) setRec({ state: "ready", url });
       })
@@ -59,6 +62,7 @@ const Fact = ({ ok, label, children }) => (
 export default function CallRecap({ call, onClose }) {
   const { state } = useLive();
   const act = useAct();
+  const confirm = useConfirm();
   const [english, setEnglish] = useState(true);
   const { of } = useMembership(state);
   const c = (call && state?.calls.find((x) => x.id === call.id)) || call;
@@ -95,7 +99,15 @@ export default function CallRecap({ call, onClose }) {
               <section aria-labelledby="captured-title">
                 <h3 id="captured-title">What the agent captured</h3>
                 <ul className="facts">
-                  <Fact ok={!!c.consent} label="Recording">{c.consent ? "Farmer agreed to it" : "Not agreed, so no transcript is kept"}</Fact>
+                  <Fact ok={!!c.consent} label="Consent">{c.consent ? "Farmer agreed to the transcript" : "Not agreed, so no transcript or recording is kept"}</Fact>
+                  {c.consent && (
+                    <Fact ok={!!c.audio} label="Audio recording">
+                      {c.audio ? <>Saved, kept until {expiry(c.audio.expires_at)}</>
+                        : c.audio_deleted ? <>Deleted by {c.audio_deleted.by || "a planner"} on {clock(c.audio_deleted.at)}</>
+                        : c.audio_error ? "Could not be saved, although the farmer was told the call is recorded. Tell the technical team."
+                        : "Not recorded"}
+                    </Fact>
+                  )}
                   {c.kind !== "confirm" && (
                     <Fact ok={!!harvest} label="Next harvest">
                       {harvest ? <>{fmtT(harvest.kg)} t{hw ? `, ${hw.label} (from ${shortDate(hw.week_start)})` : ""}{harvest.confidence === "unsure" ? ", not sure yet" : ", firm"}</> : "Not given on this call"}
@@ -149,10 +161,10 @@ export default function CallRecap({ call, onClose }) {
                     {rec.state === "error" && <p className="muted">{rec.message}</p>}
                     {rec.state === "ready" && <p className="muted small">Farmer on the left, agent on the right. Click a time to hear that line.</p>}
                     {can("calls.listen") && (
-                      <ActButton className="btn ghost small" busy="Deleting…"
+                      <ActButton className="btn sm danger" busy="Deleting…"
                         run={async () => {
-                          if (!window.confirm("Delete this recording for good? The written transcript stays.")) return;
-                          await act(() => api(`/api/calls/${c.id}/audio`, { method: "DELETE" }), "Recording deleted. The transcript stays.");
+                          const ok = await confirm({ title: "Delete this recording?", body: "The audio is removed for good and cannot be brought back. The written transcript stays.", confirm: "Delete recording", danger: true });
+                          if (ok) await act(() => api(`/api/calls/${c.id}/audio`, { method: "DELETE" }), "Recording deleted. The transcript stays.");
                         }}>Delete recording</ActButton>
                     )}
                   </div>

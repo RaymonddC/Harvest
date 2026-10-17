@@ -3,6 +3,17 @@
 Hackathon project (Google Cloud AI Builder Cup 2026, Manufacturing). Read `README.md` first, then `TODO.md`
 (open work, items 10 to 12 are the voice and demo-resilience tasks), `DECISIONS.md` and `ENV.md`.
 
+## Legal requirements: do not remove (Indonesia's PDP Law, Law 27/2022)
+The consent and retention behavior is there because of the PDP Law (our reading, not legal advice; see "Call audio recording"
+in `DECISIONS.md`). Do not delete, shorten or "simplify" any of it without asking the user:
+- The consent question and notice in the call's language (`prompt.NOTICES`, `notice_for`): it must say the purpose, what is kept
+  (transcript, and the recording when `CALL_AUDIO_BUCKET`/`CALL_AUDIO_DIR` is set) and for how many days (Art. 21).
+- Nothing is kept without a yes: no transcript and no recording if the farmer does not agree (Art. 22), and the stored "yes" is the proof (Art. 24).
+- The retention period: one setting (`CALL_AUDIO_RETENTION_DAYS`, 90) used by the notice, the stored expiry, the playback refusal and the
+  bucket lifecycle rule (`deploy/setup-call-audio.sh`). Keep these in step.
+- Planners-only listening (`calls.listen`) and the manual "Delete recording" action (a farmer's right to withdraw and have data deleted).
+- The comments and notes saying so: `prompt.py`, `call_audio.py`, `DECISIONS.md`, `ENV.md`, `TODO.md`.
+
 ## Layout
 - `backend/app/`: FastAPI gateway (`main.py`), Gemini Live relay (`live_session.py`), the agent's tools
   (`tools.py`), prompt (`prompt.py`), price rules (`rules_engine.py`), services, `access.py` and `auth.py`

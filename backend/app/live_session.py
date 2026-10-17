@@ -253,7 +253,11 @@ async def keep_recording(recorder: CallRecorder, audio_store, store: Store, sett
                                                "saved_at": now, "expires_at": expires}}, merge=True)
         await asyncio.to_thread(audio_store.purge, settings.call_audio_retention_days)
     except Exception:  # noqa: BLE001
-        log.exception("call %s: the recording could not be saved", call_id)
+        log.exception("call %s: the recording could not be saved (the farmer was told the call is recorded)", call_id)
+        try:  # the planner must be able to see that a promised recording does not exist
+            store.set("calls", call_id, {"audio_error": {"at": services.now_iso()}}, merge=True)
+        except Exception:  # noqa: BLE001
+            log.exception("call %s: could not note the failed recording either", call_id)
 
 
 async def run_call(channel: Channel, store: Store, settings: Settings, call_id: str,
@@ -388,9 +392,13 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                         if not sc:
                             continue
                         if sc.interrupted:
-                            if recorder:
-                                recorder.interrupted()
-                            await send({"type": "interrupted"})
+                            log.info("call %s: agent interrupted by the farmer's side (after_end=%s)", call_id, session.ended)
+                            # Once end_call was called the goodbye is let finish: a "yes" or a cough from the farmer must not
+                            # clear the audio that is still playing, or the voice stops in the middle of the last sentence.
+                            if not session.ended:
+                                if recorder:
+                                    recorder.interrupted()
+                                await send({"type": "interrupted"})
                         if sc.model_turn:
                             for part in sc.model_turn.parts or []:
                                 if part.inline_data and part.inline_data.data:
@@ -401,6 +409,7 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                                         # the browser long after the call was closed.
                                         post_end_seconds += len(part.inline_data.data) / 2 / OUTPUT_RATE
                                         if post_end_seconds > GOODBYE_MAX_AUDIO_SECONDS:
+                                            log.info("call %s: goodbye cut after %.1f s of speech", call_id, post_end_seconds)
                                             return
                                     if recorder:
                                         recorder.add_agent(part.inline_data.data)

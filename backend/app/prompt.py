@@ -62,6 +62,9 @@ call open and never start a new topic after the deal is saved.
 # the model on the fly) so the notice says the same thing in every call and every language, and can be checked.
 # {hello} names the caller as an AI, {ask} confirms who is on the line, {consent} asks for consent to what is kept.
 # Javanese and Sundanese were written without a native reviewer: have a speaker check them before real use.
+# LEGAL (Indonesia's PDP Law, Law 27/2022; our reading, not legal advice): the farmer must be told the purpose, what is kept and for how
+# long BEFORE agreeing (Art. 21), consent can be recorded (Art. 22), and we must be able to prove it (Art. 24). Do not remove or
+# shorten these notices, the retention number or the "no consent, nothing kept" rule without asking. See CLAUDE.md and DECISIONS.md.
 NOTICES = {
     "Bahasa Indonesia": {
         "hello": "Halo, ini asisten AI yang menelepon untuk {mill}.",
