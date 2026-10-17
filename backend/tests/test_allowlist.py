@@ -1,4 +1,4 @@
-"""Numbers added to the real-call allowlist from the dashboard."""
+"""Who real calls may reach: farmers with Agent calls on (the toggle on each farmer), plus REAL_CALL_ALLOWLIST."""
 
 import dataclasses
 
@@ -23,49 +23,35 @@ def client(twilio, store, monkeypatch):
         yield c
 
 
-def test_a_number_added_in_the_dashboard_can_be_dialled(store, twilio, monkeypatch):
+def test_turning_agent_calls_on_lets_the_agent_phone_the_farmer(store, twilio, monkeypatch):
     placed = []
     monkeypatch.setattr(services, "_place_twilio_call", lambda st, s, cid, to: placed.append(to))
     fid = services.add_farmer(store, {"name": "Pak Baru", "phone": "+62 812 3456 7890", "crop": "palm", "language": "English"})
-    with pytest.raises(services.ServiceError, match="not on the real-call allowlist"):
+    with pytest.raises(services.ServiceError, match="Agent calls is off"):
         services.dial_now(store, twilio, fid)
-    doc = services.allow_number(store, twilio, "+62 812 3456 7890", "Pak Baru")
-    assert doc["phone"] == "+6281234567890" and doc["farmer_id"] == fid  # linked to the farmer with that number
+    store.set("farmers", fid, {"agent_calls": True}, merge=True)
     services.dial_now(store, twilio, fid)
     assert placed == ["+6281234567890"]
     assert "2 numbers" in services.phone_calls_note(twilio, store)
-    services.disallow_number(store, doc["id"])
+    store.set("farmers", fid, {"agent_calls": False}, merge=True)
     assert not services.number_allowed(store, twilio, "+6281234567890")
     assert services.number_allowed(store, twilio, "+628114617000")  # the server's list still applies
 
 
-def test_cap_and_switch_off(store, twilio):
-    small = dataclasses.replace(twilio, web_allowlist_max=1)
-    services.allow_number(store, small, "+62 812 0000 0001")
-    services.allow_number(store, small, "+62 812 0000 0001", "again")  # the same number again is fine
-    with pytest.raises(services.ServiceError, match="full"):
-        services.allow_number(store, small, "+62 812 0000 0002")
-    with pytest.raises(services.ServiceError, match="turned off"):
-        services.allow_number(store, dataclasses.replace(twilio, web_allowlist_max=0), "+62 812 0000 0003")
-    with pytest.raises(services.ServiceError, match="does not look right"):
-        services.allow_number(store, twilio, "12")
-
-
-def test_texts_follow_the_same_allowlist(store, twilio):
+def test_texts_follow_the_same_rule(store, twilio):
     s = dataclasses.replace(twilio, messaging_channel="sms")
+    fid = services.add_farmer(store, {"name": "Bu Teks", "phone": "+62 812 9999 8888", "crop": "palm", "language": "English"})
     assert "not on the allowlist" in messaging._why_not(store, s, "+6281299998888")
-    services.allow_number(store, s, "+6281299998888")
+    store.set("farmers", fid, {"agent_calls": True}, merge=True)
     assert messaging._why_not(store, s, "+6281299998888") is None
 
 
-def test_api_add_farmer_with_calls_allowed_and_remove(client, store):
+def test_api_add_farmer_with_agent_calls_and_toggle_it(client, store):
     r = client.post("/api/farmers", json={"name": "Bu Telepon", "phone": "+62 813 1111 2222", "crop": "palm",
-                                          "language": "English", "allow_calls": True})
-    assert r.status_code == 200
-    nums = store.list("allowed_numbers")
-    assert [(n["phone"], n["farmer_id"]) for n in nums] == [("+6281311112222", r.json()["id"])]
-    state = client.get("/api/state").json()
-    assert state["settings"]["web_allowlist_max"] == 20 and state["settings"]["server_allowlist"] == ["+628114617000"]
-    assert client.delete(f"/api/allowed-numbers/{nums[0]['id']}").status_code == 200
-    assert client.post("/api/allowed-numbers", json={"phone": "+62 813 3333 4444", "label": "Office"}).status_code == 200
-    assert client.delete("/api/allowed-numbers/n000").status_code == 404
+                                          "language": "English", "agent_calls": True})
+    assert r.status_code == 200 and store.get("farmers", r.json()["id"])["agent_calls"] is True
+    fid = r.json()["id"]
+    assert client.put(f"/api/farmers/{fid}/agent-calls", json={"agent_calls": False}).json()["agent_calls"] is False
+    assert store.get("farmers", fid)["agent_calls"] is False
+    assert client.put("/api/farmers/nobody/agent-calls", json={"agent_calls": True}).status_code == 404
+    assert client.post("/api/allowed-numbers", json={"phone": "+62 813 3333 4444"}).status_code in (404, 405)

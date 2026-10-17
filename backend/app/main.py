@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import (access, agent_profile, auth, calendar_view, messaging, mill_ops, purchase_order, seed_data, services,
+from . import (access, agent_profile, auth, calendar_view, crm, messaging, mill_ops, purchase_order, seed_data, services,
                track_record)
 from .call_audio import make_audio_store
 from .config import Settings, get_settings
@@ -44,7 +44,7 @@ class FarmerIn(BaseModel):
     usual_kg_week: float | None = None
     can_pull_forward: bool = False
     campaign_id: str | None = None  # on add: a campaign to put the farmer in; "" for none (the database only)
-    allow_calls: bool = False  # on add: also put the number on the real-call allowlist
+    agent_calls: bool = False  # the AI agent phones this farmer (and real calls may reach the number)
     plot_lat: str = ""  # traceability: where the farmer's plot is, its area and certification (all optional)
     plot_lng: str = ""
     plot_ha: str = ""
@@ -84,6 +84,23 @@ class CampaignEditIn(BaseModel):
     daily_capacity_kg: float | None = None
     working_days: int | None = None
     truck_kg: float | None = None
+    segment: dict | None = None  # {"reliability": "reliable", "size": "large", "certified": "yes"}; {} = everyone
+
+
+class NoteIn(BaseModel):
+    kind: str = "note"
+    text: str = ""
+    rating: int | None = None
+    follow_up_on: str | None = None
+
+
+class DoneIn(BaseModel):
+    done: bool
+
+
+class PaidIn(BaseModel):
+    paid: bool
+    ref: str | None = None
 
 
 class CampaignFarmersIn(BaseModel):
@@ -95,14 +112,8 @@ class ToCallIn(BaseModel):
     to_call: bool
 
 
-class ByHandIn(BaseModel):
-    by_hand: bool
-
-
-class AllowNumberIn(BaseModel):
-    phone: str
-    label: str = ""
-    farmer_id: str | None = None
+class AgentCallsIn(BaseModel):
+    agent_calls: bool
 
 
 class RivalOfferIn(BaseModel):
@@ -315,7 +326,6 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop,
                             "phone_calls": services.phone_calls_ready(settings),
                             "phone_calls_note": services.phone_calls_note(settings, store),
-                            "web_allowlist_max": settings.web_allowlist_max,
                             "allow_any_number": "*" in settings.real_call_allowlist,
                             "server_allowlist": sorted(n for n in settings.real_call_allowlist if n != "*"),
                             "agent_options": agent_profile.options(),
@@ -388,12 +398,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         row = body.model_dump()
         row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
         cid = row.pop("campaign_id", None)
-        allow = row.pop("allow_calls", False)
-        if allow and "campaign.run" not in actor.capabilities:
-            raise HTTPException(403, "Your role cannot allow real phone calls.")
+        row["agent_calls"] = "yes" if row.get("agent_calls") else ""
         fid = services.add_farmer(store, row, cid, settings)
-        if allow:
-            services.allow_number(store, settings, row["phone"], row["name"], fid, actor)
         services.recompute_forecast(store, settings)
         return {"id": fid}
 
@@ -402,7 +408,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         row = body.model_dump()
         row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
         row.pop("campaign_id", None)  # moving between campaigns: PUT /api/campaigns/{id}/farmers
-        row.pop("allow_calls", None)  # the allowlist: /api/allowed-numbers
+        row["agent_calls"] = "yes" if row.get("agent_calls") else ""
         return services.update_farmer(store, farmer_id, row)
 
     @app.delete("/api/farmers/{farmer_id}", dependencies=[Depends(need("farmers.manage"))])
@@ -464,7 +470,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         """Rename a campaign or change its weekly target or weeks to plan."""
         return services.update_campaign(store, settings, campaign_id, body.name, body.target_kg_per_week, body.weeks,
                                         body.start_date, body.end_date, body.daily_capacity_kg, body.working_days,
-                                        body.truck_kg)
+                                        body.truck_kg, body.segment)
 
     @app.delete("/api/campaigns/{campaign_id}", dependencies=[Depends(need("campaign.run"))])
     def campaign_delete(campaign_id: str):
@@ -480,13 +486,47 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         """Cancel the farmer's calls that have not started (demo calls not answered, retries not dialled)."""
         return services.withdraw_farmer_calls(store, settings, farmer_id)
 
-    @app.put("/api/farmers/{farmer_id}/by-hand", dependencies=[Depends(need("farmers.manage"))])
-    def put_by_hand(farmer_id: str, body: ByHandIn):
-        """Call this farmer by hand (the agent's campaigns skip them), or let the agent call them again."""
+    # ----- the farmer relationship: segments, churn, notes, follow-ups, payments -----
+
+    def crm_call(fn, *a, **kw):
+        try:
+            return fn(*a, **kw)
+        except crm.CrmError as e:
+            raise HTTPException(404 if "not found" in str(e) else 400, str(e)) from None
+
+    @app.get("/api/crm")
+    def crm_overview(campaign: str | None = None):
+        """Each farmer's segment, reliability and churn signals, and the unpaid deliveries (of one campaign if named)."""
+        ids = None
+        if campaign:
+            camp = services.need_campaign(store, settings, campaign)
+            ids = {f["id"] for f in services.campaign_members(store, settings, camp["id"])}
+        return crm.overview(store, ids)
+
+    @app.post("/api/farmers/{farmer_id}/notes")
+    def add_note(farmer_id: str, body: NoteIn, actor: auth.Actor = Depends(need("farmers.manage"))):
+        return crm_call(crm.add_note, store, farmer_id, body.kind, body.text, body.rating, body.follow_up_on, actor.name)
+
+    @app.put("/api/notes/{note_id}/done")
+    def note_done(note_id: str, body: DoneIn, actor: auth.Actor = Depends(need("farmers.manage"))):
+        return crm_call(crm.set_note_done, store, note_id, body.done, actor.name)
+
+    @app.delete("/api/notes/{note_id}", dependencies=[Depends(need("farmers.manage"))])
+    def note_delete(note_id: str):
+        return crm_call(crm.delete_note, store, note_id)
+
+    @app.put("/api/deliveries/{delivery_id}/payment")
+    def delivery_paid(delivery_id: str, body: PaidIn, actor: auth.Actor = Depends(need("offers.decide"))):
+        """Mark a delivery paid (with the transfer reference) or not paid yet."""
+        return crm_call(crm.set_paid, store, delivery_id, body.paid, body.ref, actor.name)
+
+    @app.put("/api/farmers/{farmer_id}/agent-calls", dependencies=[Depends(need("campaign.run"))])
+    def put_agent_calls(farmer_id: str, body: AgentCallsIn):
+        """Let the AI agent phone this farmer (their number may then get real calls), or call them by hand."""
         if not store.get("farmers", farmer_id):
             raise HTTPException(404, "Farmer not found.")
-        store.set("farmers", farmer_id, {"by_hand": body.by_hand}, merge=True)
-        return {"farmer_id": farmer_id, "by_hand": body.by_hand}
+        store.set("farmers", farmer_id, {"agent_calls": body.agent_calls}, merge=True)
+        return {"farmer_id": farmer_id, "agent_calls": body.agent_calls}
 
     @app.put("/api/farmers/{farmer_id}/to-call", dependencies=[Depends(need("farmers.manage"))])
     def put_to_call(farmer_id: str, body: ToCallIn):
@@ -495,15 +535,6 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             raise HTTPException(404, "Farmer not found.")
         store.set("farmers", farmer_id, {"to_call": body.to_call}, merge=True)
         return {"farmer_id": farmer_id, "to_call": body.to_call}
-
-    @app.post("/api/allowed-numbers")
-    def post_allowed_number(body: AllowNumberIn, actor: auth.Actor = Depends(need("campaign.run"))):
-        """Let real phone calls (and texts) reach this number."""
-        return services.allow_number(store, settings, body.phone, body.label, body.farmer_id, actor)
-
-    @app.delete("/api/allowed-numbers/{number_id}", dependencies=[Depends(need("campaign.run"))])
-    def delete_allowed_number(number_id: str):
-        return services.disallow_number(store, number_id)
 
     def _pdf(made: tuple[str, bytes]) -> Response:
         name, data = made

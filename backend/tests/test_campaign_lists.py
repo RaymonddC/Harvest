@@ -180,20 +180,41 @@ def test_a_call_left_on_after_its_time_limit_or_on_a_removed_channel_is_ended(st
 
 
 
-def test_farmers_marked_by_hand_are_left_out_of_the_agents_calls(store, settings):
+def test_phone_rounds_call_only_farmers_with_agent_calls_on(store, settings, monkeypatch):
+    import dataclasses
     from app import services
-    members = services.campaign_members(store, settings, "current")
-    reasons = services.call_list(store, settings, members)
-    mine = sorted(reasons)[:3]
-    for fid in mine:
-        store.set("farmers", fid, {"by_hand": True}, merge=True)
-    r = services.start_campaign(store, settings, "collect", "current")
-    called = {c["farmer_id"] for c in store.list("calls") if c["status"] == "queued"}
-    assert r["by_hand"] == 3 and not called & set(mine) and r["queued"] == len(reasons) - 3
+    monkeypatch.setattr(services, "_place_twilio_call",
+                        lambda st, s, cid, to: st.set("calls", cid, {"dialed_at": services.now_iso()}, merge=True))
+    s = dataclasses.replace(settings, twilio_account_sid="AC1", twilio_auth_token="tok", twilio_from_number="+18000000000",
+                            public_base_url="https://example.test", real_calls_enabled=True)
+    members = services.campaign_members(store, s, "current")
+    reasons = sorted(services.call_list(store, s, members))
+    for fid in reasons[:3]:
+        store.set("farmers", fid, {"agent_calls": True}, merge=True)
+    r = services.start_campaign(store, s, "collect", "current", channel="twilio")
+    called = {c["farmer_id"] for c in store.list("calls") if c.get("channel") == "twilio"}
+    assert called == set(reasons[:3]) and r["by_hand"] == len(reasons) - 3
+    # Agent calls is the allowlist: on, the number may get a real call; off, it may not.
+    phone = lambda fid: services.normalize_phone(store.get("farmers", fid)["phone"])  # noqa: E731
+    assert services.number_allowed(store, s, phone(reasons[0])) and not services.number_allowed(store, s, phone(reasons[-1]))
 
 
-def test_by_hand_is_kept_from_the_farmer_form(store, settings):
+def test_agent_calls_is_kept_from_the_farmer_form(store, settings):
     from app import services
     fid = services.add_farmer(store, {"name": "Pak Uji", "phone": "+62 811 0000 9999", "crop": "palm",
-                                      "language": "English", "by_hand": "yes"}, settings=settings)
-    assert store.get("farmers", fid)["by_hand"] is True
+                                      "language": "English", "agent_calls": "yes"}, settings=settings)
+    assert store.get("farmers", fid)["agent_calls"] is True
+    other = services.add_farmer(store, {"name": "Bu Uji", "phone": "+62 811 0000 9998", "crop": "palm",
+                                        "language": "English"}, settings=settings)
+    assert store.get("farmers", other)["agent_calls"] is False  # manual by default
+
+
+def test_a_new_round_replaces_old_calls_that_never_started(store, settings):
+    from app import services
+    members = services.campaign_members(store, settings, "current")
+    fid = sorted(services.call_list(store, settings, members))[0]
+    farmer = store.get("farmers", fid)
+    old = services.queue_call(store, farmer, "collect")  # an old demo call nobody answered
+    r = services.start_campaign(store, settings, "collect", "current")
+    assert r["replaced"] >= 1 and store.get("calls", old)["outcome"] == "withdrawn"
+    assert any(c["farmer_id"] == fid and c["status"] == "queued" and c.get("campaign_id") == "current" for c in store.list("calls"))

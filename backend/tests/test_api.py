@@ -406,7 +406,7 @@ def test_dial_now_refuses_when_real_calls_are_disabled(store, settings):
 
 def test_dial_now_refuses_a_number_not_on_the_allowlist(store, settings):
     s = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=("+10000000000",))
-    with pytest.raises(services.ServiceError, match="allowlist"):
+    with pytest.raises(services.ServiceError, match="Agent calls is off"):
         services.dial_now(store, s, "f01")
 
 
@@ -689,14 +689,15 @@ def test_phone_campaign_dials_one_farmer_at_a_time_and_skips_refused_numbers(sto
     monkeypatch.setattr(services, "_after_phone_call", services.dial_next)  # run the next dial inline
     to_call = sorted(services.call_list(store, settings, services.campaign_members(store, settings, "current")))
     allowed = tuple(normalize_phone(store.get("farmers", fid)["phone"]) for fid in to_call[1:3])
-    s = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=allowed, phone_calls_at_once=1)
+    for fid in to_call[1:3]:  # Agent calls on: the agent may phone them; to_call[0] is left to the planner
+        store.set("farmers", fid, {"agent_calls": True}, merge=True)
+    s = twilio_settings(settings, real_calls_enabled=True, phone_calls_at_once=1)
 
     r = services.start_campaign(store, s, "collect", channel="twilio")
-    assert r["channel"] == "twilio" and r["queued"] == len(to_call)
+    assert r["channel"] == "twilio" and r["queued"] == 2 and r["by_hand"] == len(to_call) - 2
     first = store.get("calls", r["dialled"])
-    assert first["farmer_id"] == to_call[1] and len(fake.created) == 1  # to_call[0] is not on the allowlist
-    skipped = [c for c in store.list("calls") if c["farmer_id"] == to_call[0]][0]
-    assert skipped["status"] == "dropped" and skipped["outcome"] == "skipped" and "allowlist" in skipped["summary"]
+    assert first["farmer_id"] == to_call[1] and len(fake.created) == 1
+    assert not [c for c in store.list("calls") if c["farmer_id"] == to_call[0]]  # never queued for the agent
     assert services.dial_next(store, s) is None  # one call is already ringing
 
     services.finish_call(store, s, first["id"], ended_cleanly=True, outcome="completed", summary="ok",
@@ -717,8 +718,9 @@ def test_phone_campaign_rings_several_farmers_at_once(store, settings, monkeypat
     monkeypatch.setattr("twilio.rest.Client", fake.Client)
     monkeypatch.setattr(services, "_after_phone_call", services.dial_next)
     to_call = sorted(services.call_list(store, settings, services.campaign_members(store, settings, "current")))
-    allowed = tuple(normalize_phone(store.get("farmers", fid)["phone"]) for fid in to_call[:5])
-    s = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=allowed, phone_calls_at_once=3)
+    for fid in to_call[:5]:
+        store.set("farmers", fid, {"agent_calls": True}, merge=True)
+    s = twilio_settings(settings, real_calls_enabled=True, phone_calls_at_once=3)
     services.start_campaign(store, s, "collect", channel="twilio")
     assert len(fake.created) == 3  # three ring at the same time
     assert services.dial_next(store, s) is None  # the limit is reached
@@ -738,7 +740,7 @@ def test_phone_calls_note_explains_the_state(settings):
     assert "not set up" in services.phone_calls_note(settings)
     assert "REAL_CALLS_ENABLED" in services.phone_calls_note(twilio_settings(settings))
     on = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=("+628114617000",))
-    assert services.phone_calls_note(on) == "Real phone calls are on, only to the 1 number on the allowlist."
+    assert services.phone_calls_note(on) == "Real phone calls are on, only to farmers with Agent calls on (1 number)."
 
 
 # ---------- manual edits: harvests and answers ----------

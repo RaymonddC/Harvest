@@ -68,7 +68,7 @@ export function crmOf(state, cid) {
     else if (deal) stage = deal.delivered_kg > 0 ? "delivered" : "deal";
     else if (reason && last && (last.kind === "collect" || last.kind === "gap_fill") && NOT_REACHED.includes(last.outcome)) stage = "no_reply";
     else if (reason) stage = "to_call";
-    return { farmer: f, harvest: h, reason, stage, open, last, pending, deal, byHand: !!f.by_hand };
+    return { farmer: f, harvest: h, reason, stage, open, last, pending, deal, byHand: !!state.settings?.phone_calls && !f.agent_calls };
   });
   const counts = Object.fromEntries(STAGES.map((s) => [s.key, 0]));
   const reasons = Object.fromEntries(Object.keys(REASONS).map((k) => [k, 0]));

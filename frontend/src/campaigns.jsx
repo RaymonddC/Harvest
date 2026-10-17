@@ -66,11 +66,12 @@ export function inCampaign(state, list, cid) {
   if (!state || !list) return [];
   const camps = campaignsOf(state);
   const farmers = new Map(state.farmers.map((f) => [f.id, f]));
+  const born = camps.find((c) => c.id === cid)?.created_at || "";
   return list.filter((doc) => {
     if ("phone" in doc && "language" in doc) return farmerCampaign(doc, camps) === cid; // a farmer
     if (doc.campaign_id) return doc.campaign_id === cid;
     const f = farmers.get(doc.farmer_id);
-    if (f) return farmerCampaign(f, camps) === cid;
+    if (f) return farmerCampaign(f, camps) === cid && (!born || !("status" in doc) || (doc.created_at || "") >= born);
     return firstOfCrop(camps, doc.crop || camps[0]?.crop) === cid;
   });
 }

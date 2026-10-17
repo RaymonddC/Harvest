@@ -50,6 +50,7 @@ export default function FarmerPipeline({ state, cid, title, filter, onClearFilte
       if (!can("campaign.run")) return toast.error("Your role cannot start calls.");
       if (x.stage === "calling") return null;
       const byPhone = phoneCalls && numberAllowed(state, f.phone);
+      if (phoneCalls && !byPhone) return toast(`Agent calls is off for ${f.name}.`, { description: "Turn it on in the farmer list or on their card, then drag again." });
       return act(() => api(`/api/farmers/${f.id}/${byPhone ? "dial" : "call"}`, { body: {} }),
         byPhone ? `Calling ${f.name}'s phone…` : `Call to ${f.name} queued on the demo phone (Calls page).`);
     }

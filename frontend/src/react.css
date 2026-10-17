@@ -1437,3 +1437,40 @@ body.app .hero, .hero { background: none !important; border: 0; border-bottom: 1
 *::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .todo-list li, .todo-list li.amber, .todo-list li.red, .todo-list li.on { border-color: var(--line) !important; }
 body.app .hero.gap, body.app .hero.ok, .hero.gap, .hero.ok { border-color: var(--line); }
+
+/* ---------- Relationship: Agent calls switch, standing, churn, notes, payment ---------- */
+.agent-toggle, .mini-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+.agent-toggle input, .mini-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.agent-toggle .track, .mini-switch .track { width: 34px; height: 20px; border-radius: 10px; background: var(--line-strong, #C9D0CC); position: relative; transition: background .15s; flex: none; }
+.agent-toggle .track i, .mini-switch .track i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: left .15s; }
+.agent-toggle.on .track, .mini-switch.on .track { background: var(--leaf); }
+.agent-toggle.on .track i, .mini-switch.on .track i { left: 16px; }
+.agent-toggle input:focus-visible + .track, .mini-switch input:focus-visible + .track { outline: 3px solid var(--leaf); outline-offset: 2px; }
+.agent-toggle input:disabled + .track, .mini-switch input:disabled + .track { opacity: .5; }
+.agent-toggle { margin: 6px 0 2px; }
+.standing { display: flex; flex-direction: column; gap: 8px; }
+.seg-line { margin: 0; font-size: 13.5px; color: var(--muted); }
+.churn { font-size: 13.5px; }
+.churn b { color: #8A2E0D; }
+.churn ul { margin: 2px 0 0; padding-left: 18px; color: #4A3A33; }
+.notes { display: flex; flex-direction: column; gap: 10px; }
+.note-form { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.note-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.note-row select, .note-row input { min-height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13.5px; background: var(--surface); }
+.note-row .follow { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.note-form textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 14px; resize: vertical; }
+.note-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.note-list li { padding: 9px 0; border-top: 1px solid var(--line); }
+.note-list li:first-child { border-top: 0; }
+.note-list .note-head { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.note-list li.complaint .note-head b { color: #8A2E0D; }
+.note-list p { margin: 3px 0 0; font-size: 14px; }
+.note-list li.done p, .note-list li.done .note-head b { color: var(--muted); }
+.note-done { display: inline-flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 13px; font-weight: 600; color: var(--leaf-deep); cursor: pointer; }
+.paid-tag { font-size: 12.5px; font-weight: 700; color: var(--leaf-deep); }
+.unpaid-tag { font-size: 12.5px; color: #8A5605; }
+.unpaid-line { margin: 0 0 6px; font-size: 13.5px; color: #8A5605; }
+.seg-fields { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0; }
+.seg-fields legend { font-size: 13px; font-weight: 700; padding: 0 4px; }
+.avatar-face { flex: none; border-radius: 10px; }
+.avatar-face.quiet { opacity: .6; filter: saturate(.5); }

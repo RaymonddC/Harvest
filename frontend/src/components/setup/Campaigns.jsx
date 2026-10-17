@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SEGMENT_WORD } from "./Relationship.jsx";
 import { campaignsOf, CROPS, cropName, multiCrop, useCrop, useMembership } from "../../campaigns.jsx";
 import { toCallOf } from "../../crm.js";
 import { useConfirm } from "../../dialogs.jsx";
@@ -192,13 +193,15 @@ function EditCampaign({ c, onClose, state }) {
   const planStart = state.settings?.plan_start;
   const [f, setF] = useState(() => ({ name: c.name || "", target: String(Math.round((c.target_kg_per_week || 0) / 1000)), ...datesOf(c, state.settings),
     cap: c.daily_capacity_kg ? String(c.daily_capacity_kg / 1000) : "", days: String(c.working_days || 6), truck: String((c.truck_kg || 8000) / 1000) }));
+  const [seg, setSeg] = useState(() => ({ reliability: "", size: "", certified: "", ...(c.segment || {}) }));
   const [saving, setSaving] = useState(false);
   const only = campaignsOf(state).length <= 1;
   const save = async (e) => {
     e.preventDefault();
     setSaving(true);
     const ok = await act(() => api(`/api/campaigns/${encodeURIComponent(c.id)}`, { method: "PUT",
-      body: { name: f.name, target_kg_per_week: Number(f.target) * 1000, start_date: f.start, end_date: f.end, ...ops(f) } }), "Campaign saved.");
+      body: { name: f.name, target_kg_per_week: Number(f.target) * 1000, start_date: f.start, end_date: f.end, ...ops(f),
+        segment: Object.fromEntries(Object.entries(seg).filter(([, v]) => v)) } }), "Campaign saved.");
     setSaving(false);
     if (ok) onClose();
   };
@@ -214,6 +217,20 @@ function EditCampaign({ c, onClose, state }) {
         <div style={{ display: "grid", gap: 10, margin: "12px 0" }}>
           <p className="sub" style={{ margin: 0 }}>Crop: {cropName(c.crop)} (fixed). Changing the target or dates redraws the forecast straight away.</p>
           <Fields f={f} setF={setF} planStart={planStart} />
+          <fieldset className="seg-fields">
+            <legend>Who the agent calls in this campaign</legend>
+            <div className="grid3">
+              {Object.entries(SEGMENT_WORD).map(([key, words]) => (
+                <label key={key} className="field">{{ reliability: "Track record", size: "Size", certified: "Certification" }[key]}
+                  <select value={seg[key] || ""} onChange={(e) => setSeg({ ...seg, [key]: e.target.value })}>
+                    <option value="">Any</option>
+                    {Object.entries(words).map(([v, w]) => <option key={v} value={v}>{w}</option>)}
+                  </select>
+                </label>
+              ))}
+            </div>
+            <small className="muted">Leave all on Any to call every farmer in the campaign. Farmers with Agent calls off are always yours to call.</small>
+          </fieldset>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <SubmitButton busy={saving} disabled={!fieldsOk(f, planStart)} busyText="Saving…">Save</SubmitButton>

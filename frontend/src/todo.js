@@ -1,6 +1,7 @@
 import { campaignFor, inCampaign } from "./campaigns.jsx";
 import { toCallOf } from "./crm.js";
 import { fmtT } from "./lib.js";
+import { dueFollowUps } from "./components/setup/Relationship.jsx";
 
 // What is lacking in a campaign and what to do about it, most urgent first: each item is the problem ("what"), the
 // next action ("next") and where it is done ("to"). The sidebar shows the first few; the Overview shows them all.
@@ -25,10 +26,16 @@ export function todoItems(state, cid) {
     items.push({ key: "call", verb: "Call them", to: "/setup#farmer-list", tone: "amber", what: `${toCall.length} farmers need a harvest call`,
       next: unknown.length ? `Call them: about ${fmtT(usualKg)} t a week is still unknown` : "Call them: their answers were unsure" });
   }
+  const members = new Set(inCampaign(state, state.farmers, cid).map((f) => f.id));
+  const due = dueFollowUps(state, members);
+  if (due.length) {
+    items.push({ key: "followup", verb: "See them", to: "/setup#farmer-list", tone: "amber",
+      what: `${due.length} follow-up${due.length > 1 ? "s" : ""} due`, next: due.slice(0, 2).map((n) => n.farmer_name).join(", ") + (due.length > 2 ? " and others" : "") });
+  }
   if (byHand.length) {
     items.push({ key: "byhand", verb: "See them", to: "/setup#farmer-list", tone: "amber",
       what: `${byHand.length} farmer${byHand.length > 1 ? "s" : ""} to call yourself`,
-      next: "Marked to call by hand: call them and enter their harvest on their card" });
+      next: "Agent calls is off for them: call them and enter their harvest on their card" });
   }
   if (gap) {
     const forward = (gap.shortlist || []).length;
