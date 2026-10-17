@@ -81,8 +81,7 @@ Never commit a real `.env`, `deploy/deploy.env`, key or token.
 | `MAX_CALL_SECONDS` | `360` | No | Hard limit on one call. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `AUTH_REQUIRED` | `true` | No | Planner actions need the planner role. `false` leaves them open. | Not settable from GitHub yet: the code default runs. See the rule above |
 | `MESSAGING_CHANNEL` | `off` | No | Text messages: `off` records them in the outbox only; `sms` or `whatsapp` sends them over Twilio, to numbers on `REAL_CALL_ALLOWLIST`. Deal confirmations go to the farmer after the voice confirmation; alerts go to `PLANNER_ALERT_TO`. A US number needs A2P registration for SMS. | GitHub variable `MESSAGING_CHANNEL` |
-| `TWILIO_WHATSAPP_FROM` | none | No | The WhatsApp sender number: for `MESSAGING_CHANNEL=whatsapp` texts, and for the WhatsApp chat agent (farmers chat with the agent; set the sender's "a message comes in" webhook in Twilio to `PUBLIC_BASE_URL/twilio/whatsapp`, POST). | GitHub variable `TWILIO_WHATSAPP_FROM` |
-| `TWILIO_WHATSAPP_OPENING_SID` | none | No | The Content SID (`HX...`) of an approved WhatsApp template that opens a chat, with variables `{{1}}` the farmer's name and `{{2}}` the mill. Its text must say it is an AI writing for the mill and ask consent to keep a written record (as `prompt.CHAT_NOTICES`). Without it the opening goes as plain text, which WhatsApp delivers only within 24 hours of the farmer's last message (or in the sandbox). | GitHub variable `TWILIO_WHATSAPP_OPENING_SID` |
+| `TWILIO_WHATSAPP_FROM` | none | No | The WhatsApp sender number, for `MESSAGING_CHANNEL=whatsapp`. | GitHub variable `TWILIO_WHATSAPP_FROM` |
 | `PLANNER_ALERT_TO` | none | No | Comma-separated numbers that get the planner's alerts (a new gap week, an offer waiting, the Monday digest). Empty: alerts only show in the dashboard. | GitHub variable `PLANNER_ALERT_TO` |
 | `JOB_TOKEN` | none (job off) | Yes | Protects `POST /api/jobs/weekly`, the hourly job: once a week (from Monday 06:00) it saves what farmers promised and sends the alerts, and every hour it starts the campaigns whose automatic calls are due (days and time set per campaign on the Campaign page). When set, `deploy.sh` creates a Cloud Scheduler job (every hour, Asia/Jakarta) that calls it. | GitHub secret `JOB_TOKEN`, then redeploy |
 | `JWT_SECRET` | a new random value each start | Yes | Signs sign-in tokens. Set a long random value (at least 32 characters) in the cloud. | GitHub secret `JWT_SECRET`, then redeploy (everyone signs in again) |
@@ -123,7 +122,7 @@ options of that one script, not of the service, and need no entry elsewhere.
 | `MILL_NAME`, `DEMO_LANGUAGE` | as above | Passed to the service. |
 | `FIREBASE_WEB_CONFIG` | none | Passed to the service and written into `web/config.js`. |
 | `JWT_SECRET` | a new random value each deploy | Passed to the service. Fix it to keep people signed in across deploys. |
-| `MESSAGING_CHANNEL`, `TWILIO_WHATSAPP_FROM`, `TWILIO_WHATSAPP_OPENING_SID`, `PLANNER_ALERT_TO` | `off`, none, none, none | Passed to the service (text messages, the WhatsApp chat agent and planner alerts). |
+| `MESSAGING_CHANNEL`, `TWILIO_WHATSAPP_FROM`, `PLANNER_ALERT_TO` | `off`, none, none | Passed to the service (text messages and planner alerts). |
 | `JOB_TOKEN` | none | Passed to the service; when set, `deploy.sh` also creates or updates the Cloud Scheduler job `harvest-weekly`. |
 | `DEMO_PASSWORD` | `harvest-demo` | Passed to the service; also used to sign in as `dewi` when seeding. |
 | `SEED_DEMO_DATA` | `true` | Replace everything in Firestore with the demo data after deploying. Use `true` on the first deploy only. |

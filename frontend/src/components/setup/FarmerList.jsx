@@ -154,8 +154,6 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
                 <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
                   {phoneCalls && <><ActButton need="campaign.run" className="btn sm leaf" busy="Calling…" run={() => dial(f)}>Call phone</ActButton>{" "}</>}
                   <ActButton need="campaign.run" className="btn sm" busy="Queuing…" run={() => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`)}>{phoneCalls ? "Browser call" : "Call now"}</ActButton>{" "}
-                  <ActButton need="campaign.run" className="btn sm" busy="Sending…" run={() => act(() => api(`/api/farmers/${f.id}/whatsapp`, { body: {} }),
-                    (r) => r.live ? `WhatsApp sent to ${f.name}. Their replies go to the agent.` : `Demo WhatsApp chat with ${f.name} open on the Calls page: type the farmer's replies there.`)}>WhatsApp</ActButton>{" "}
                   <Menu.Root>
                     <Menu.Trigger asChild><button className="btn sm more" type="button" aria-label={`More for ${f.name}`}>⋯</button></Menu.Trigger>
                     <Menu.Portal>

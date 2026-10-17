@@ -110,7 +110,7 @@ export default function Calls() {
               <tbody>
                 {list.map(({ c, h, o, answers, f }) => {
                   const chip = callChip(c);
-                  const open = !["queued", "on_call"].includes(c.status) || (c.channel === "whatsapp" && c.status === "on_call");  // an open chat can be followed live
+                  const open = !["queued", "on_call"].includes(c.status);
                   return (
                     <tr key={c.id} className={open ? "clickable" : ""} onClick={open ? () => setShown(c) : undefined}
                       tabIndex={open ? 0 : undefined} onKeyDown={open ? (e) => { if (e.key === "Enter") setShown(c); } : undefined}>
@@ -119,7 +119,7 @@ export default function Calls() {
                       </td>
                       <td>
                         <Pill cls={chip.cls}>{chip.text}</Pill>
-                        <small className="cell-sub">{KIND_WORD[c.kind] || c.kind} · {fmtWhen(when(c)) || "waiting"}{c.channel === "twilio" ? " · phone" : c.channel === "whatsapp" ? " · WhatsApp" : c.channel === "browser" ? " · demo" : ""}</small>
+                        <small className="cell-sub">{KIND_WORD[c.kind] || c.kind} · {fmtWhen(when(c)) || "waiting"}{c.channel === "twilio" ? " · phone" : c.channel === "browser" ? " · demo" : ""}</small>
                       </td>
                       <td>
                         {h ? (

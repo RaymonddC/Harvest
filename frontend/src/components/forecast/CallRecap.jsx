@@ -16,51 +16,6 @@ const length = (c) => {
 };
 const clock = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
 
-// A WhatsApp chat that is still open: the messages so far, and in a demo chat (no real WhatsApp for this number) a box
-// to type the farmer's replies, so the agent can be tried without a phone.
-function LiveChat({ c }) {
-  const act = useAct();
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
-  const end = useRef(null);
-  const lines = c.chat || [];
-  useEffect(() => { end.current?.scrollIntoView({ block: "nearest" }); }, [lines.length, busy]);
-  const send = async (e) => {
-    e.preventDefault();
-    const msg = text.trim();
-    if (!msg || busy) return;
-    setBusy(true);
-    const r = await act(() => api(`/api/chats/${c.id}/reply`, { body: { text: msg } }));
-    if (r) setText("");
-    setBusy(false);
-  };
-  return (
-    <div className="wa-chat">
-      <div className="wa-lines" aria-live="polite">
-        {lines.map((l, i) => (
-          <div key={i} className={`wa-bubble ${l.who}`}>
-            <span>{l.text}</span>
-            {l.at && <time>{new Date(l.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</time>}
-          </div>
-        ))}
-        {busy && <div className="wa-bubble agent typing" aria-label="The agent is writing">…</div>}
-        <span ref={end} />
-      </div>
-      {c.whatsapp_live ? (
-        <p className="small muted">On real WhatsApp: the farmer answers from their phone and the agent replies by itself.</p>
-      ) : can("campaign.run") && (
-        <form className="wa-reply" onSubmit={send}>
-          <label className="sr-only" htmlFor={`wa-${c.id}`}>The farmer's reply</label>
-          <input id={`wa-${c.id}`} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} autoComplete="off"
-            placeholder={`Write as ${c.farmer_name}…`} disabled={busy} />
-          <button className="btn solid" type="submit" disabled={busy || !text.trim()}>{busy ? "Sending…" : "Send"}</button>
-        </form>
-      )}
-      {!c.whatsapp_live && <p className="small muted">Demo chat: {c.whatsapp_note || "this number cannot get WhatsApp"} You write the farmer's side.</p>}
-    </div>
-  );
-}
-
 // The forecast week a date falls in, from that crop's forecast rows.
 function weekOf(rows, iso) {
   if (!iso) return null;
@@ -144,8 +99,7 @@ export default function CallRecap({ call, onClose }) {
               <section aria-labelledby="captured-title">
                 <h3 id="captured-title">What the agent captured</h3>
                 <ul className="facts">
-                  <Fact ok={!!c.consent} label="Consent">{c.consent ? "Farmer agreed to the transcript"
-                    : c.status === "on_call" ? "Not answered yet" : "Not agreed, so no transcript or recording is kept"}</Fact>
+                  <Fact ok={!!c.consent} label="Consent">{c.consent ? "Farmer agreed to the transcript" : "Not agreed, so no transcript or recording is kept"}</Fact>
                   {c.consent && (
                     <Fact ok={!!c.audio} label="Audio recording">
                       {c.audio ? <>Saved, kept until {expiry(c.audio.expires_at)}</>
@@ -194,10 +148,7 @@ export default function CallRecap({ call, onClose }) {
 
               <section aria-labelledby="talk-title">
                 <div className="talk-head">
-                  <h3 id="talk-title">{c.channel === "whatsapp" ? "WhatsApp chat" : "Conversation"}</h3>
-                  {c.channel === "whatsapp" && c.status === "on_call" && can("campaign.run") && (
-                    <ActButton className="btn sm ghost" busy="Ending…" run={() => act(() => api(`/api/chats/${c.id}/end`, { body: {} }), "Chat ended.")}>End chat</ActButton>
-                  )}
+                  <h3 id="talk-title">Conversation</h3>
                   {translated && (
                     <label className="switch"><input type="checkbox" checked={english} onChange={(e) => setEnglish(e.target.checked)} />
                       Show translation</label>
@@ -218,7 +169,7 @@ export default function CallRecap({ call, onClose }) {
                     )}
                   </div>
                 )}
-                {c.channel === "whatsapp" && c.status === "on_call" ? <LiveChat c={c} /> : lines ? (
+                {lines ? (
                   <div className="transcript recap">
                     {lines.map((l, i) => (
                       <div key={i} className={`bubble ${l.who}`}>

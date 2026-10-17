@@ -80,7 +80,6 @@ jobs:
           # Text messages and planner alerts (optional).
           MESSAGING_CHANNEL: ${{ vars.MESSAGING_CHANNEL }}
           TWILIO_WHATSAPP_FROM: ${{ vars.TWILIO_WHATSAPP_FROM }}
-          TWILIO_WHATSAPP_OPENING_SID: ${{ vars.TWILIO_WHATSAPP_OPENING_SID }}
           PLANNER_ALERT_TO: ${{ vars.PLANNER_ALERT_TO }}
           # Redeploys must not wipe live data, and the deployer account has no right to enable APIs.
           SEED_DEMO_DATA: "false"

@@ -65,14 +65,9 @@ export default function StartCalling({ state, toCall }) {
   const minutes = Math.round((s.max_call_seconds || 360) / 60);
   const phoneCalls = !!s.phone_calls;
   const byPhone = campaign.channel === "twilio";
-  const byChat = campaign.channel === "whatsapp";
   const start = async (channel) => {
-    const done = {
-      twilio: (x) => `Calling ${x.queued} farmers' phones, one at a time.`,
-      whatsapp: (x) => `WhatsApp opened with ${x.queued} farmers${x.chats?.demo ? ` (${x.chats.demo} as demo chats on the Calls page)` : ""}.`,
-      browser: (x) => `${x.queued} demo calls ready on the Calls page.`,
-    }[channel];
-    const r = await act(() => api(startUrl(cid), { body: { kind: "collect", channel } }), done);
+    const r = await act(() => api(startUrl(cid), { body: { kind: "collect", channel } }),
+      channel === "twilio" ? (x) => `Calling ${x.queued} farmers' phones, one at a time.` : (x) => `${x.queued} demo calls ready on the Calls page.`);
     if (r) navigate(channel === "twilio" ? "/forecast" : "/calls");
   };
   const who = `${toCall} ${toCall === 1 ? "farmer" : "farmers"}`;
@@ -123,22 +118,18 @@ export default function StartCalling({ state, toCall }) {
       <div className="start-acts">
         {running ? <>
           {byPhone && <span className="pill lg dot running" style={{ alignSelf: "flex-start", background: "var(--ink-2)", color: "var(--on-ink)" }}>Calling phones, one at a time</span>}
-          {byPhone ? <Link className="btn mint big block" to="/forecast">Watch the calls</Link>
-            : byChat ? <Link className="btn mint big block" to="/calls">Open the WhatsApp chats</Link>
-            : <Link className="btn mint big block" to="/calls">Open the demo phone</Link>}
+          {byPhone ? <Link className="btn mint big block" to="/forecast">Watch the calls</Link> : <Link className="btn mint big block" to="/calls">Open the demo phone</Link>}
           <ActButton need="campaign.run" className="btn on-ink block" busy="Stopping…" run={() => act(() => api(stopUrl(cid), { body: {} }), "Calling stopped.")}>Stop calling</ActButton>
         </> : phoneCalls ? <>
           <ActButton need="campaign.run" className="btn mint big block" busy="Starting…" disabled={!toCall} run={() => start("twilio")}>
             <Icon name="phone" />{toCall ? `Call ${who} now` : "Add farmers to call"}
           </ActButton>
           <ActButton need="campaign.run" className="btn on-ink block" busy="Starting…" disabled={!toCall} run={() => start("browser")}>Try it on the demo phone</ActButton>
-          <ActButton need="campaign.run" className="btn on-ink block" busy="Sending…" disabled={!toCall} run={() => start("whatsapp")}><Icon name="chat" />Message them on WhatsApp</ActButton>
-        </> : <>
+        </> : (
           <ActButton need="campaign.run" className="btn mint big block" busy="Starting…" disabled={!toCall} run={() => start("browser")}>
             <Icon name="phone" />{toCall ? `Call ${who} (demo)` : "Add farmers to call"}
           </ActButton>
-          <ActButton need="campaign.run" className="btn on-ink block" busy="Sending…" disabled={!toCall} run={() => start("whatsapp")}><Icon name="chat" />Message them on WhatsApp</ActButton>
-        </>}
+        )}
       </div>
       <AutoCalls campaign={campaign} phoneCalls={phoneCalls} weeklyJob={!!s.weekly_job} />
     </section>
