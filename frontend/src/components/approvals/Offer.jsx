@@ -53,7 +53,6 @@ function proof(o, l, quote, price) {
 }
 
 const money = (n, cur) => (cur === "IDR" ? `Rp ${Math.round(n).toLocaleString("en-US")}` : `${n.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${cur}`);
-const TEXT_WORD = { sent: "Text sent", failed: "Text failed", not_sent: "Text not sent" };
 
 // imp: what approving this offer alone does to every week (from /api/approvals/impact), and its cost.
 export default function Offer({ o, l, row, quote, confirming = false, imp = null }) {
@@ -102,10 +101,6 @@ export default function Offer({ o, l, row, quote, confirming = false, imp = null
       )}
       {o.status === "approved" && (
         <div className="text-line">
-          <span className="small muted">{o.text_status ? TEXT_WORD[o.text_status] || o.text_status : "No written confirmation yet"}{o.text_status === "not_sent" ? " (see Messages)" : ""}</span>
-          <ActButton need="offers.decide" className="btn sm ghost" busy="Sending…"
-            run={() => act(() => api(`/api/offers/${o.id}/send-confirmation`), (m) => (m && m.status === "sent" ? "Text sent to the farmer." : `Recorded, not sent: ${m?.reason || ""}`))}>
-            {o.text_status ? "Send text again" : "Send text"}</ActButton>
           <a className="btn sm" href={apiUrl(offerPoUrl(o.id))} download>Purchase order (PDF)</a>
         </div>
       )}

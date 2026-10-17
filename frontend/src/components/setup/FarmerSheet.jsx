@@ -200,7 +200,7 @@ function PhoneAllow({ f, state }) {
 }
 
 // The farmer's history as one timeline, newest first (a CRM contact's activity): calls, harvest answers and edits,
-// offers and decisions, deliveries and texts.
+// offers and decisions, and deliveries.
 function activityOf(state, f) {
   const out = [];
   const when = (iso) => (iso ? new Date(iso) : null);
@@ -218,9 +218,6 @@ function activityOf(state, f) {
   for (const o of state.offers.filter((x) => x.farmer_id === f.id)) {
     out.push({ t: o.created_at, kind: "offer", what: `Offer: ${fmtKg(o.kg)} kg at ${plainPrice(o.price_per_kg, o.currency || "IDR")}/kg`, detail: o.deliver_week_start ? `for the week of ${o.deliver_week_start}` : "" });
     if (o.decided_at) out.push({ t: o.decided_at, kind: o.status === "approved" ? "deal" : "offer", what: `Offer ${o.status} by ${o.decided_by || "Planner"}`, detail: o.delivered_kg ? `${fmtKg(o.delivered_kg)} kg delivered so far` : "" });
-  }
-  for (const m of (state.messages || []).filter((x) => x.farmer_id === f.id)) {
-    out.push({ t: m.created_at, kind: "message", what: `Text (${(m.kind || "").replace(/_/g, " ")}): ${m.status === "sent" ? "sent" : "recorded, not sent"}`, detail: m.body || "" });
   }
   return out.filter((x) => x.t).sort((a, b) => when(b.t) - when(a.t));
 }
