@@ -137,6 +137,8 @@ class AnswerIn(BaseModel):
 class ScheduleIn(BaseModel):
     enabled: bool = False
     channel: str = "browser"
+    days: list[int] | None = None  # 0 = Monday ... 6 = Sunday
+    time: str | None = None  # "06:00", on the hour, Asia/Jakarta
 
 
 class DeliveryIn(BaseModel):
@@ -580,15 +582,24 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     @app.put("/api/campaigns/{campaign_id}/schedule", dependencies=[Depends(need("campaign.run"))])
     def campaign_schedule(campaign_id: str, body: ScheduleIn):
         """Start this campaign by itself every Monday morning (Cloud Scheduler calls /api/jobs/weekly)."""
-        return services.set_weekly_schedule(store, settings, campaign_id, body.enabled, body.channel)
+        return services.set_weekly_schedule(store, settings, campaign_id, body.enabled, body.channel, body.days, body.time)
+
+    def _job_auth(token: str | None) -> None:
+        if not settings.job_token:
+            raise HTTPException(404, "The scheduled job is not set up (JOB_TOKEN).")
+        if not hmac.compare_digest(token or "", settings.job_token):
+            raise HTTPException(403, "Wrong job token.")
 
     @app.post("/api/jobs/weekly", include_in_schema=False)
     def jobs_weekly(x_job_token: str | None = Header(default=None)):
-        """Monday morning job: roll the weeks, snapshot promises, start the weekly campaigns."""
-        if not settings.job_token:
-            raise HTTPException(404, "The weekly job is not set up (JOB_TOKEN).")
-        if not hmac.compare_digest(x_job_token or "", settings.job_token):
-            raise HTTPException(403, "Wrong job token.")
+        """Cloud Scheduler, every hour: the weekly bookkeeping once a week, and the campaigns due this hour."""
+        _job_auth(x_job_token)
+        return services.scheduled_calls(store, settings)
+
+    @app.post("/api/jobs/run-all", include_in_schema=False)
+    def jobs_run_all(x_job_token: str | None = Header(default=None)):
+        """By hand: the weekly bookkeeping and every campaign with automatic calls, now."""
+        _job_auth(x_job_token)
         return services.weekly_job(store, settings)
 
     @app.post("/api/offers/{offer_id}/send-confirmation", dependencies=[Depends(need("offers.decide"))])

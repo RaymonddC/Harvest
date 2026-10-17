@@ -21,7 +21,6 @@ export default function Campaigns({ state }) {
   const [editing, setEditing] = useState(null);
   const campaigns = campaignsOf(state);
   const soon = !multiCrop(state);
-  const twins = (c) => campaigns.filter((x) => x.crop === c.crop).length > 1;
   return (
     <section className="campaigns" aria-label="Campaigns">
       <div className="camp-list" role="group" aria-label="Pick a campaign">
@@ -37,7 +36,7 @@ export default function Campaigns({ state }) {
                   <span className="camp-crop"><Icon name="leaf" size={16} />{c.label}</span>
                   <span className={`camp-status ${s.cls}`}><i />{s.word}</span>
                 </span>
-                {(c.name || twins(c)) && <span className="camp-sub">{cropName(c.crop)}</span>}
+                {c.name && c.name !== cropName(c.crop) && <span className="camp-sub">{cropName(c.crop)}</span>}
                 <span className="camp-figs">
                   <span><b className="num">{fmtT(c.target_kg_per_week || 0)} t</b> a week · {(({ start, end }) => `${shortDay(start)} – ${shortDay(end)}`)(datesOf(c, state.settings))}</span>
                   <span>{farmers.length} farmers · {toCall} to call</span>

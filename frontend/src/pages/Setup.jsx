@@ -30,8 +30,8 @@ export default function Setup() {
   const head = (
     <div className="page-head">
       <div>
-        <h1>Campaigns</h1>
-        <p>Pick a campaign, then three quick steps for it. Once the price range is set, one click calls its farmers.</p>
+        <h1>Campaign</h1>
+        <p>Who the agent calls, at what price, and when.</p>
       </div>
     </div>
   );

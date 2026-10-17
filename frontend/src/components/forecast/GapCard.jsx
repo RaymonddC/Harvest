@@ -55,7 +55,7 @@ export function Hero({ gap, rows, state }) {
       <div className="hero-acts">
         {/* While gap-fill calls run, the next step is answering them, not starting more. */}
         {calling ? (followCalls(campaign).external
-          ? <Link className="btn solid big" to="/calls"><Icon name="phone" size={16} />Answer the calls</Link>
+          ? <Link className="btn solid big" to="/calls"><Icon name="phone" size={16} />Open the demo phone</Link>
           : <span className="pill lg dot running">Ringing phones, one at a time</span>) : (
         <ActButton need="campaign.run" className="btn solid big" busy="Queuing calls…" disabled={!canFill}
           run={() => act(() => api(startUrl(cid), { body: gapFillBody(state) }), gapFillToast)}>

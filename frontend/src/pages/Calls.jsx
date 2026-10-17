@@ -23,8 +23,8 @@ export default function Calls() {
       <div>
         <h1>Calls{campaign.label ? ` · ${campaign.label}` : ""}</h1>
         <p>{phoneOn
-          ? "Phone calls ring the farmers' own phones and show up here live. Demo calls are answered in the phone on the left."
-          : "This browser stands in for the farmer's phone: answer a waiting call on the left and play the farmer, or press Play the farmer for me. Use headphones."}</p>
+          ? "The agent calls the farmers' own phones; each call shows up here live. The demo phone on the left is for trying a call yourself."
+          : "The agent makes outbound calls. With no phone line set up, the demo phone on the left plays the farmer: answer a ringing call and speak as the farmer, or press Play the farmer for me. Use headphones."}</p>
       </div>
       <button className="btn" type="button" onClick={() => setLogOpen(true)}>Call log</button>
     </div>
@@ -32,13 +32,13 @@ export default function Calls() {
   return (
     <Shell title="Calls" head={head}>
       <div className="calls-layout">
-        <section className="call-frame" aria-label="Call client">
+        <section className="call-frame" aria-label="Demo phone">
           {/* Same origin, so the call client shares the sign-in; the microphone is allowed for the frame. */}
           <iframe title="Call client" src="/call.html?embed" allow="microphone; autoplay" />
         </section>
         <div className="calls-side">
           <section className="card" aria-labelledby="waiting-title">
-            <div className="card-head"><h2 id="waiting-title">Waiting to be answered</h2><Pill>{waiting.length}</Pill></div>
+            <div className="card-head"><h2 id="waiting-title">Waiting to be called</h2><Pill>{waiting.length}</Pill></div>
             {waiting.length ? (
               <ul className="rows">
                 {waiting.slice(0, 8).map((c) => (

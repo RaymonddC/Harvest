@@ -217,5 +217,13 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     more than their plot can grow. Still to do: real Disbun price import (no public API found; entered by hand), voice
     calls that ask farmers to deliver later (today the planner agrees it and the farmer gets a text), plot polygons.
 
+21. **Adjustable automatic calls, clearer Campaign page, more demo campaigns (17 Oct, same branch).** Each campaign's
+    automatic calls run on chosen weekdays at a chosen hour (Asia/Jakarta); Cloud Scheduler now calls
+    `/api/jobs/weekly` every hour (`scheduled_calls`), which does the weekly bookkeeping once a week from Monday 06:00
+    and starts the campaigns due that hour (`/api/jobs/run-all` runs everything by hand). The redeploy updates the
+    scheduler job. Wording now says calls are outbound and the browser is a demo phone. Demo data adds "Palm, Kampar"
+    and "Rubber" with their own farmers, history and a waiting offer (`load_seed(..., more_campaigns=True)`; tests use
+    the single-campaign demo).
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

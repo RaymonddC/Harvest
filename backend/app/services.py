@@ -329,13 +329,43 @@ def edit_answer(store: Store, call_id: str, question_id: str, answer: str, actor
     return answers[question_id]
 
 
-def set_weekly_schedule(store: Store, settings: Settings, crop: str | None, enabled: bool, channel: str = "browser") -> dict:
-    """Mark a campaign to start by itself every Monday morning (run by the weekly job)."""
+# Automatic calls: each campaign can start itself on chosen weekdays at a chosen hour, in the mill's time zone
+# (Asia/Jakarta, UTC+7, no daylight saving). Cloud Scheduler calls the job every hour; see scheduled_calls.
+SCHEDULE_TZ = dt.timezone(dt.timedelta(hours=7), "WIB")
+DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def _check_schedule(days, time) -> tuple[list[int], str]:
+    days = sorted({int(d) for d in (days if days is not None else [0])})
+    if not days or any(not 0 <= d <= 6 for d in days):
+        raise ServiceError("Pick at least one day (Monday to Sunday).")
+    time = (time or "06:00").strip()
+    try:
+        hour, minute = (int(x) for x in time.split(":"))
+    except ValueError:
+        raise ServiceError("The time must look like 06:00.") from None
+    if not 0 <= hour <= 23 or minute != 0:
+        raise ServiceError("Pick a time on the hour (the job runs once an hour).")
+    return days, f"{hour:02d}:00"
+
+
+def schedule_text(weekly: dict) -> str:
+    days = weekly.get("days") or [0]
+    names = ("every day" if len(days) == 7 else "Monday to Friday" if days == [0, 1, 2, 3, 4]
+             else "Monday to Saturday" if days == [0, 1, 2, 3, 4, 5] else ", ".join(DAY_NAMES[d] for d in days))
+    return f"{names} at {weekly.get('time') or '06:00'}"
+
+
+def set_weekly_schedule(store: Store, settings: Settings, crop: str | None, enabled: bool, channel: str = "browser",
+                        days: list[int] | None = None, time: str | None = None) -> dict:
+    """Let a campaign start its calls by itself on the chosen days at the chosen hour (run by the hourly job)."""
     camp = need_campaign(store, settings, crop)
     crop = campaign_crop(settings, camp)
     if channel not in ("browser", "twilio"):
         raise ServiceError("Channel must be browser or twilio.")
-    weekly = {"enabled": bool(enabled), "channel": channel, "updated_at": now_iso()}
+    old = camp.get("weekly") or {}
+    days, time = _check_schedule(days if days is not None else old.get("days"), time or old.get("time"))
+    weekly = {"enabled": bool(enabled), "channel": channel, "days": days, "time": time, "updated_at": now_iso()}
     store.set("campaigns", camp["id"], {"weekly": weekly}, merge=True)
     return {**weekly, "crop": crop, "campaign_id": camp["id"]}
 
@@ -354,9 +384,60 @@ def roll_weeks(store: Store, settings: Settings, today: dt.date | None = None) -
     return rolled
 
 
+def weekly_bookkeeping(store: Store, settings: Settings) -> dict:
+    """Once a week: snapshot what farmers promised for the week that starts now (so deliveries can be checked
+    against it later), alert new gaps, and send the waiting-offers digest."""
+    from . import messaging, track_record
+
+    week = settings.plan_start - dt.timedelta(days=7)  # the week that starts today; week 1 is next week
+    snap = track_record.snapshot_promises(store, settings, week)
+    messaging.check_gap_alerts(store, settings)
+    waiting = [o for o in store.list("offers") if o.get("status") in ("pending", "escalated")]
+    if waiting:
+        messaging.alert_planner(store, settings, f"{settings.mill_name}: {len(waiting)} offers wait for your approval.",
+                                "offers_digest")
+    return {"plan_start": settings.plan_start.isoformat(), "promises": snap}
+
+
+def _start_scheduled(store: Store, settings: Settings, camp: dict) -> dict:
+    weekly = camp.get("weekly") or {}
+    crop = campaign_crop(settings, camp)
+    if camp.get("status") == "running":
+        return {"crop": crop, "campaign_id": camp["id"], "why": "already calling", "skipped": True}
+    try:
+        r = start_campaign(store, settings, "collect", camp["id"], weekly.get("channel", "browser"))
+        return {"crop": crop, "campaign_id": camp["id"], "queued": r["queued"], "channel": r["channel"]}
+    except ServiceError as e:
+        return {"crop": crop, "campaign_id": camp["id"], "why": str(e), "skipped": True}
+
+
+def scheduled_calls(store: Store, settings: Settings, now: dt.datetime | None = None) -> dict:
+    """The hourly job: the weekly bookkeeping once a week (from Monday 06:00), then start each campaign whose
+    automatic calls are due this hour. Each slot runs once, even if the job is called twice in the hour."""
+    local = (now or dt.datetime.now(dt.timezone.utc)).astimezone(SCHEDULE_TZ)
+    camps = list_campaigns(store, settings)
+    out: dict = {"now": local.isoformat(timespec="minutes"), "started": [], "skipped": []}
+    week = (local.date() - dt.timedelta(days=local.weekday())).isoformat()
+    marker = next((c for c in camps if c["id"] == "current"), camps[0] if camps else None)
+    if marker is not None and (local.weekday() > 0 or local.hour >= 6) and marker.get("bookkeeping_week") != week:
+        out["bookkeeping"] = weekly_bookkeeping(store, settings)
+        store.set("campaigns", marker["id"], {"bookkeeping_week": week}, merge=True)
+    slot = local.strftime("%Y-%m-%dT%H")
+    for camp in camps:
+        weekly = camp.get("weekly") or {}
+        if not weekly.get("enabled") or camp.get("last_scheduled_slot") == slot:
+            continue
+        if local.weekday() not in (weekly.get("days") or [0]) or local.hour != int((weekly.get("time") or "06:00")[:2]):
+            continue
+        store.set("campaigns", camp["id"], {"last_scheduled_slot": slot, "last_weekly_job": now_iso()}, merge=True)
+        r = _start_scheduled(store, settings, camp)
+        out["skipped" if r.pop("skipped", False) else "started"].append(r)
+    return out
+
+
 def weekly_job(store: Store, settings: Settings) -> dict:
-    """Monday morning: snapshot what farmers promised for the week that starts now (so deliveries can be checked
-    against it later), then start every campaign marked "call every Monday" that is not already calling."""
+    """Run everything now, whatever the day: the weekly bookkeeping, then start every campaign with automatic calls
+    switched on (for a manual run; the scheduler calls scheduled_calls every hour)."""
     from . import track_record
 
     from . import messaging

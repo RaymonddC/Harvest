@@ -115,7 +115,7 @@ fi
 # (enabled with the others above; CI skips enabling) and the right to manage scheduler jobs; a missing right
 # leaves the job unset with a warning, the rest of the deploy is fine.
 if [[ -n "${JOB_TOKEN:-}" ]]; then
-  SCHED=(--location "$REGION" --schedule "0 6 * * 1" --time-zone "Asia/Jakarta" --uri "$URL/api/jobs/weekly" --http-method POST)
+  SCHED=(--location "$REGION" --schedule "0 * * * *" --time-zone "Asia/Jakarta" --uri "$URL/api/jobs/weekly" --http-method POST)
   gcloud scheduler jobs update http harvest-weekly "${SCHED[@]}" --update-headers "X-Job-Token=$JOB_TOKEN" >/dev/null 2>&1     || gcloud scheduler jobs create http harvest-weekly "${SCHED[@]}" --headers "X-Job-Token=$JOB_TOKEN" >/dev/null     || echo "WARNING: the weekly Cloud Scheduler job was not created (check the Cloud Scheduler API and permissions)." >&2
 fi
 

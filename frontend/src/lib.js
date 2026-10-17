@@ -23,7 +23,7 @@ export const PAGES = [
   { key: "agent", to: "/agent", label: "Agent", step: "settings",
     line: "A setting, not a weekly step: how the AI agent sounds on this campaign's calls and what it asks besides the harvest." },
   { key: "calls", to: "/calls", label: "Calls", step: "call", next: "forecast",
-    line: "The agent phones each farmer and saves the harvest they give. Demo calls are answered here." },
+    line: "The agent phones each farmer (outbound) and saves the harvest they give. Follow the calls here; in demo mode this page also plays the farmer's phone." },
   { key: "forecast", to: "/", label: "Live forecast", step: "watch", next: "approvals",
     line: "Every saved answer updates the weeks. When a week is short, gap-fill calls ask farmers to bring harvest forward." },
   { key: "calendar", to: "/calendar", label: "Calendar", step: "watch", next: "approvals",
@@ -59,8 +59,8 @@ export const startUrl = (cid) => `/api/campaigns/${encodeURIComponent(cid)}/star
 export const stopUrl = (cid) => `/api/campaigns/${encodeURIComponent(cid)}/stop`;
 export const gapFillToast = (r) => (r.channel === "twilio"
   ? `${r.queued} gap-fill calls: ringing the farmers' phones one at a time.`
-  : `${r.queued} gap-fill calls queued. Answer them on the Calls page.`);
+  : `${r.queued} gap-fill demo calls ready on the Calls page.`);
 // While a campaign runs: the call client for demo calls, the live forecast for real phone calls.
 export const followCalls = (campaign) => (campaign?.channel === "twilio"
   ? { href: "/", label: "Watch the phone calls", external: false }
-  : { href: "/calls", label: "Answer the calls", external: false });
+  : { href: "/calls", label: "Open the demo phone", external: false });

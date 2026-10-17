@@ -897,3 +897,31 @@ body.app .chart .target, body.app .chart .capacity { z-index: 3; pointer-events:
   font-size: 10px; color: var(--faint); font-weight: 600; }
 .p-month .sb-beyond, .p-year .sb-beyond { transform: translateX(-50%); bottom: 4px; white-space: normal; text-align: center; width: 90%; }
 .p-day .sb-beyond { display: none; }
+
+/* ---------- Campaign page: the call card and its automatic calls ---------- */
+.start-card { gap: 14px; }
+.call-mode { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 10px 12px; border-radius: 10px;
+  background: rgba(255, 255, 255, .06); color: var(--on-ink-muted); font-size: 13px; line-height: 1.45; }
+.call-mode b { color: var(--on-ink); }
+.call-mode .icon { margin-top: 2px; color: var(--mint, #7FE0B4); }
+.start-acts { display: flex; flex-direction: column; gap: 10px; }
+.auto-calls { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, .12); margin-top: auto; }
+.auto-head { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.auto-head input { margin-top: 3px; width: 18px; height: 18px; accent-color: #2FBF7F; }
+.auto-head span { display: flex; flex-direction: column; }
+.auto-head b { color: var(--on-ink); font-size: 14.5px; }
+.auto-head small { color: var(--on-ink-muted); font-size: 12.5px; }
+.auto-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.auto-days button { min-height: 34px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .16); background: transparent;
+  color: var(--on-ink-muted); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.auto-days button.on { background: #2FBF7F; border-color: #2FBF7F; color: #06130D; }
+.auto-days button:disabled { cursor: not-allowed; opacity: .6; }
+.auto-time { display: flex; gap: 10px; align-items: center; }
+.auto-time label { display: inline-flex; gap: 8px; align-items: center; color: var(--on-ink-muted); font-size: 13px; font-weight: 600; }
+.auto-time select { min-height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .08);
+  color: var(--on-ink); font: inherit; }
+.auto-time select option { color: #111; }
+.auto-warn { color: #F5C766; font-size: 12px; }
+/* The three steps: the farmer card no longer stretches empty space under its buttons. */
+.steps.linked > .card { align-self: stretch; }
+.steps.linked .drop { justify-content: center; }

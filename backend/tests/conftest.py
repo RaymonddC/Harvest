@@ -24,5 +24,5 @@ def settings(tmp_path):
 @pytest.fixture
 def store(settings):
     s = MemoryStore()
-    seed_data.load_seed(s, settings)
+    seed_data.load_seed(s, settings, more_campaigns=False)  # the tests were written for the single-campaign demo
     return s
