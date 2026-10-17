@@ -461,6 +461,13 @@ def scheduled_calls(store: Store, settings: Settings, now: dt.datetime | None = 
             out["bigquery"] = bq_export.export(store, settings)
         except Exception as e:  # noqa: BLE001 - a BigQuery problem must not stop the calls
             out["bigquery"] = {"error": str(e)[:300]}
+    from . import daily_brief
+
+    if settings.daily_brief and daily_brief.due(store, local):  # once a day from 07:00: Gemini's summary and the task list
+        try:
+            out["brief"] = daily_brief.write(store, settings, local)
+        except Exception as e:  # noqa: BLE001 - the brief must not stop the calls
+            out["brief"] = {"error": str(e)[:300]}
     week = (local.date() - dt.timedelta(days=local.weekday())).isoformat()
     marker = next((c for c in camps if c["id"] == "current"), camps[0] if camps else None)
     if marker is not None and (local.weekday() > 0 or local.hour >= 6) and marker.get("bookkeeping_week") != week:

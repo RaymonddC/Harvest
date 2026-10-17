@@ -504,6 +504,16 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             ids = {f["id"] for f in services.campaign_members(store, settings, camp["id"])}
         return crm.overview(store, ids)
 
+    @app.post("/api/brief", dependencies=[Depends(need("campaign.run"))])
+    def write_brief():
+        """Write today's brief now (the hourly job writes it once a day from 07:00) and update the task list."""
+        from . import daily_brief
+
+        out = daily_brief.write(store, settings)
+        if "error" in out:
+            raise HTTPException(502, out["error"])
+        return out
+
     @app.post("/api/bigquery/export", dependencies=[Depends(need("campaign.run"))])
     def bigquery_export():
         """Copy the supply data to BigQuery now and refresh the BigQuery ML forecast (the hourly job does it too)."""

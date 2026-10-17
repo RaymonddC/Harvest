@@ -6,6 +6,7 @@ import TargetBreakdown, { breakdown } from "../components/forecast/TargetBreakdo
 import FarmerPipeline from "../components/setup/FarmerPipeline.jsx";
 import FarmerForm from "../components/setup/FarmerForm.jsx";
 import FarmerSheet from "../components/setup/FarmerSheet.jsx";
+import DailyBrief from "../components/setup/DailyBrief.jsx";
 import { farmersBehind } from "../components/setup/NeedPanel.jsx";
 import { crmOf, toCallOf } from "../crm.js";
 import { fmtT } from "../lib.js";
@@ -18,7 +19,8 @@ import { Icon } from "../ui.jsx";
 //   1. the chain from farmers to deliveries, with a count at every link (where the work stands)
 //   2. what we have and what we lack against the target, in total and per week (click a part: its farmers)
 //   3. what to do next, most urgent first
-//   4. the farmers as a pipeline board
+//   4. Gemini's daily brief and the tasks it set
+//   5. the farmers as a pipeline board
 export default function Overview() {
   const { state } = useLive();
   const { cid } = useCrop();
@@ -131,6 +133,8 @@ export default function Overview() {
               )}
             </section>
           </div>
+
+          <DailyBrief state={state} onOpen={setOpenFarmer} />
 
           <FarmerPipeline state={state} cid={cid} title="Farmers, by stage" filter={filter} onClearFilter={() => setFilter(null)}
             onEdit={setFarmerForm} onOpen={setOpenFarmer} />

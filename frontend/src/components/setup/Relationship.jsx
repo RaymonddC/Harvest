@@ -11,7 +11,7 @@ export const SEGMENT_WORD = {
   size: { small: "Small", medium: "Medium", large: "Large" },
   certified: { yes: "Certified", no: "Not certified" },
 };
-const KINDS = [["note", "Note"], ["call", "Call I made"], ["visit", "Visit"], ["feedback", "Feedback"], ["complaint", "Complaint"]];
+const KINDS = [["note", "Note"], ["call", "Call I made"], ["visit", "Visit"], ["feedback", "Feedback"], ["complaint", "Complaint"], ["task", "To do"]];
 const KIND_WORD = Object.fromEntries(KINDS);
 const today = () => new Date().toISOString().slice(0, 10);
 const day = (iso) => (iso ? new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "");
@@ -107,7 +107,7 @@ export function Notes({ f, notes }) {
                 <label className="note-done">
                   <input type="checkbox" checked={!!n.done} disabled={!can("farmers.manage")}
                     onChange={() => act(() => api(`/api/notes/${n.id}/done`, { method: "PUT", body: { done: !n.done } }), n.done ? "Opened again." : "Done.")} />
-                  {n.kind === "complaint" ? (n.done ? "Resolved" : "Resolve") : n.done ? `Followed up` : `Follow up on ${day(n.follow_up_on)}`}
+                  {n.kind === "complaint" ? (n.done ? "Resolved" : "Resolve") : n.done ? (n.kind === "task" ? "Done" : `Followed up`) : `Follow up on ${day(n.follow_up_on)}`}
                 </label>
               )}
             </li>

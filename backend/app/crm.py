@@ -13,7 +13,8 @@ delivers less than promised (reliability under 60%), unhappy (a low rating or an
 selling elsewhere (an approved deal whose delivery week is over with nothing delivered).
 
 Notes (collection "notes") are the planner's own record: a note, a call or visit they made, the farmer's feedback
-(with a rating) or a complaint, each optionally with a follow-up date. A follow-up is done when ticked off.
+(with a rating), a complaint or a task (the daily brief writes tasks too, daily_brief.py), each optionally with a
+follow-up date. A follow-up is done when ticked off.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ from .store import Store
 
 RELIABLE, MIXED = 0.9, 0.6
 SMALL, LARGE = 500, 1000
-NOTE_KINDS = {"note": "Note", "call": "Call I made", "visit": "Visit", "feedback": "Feedback", "complaint": "Complaint"}
+NOTE_KINDS = {"note": "Note", "call": "Call I made", "visit": "Visit", "feedback": "Feedback", "complaint": "Complaint", "task": "To do"}
 NOT_REACHED = {"no_answer", "busy", "failed", "canceled", "not_connected", "dropped"}
 SEGMENT_KEYS = {"reliability": ("reliable", "mixed", "unreliable", "new"), "size": ("small", "medium", "large"),
                 "certified": ("yes", "no")}

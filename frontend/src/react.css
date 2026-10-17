@@ -1779,3 +1779,13 @@ tr.is-live td { background: #F2F8F4; }
 .map-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; }
 .map-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .map-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+/* Overview: Gemini's daily brief */
+.brief-card { gap: 12px; }
+.brief-text { margin: 0; max-width: 72ch; line-height: 1.55; }
+.brief-tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.brief-tasks li { display: grid; grid-template-columns: minmax(120px, 180px) 1fr auto; gap: 12px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--hairline, #E5E4DD); }
+.brief-tasks li.done span { text-decoration: line-through; color: var(--g-text-3, #6B7280); }
+.brief-tasks .linkish { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--g-action, #16774E); cursor: pointer; text-align: left; }
+.brief-tasks .linkish:hover { text-decoration: underline; }
+@media (max-width: 640px) { .brief-tasks li { grid-template-columns: 1fr auto; } .brief-tasks li span { grid-column: 1 / -1; grid-row: 2; } }
