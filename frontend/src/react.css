@@ -1659,3 +1659,7 @@ body.app .start-card select { color: #1B231F; background: #fff; }
   body.app main.page { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
   .cal-chip { font-size: 0 !important; width: 8px; height: 8px; min-height: 0; padding: 0 !important; border-radius: 50%; overflow: hidden; display: inline-block; margin: 1px; }
 }
+
+/* Re-measure fixes: agent selects at 3:1, out-of-month day numbers readable (4.5:1) */
+body.app .agent-col select { border-color: #8E8D84; }
+body.app .cal-day.out .cal-num { color: #6B726D; }

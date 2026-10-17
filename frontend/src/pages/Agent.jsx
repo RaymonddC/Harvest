@@ -11,7 +11,7 @@ export default function Agent() {
   const head = (
     <div className="page-head">
       <div>
-        <h1>The agent{campaign.label ? ` · ${campaign.label}` : ""}</h1>
+        <h1>The agent{campaign.label ? <span className="h1-ctx">{campaign.label}</span> : null}</h1>
         <p>Each campaign has its own agent. Pick the campaign in the sidebar to set up another.</p>
       </div>
       <a className="btn" href={apiUrl("/api/answers.csv")} download="answers.csv">Download answers</a>

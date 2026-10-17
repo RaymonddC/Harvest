@@ -33,7 +33,7 @@ function label(e, names) {
     default: return "";
   }
 }
-// One chip per kind and day: a single event by name, several as a count and total ("9 harvests · 12 t").
+// One chip per kind and day: a single event by name, several as a count and total ("12 t, 9 harvests").
 const GROUP_WORD = { call: ["call", "calls"], harvest: ["harvest", "harvests"], deal: ["deal", "deals"], delivery: ["delivery", "deliveries"] };
 function chips(evs, names) {
   const groups = [];
@@ -47,7 +47,7 @@ function chips(evs, names) {
     const kg = g.items.reduce((n, e) => n + (e.kg || 0), 0);
     const waiting = g.items.filter((e) => e.planned || (e.type === "deal" && e.status !== "approved")).length;
     const allProjected = g.items.every((e) => e.projected);
-    return { text: `${g.items.length} ${g.items.length === 1 ? one : many}${kg ? ` · ${fmtT(kg)} t` : ""}${waiting ? ` · ${waiting} waiting` : ""}${allProjected ? " (projected)" : ""}`,
+    return { text: `${kg ? `${fmtT(kg)} t, ` : ""}${g.items.length} ${g.items.length === 1 ? one : many}${waiting ? `, ${waiting} waiting` : ""}${allProjected ? " (projected)" : ""}`,
       cls: `${g.type} ${allProjected ? "projected" : ""} ${waiting === g.items.length && g.type === "call" ? "planned" : ""}` };
   });
 }
