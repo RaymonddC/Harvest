@@ -56,6 +56,8 @@ export default function Login() {
   const [people, setPeople] = useState(null);
   const [demoPassword, setDemoPassword] = useState("");
   const [busy, setBusy] = useState(null);
+  // "Sign in with a username" open: the people are hidden so the form is the only thing to do.
+  const [byName, setByName] = useState(!!params.get("expired") && !people?.length);
   const [notice, setNotice] = useState(params.get("expired") ? "Your session ended. Pick a person to continue." : "");
   useEffect(() => {
     api("/api/auth/demo", { method: "GET", auth: false })
@@ -114,10 +116,10 @@ export default function Login() {
       <section className="login-pick picker" aria-labelledby="login-title">
         <motion.div className="lp-head" {...rise(0)}>
           <h1 id="login-title">Who is signing in?</h1>
-          <p className="muted">Demo mode: just pick a person. What each person can do depends on their role. All data is synthetic.</p>
+          <p className="muted">{byName ? "Sign in with your own username and password." : "Demo mode: just pick a person. What each person can do depends on their role. All data is synthetic."}</p>
         </motion.div>
         {notice && <p className="banner error" role="alert">{notice}</p>}
-        <motion.div className="roles" role="group" aria-label="People" {...rise(1)}>
+        {!byName && <motion.div className="roles" role="group" aria-label="People" {...rise(1)}>
           {(people || []).map((p, i) => (
             <button key={p.id} type="button" className={`role-tile ${i === 0 ? "main" : ""}`} disabled={!!busy} aria-busy={busy === p.id || undefined} onClick={() => pick(p)}>
               <span className="role-icon"><Icon name={ROLE_ICON[p.role] || "users"} size={20} /></span>
@@ -126,9 +128,9 @@ export default function Login() {
               <span className="role-go">{busy === p.id ? <><Spinner />Signing in…</> : p.role === "farmer" ? "Open the call client" : "Open the overview"}</span>
             </button>
           ))}
-        </motion.div>
-        <details className="own-account" open={!!params.get("expired") && !people?.length}>
-          <summary>Sign in with a username</summary>
+        </motion.div>}
+        <details className="own-account" open={byName} onToggle={(e) => setByName(e.currentTarget.open)}>
+          <summary>{byName ? "Back to the people" : "Sign in with a username"}</summary>
           <SignInForm onSignedIn={done} noDemo autoFocus={false} initialError={params.get("expired") && !people?.length ? "Your session ended. Sign in again." : ""} />
         </details>
         {current && <p className="small muted">Currently signed in as {current.name} ({roleLabel(current)}). Picking someone switches you.</p>}
