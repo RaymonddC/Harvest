@@ -7,16 +7,33 @@ export {
 
 // Planner pages: route, sidebar label (the key is also the icon name). "need" is the capability a
 // page requires before it shows in the sidebar.
-export const PAGES = [
-  { key: "setup", to: "/setup", label: "Campaign" },
-  { key: "farmers", to: "/farmers", label: "Farmers" },
-  { key: "agent", to: "/agent", label: "Agent" },
-  { key: "calls", to: "/calls", label: "Calls" },
-  { key: "forecast", to: "/", label: "Live forecast" },
-  { key: "calendar", to: "/calendar", label: "Calendar" },
-  { key: "approvals", to: "/approvals", label: "Approvals" },
-  { key: "users", to: "/users", label: "Users", need: "users.admin" },
+// The sidebar follows the planner's flow: prepare, call, watch, decide. Each page says what its step is for
+// and which page comes next. Users is admin work, so it lives in the account menu, not here.
+export const FLOW = [
+  { n: 1, id: "prepare", label: "Prepare" },
+  { n: 2, id: "call", label: "Call" },
+  { n: 3, id: "watch", label: "Watch" },
+  { n: 4, id: "decide", label: "Decide" },
 ];
+export const PAGES = [
+  { key: "farmers", to: "/farmers", label: "Farmers", step: "prepare", next: "setup",
+    line: "Every farmer the mill works with. A campaign only calls the farmers you put in it." },
+  { key: "setup", to: "/setup", label: "Campaign", step: "prepare", next: "calls",
+    line: "Pick the campaign, check its farmers and the crop's fair price range, then start calling." },
+  { key: "agent", to: "/agent", label: "Agent", step: "settings",
+    line: "A setting, not a weekly step: how the AI agent sounds on this campaign's calls and what it asks besides the harvest." },
+  { key: "calls", to: "/calls", label: "Calls", step: "call", next: "forecast",
+    line: "The agent phones each farmer and saves the harvest they give. Demo calls are answered here." },
+  { key: "forecast", to: "/", label: "Live forecast", step: "watch", next: "approvals",
+    line: "Every saved answer updates the weeks. When a week is short, gap-fill calls ask farmers to bring harvest forward." },
+  { key: "calendar", to: "/calendar", label: "Calendar", step: "watch", next: "approvals",
+    line: "The same plan by day: calls, harvests, deal deliveries and weighbridge deliveries." },
+  { key: "approvals", to: "/approvals", label: "Approvals", step: "decide", next: "forecast",
+    line: "Nothing is agreed until you approve. The farmer then hears the confirmation and the purchase order is ready." },
+];
+// Set once and changed rarely: below the flow, under "Settings" (Users is in the account menu).
+export const SETTINGS = { id: "settings", label: "Settings" };
+export const ADMIN_PAGES = [{ key: "users", to: "/users", label: "Users", need: "users.admin" }];
 
 // The old one-file-per-page URLs (the call client and bookmarks still use them).
 export const OLD_URLS = { "index.html": "/", "setup.html": "/setup", "approvals.html": "/approvals", "users.html": "/users", "login.html": "/login" };

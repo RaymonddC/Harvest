@@ -2,7 +2,7 @@ import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { clearSession, roleLabel } from "../lib.js";
+import { can, clearSession, roleLabel } from "../lib.js";
 import { Avatar, Dialog, DialogClose } from "../ui.jsx";
 import SignInForm from "./SignInForm.jsx";
 
@@ -57,6 +57,7 @@ export default function AccountMenu({ session }) {
               <span><b>{session.name}</b><small>{roleLabel(session)}{session.username ? ` · @${session.username}` : ""}</small></span>
             </div>
             <Menu.Separator className="hc-menu-sep" />
+            {can("users.admin") && <Menu.Item className="hc-menu-item" onSelect={() => navigate("/users")}>Manage users and roles</Menu.Item>}
             <Menu.Item className="hc-menu-item" onSelect={() => setSwitching(true)}>Switch user</Menu.Item>
             <Menu.Item className="hc-menu-item danger" onSelect={signOut}>Sign out</Menu.Item>
           </Menu.Content>

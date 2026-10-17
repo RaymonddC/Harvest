@@ -16,7 +16,7 @@ function ticks(maxKg) {
 // The bar's layers. Harvest moved out to another week by an approved deal is taken off the top,
 // so the layers always add up to the expected tonnes.
 function parts(r) {
-  const raw = [["firm", r.firm_kg || 0], ["unsure", r.unsure_weighted_kg || 0], ["approved", r.approved_in_kg || 0]];
+  const raw = [["firm", r.firm_kg || 0], ["unsure", r.unsure_weighted_kg || 0], ["projected", r.projected_kg || 0], ["approved", r.approved_in_kg || 0]];
   let over = raw.reduce((n, [, v]) => n + v, 0) - r.expected_kg;
   for (let i = raw.length - 1; i >= 0 && over > 0; i--) {
     const cut = Math.min(raw[i][1], over);
@@ -35,6 +35,7 @@ function TipBody({ r, target }) {
       <strong>{r.label} · {shortDate(r.week_start)}</strong>
       <Line label="Firm answers" kg={r.firm_kg} />
       {r.unsure_weighted_kg > 0 && <Line label={r.unsure_count ? `${r.unsure_count} unsure, counted half` : "Unsure, counted half"} kg={r.unsure_weighted_kg} />}
+      {r.projected_kg > 0 && <Line label="Later harvest rounds (projected)" kg={r.projected_kg} />}
       {r.approved_in_kg > 0 && <Line label="Approved deals" kg={r.approved_in_kg} />}
       {r.pending_kg > 0 && <Line label="Waiting for approval" kg={r.pending_kg} />}
       <div className="sum"><span>Expected</span><b className="num">{fmtT(r.expected_kg)} of {fmtT(target)} t</b></div>
@@ -96,7 +97,7 @@ export default function Chart({ rows }) {
               </div>
               <div className="pend" hidden={!r.pending_kg} style={{ height: pct(r.pending_kg) }} title={`${fmtT(r.pending_kg)} t waiting for approval`} />
               <div className={`bar ${r.is_gap ? "gap" : ""}`} style={{ height: pct(r.expected_kg) }}>
-                {/* What the week stands on, bottom up: firm answers, unsure ones (counted half), approved deals. */}
+                {/* What the week stands on, bottom up: firm answers, unsure ones (counted half), projected later rounds, approved deals. */}
                 {parts(r).map(([k, v]) => v > 0 && <i key={k} className={`seg ${k}`} style={{ flexGrow: v }} />)}
               </div>
               {/* The missing tonnes, drawn from the top of the bar up to the target line. */}

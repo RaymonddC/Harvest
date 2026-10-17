@@ -12,7 +12,7 @@ import { api } from "../lib.js";
 import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 import { useAct } from "../toast.jsx";
-import { ActButton, Icon } from "../ui.jsx";
+import { ActButton } from "../ui.jsx";
 
 // One campaign: pick or edit it, then its three steps (its farmers, the crop's price range, start calling).
 export default function Setup() {
@@ -26,7 +26,6 @@ export default function Setup() {
     .sort((a, b) => Number(!!b.to_call) - Number(!!a.to_call) || a.id.localeCompare(b.id)) : [];
   const toCall = farmers.filter((f) => f.to_call).length;
   const l = state ? state.limits.find((x) => (x.crop || x.id) === crop) || null : null; // none yet for a new crop: the form starts blank
-  const persona = campaign.persona || {};
 
   const head = (
     <div className="page-head">
@@ -46,16 +45,6 @@ export default function Setup() {
         <PriceRange key={crop} l={l} crop={crop} />
         {state ? <StartCalling state={state} toCall={toCall} /> : <section className="card dark"><div className="stats" id="campaign-lines" /></section>}
       </div>
-      {state && campaign.id && (
-        <section className="card agent-link" aria-label="The agent">
-          <span className="agent-link-icon"><Icon name="agent" size={20} /></span>
-          <div>
-            <b>{persona.name || "The agent"}</b>
-            <span className="sub">{persona.preset || persona.style ? `${persona.style || persona.preset} · ` : ""}{(campaign.questions || []).length} extra question{(campaign.questions || []).length === 1 ? "" : "s"} on harvest calls</span>
-          </div>
-          <Link className="btn" to="/agent">Set up the agent</Link>
-        </section>
-      )}
       {state && (
         <FarmerList farmers={farmers} onEdit={setFarmerForm} onOpen={setOpenFarmer} cid={cid}
           title={`Farmers in ${campaign.label || cropName(crop)}`}

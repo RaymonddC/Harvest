@@ -101,7 +101,7 @@ export default function Calendar() {
         <h1>Calendar</h1>
         <p>Calls, harvests, deals and deliveries by day{scope === "one" && campaign.label ? `, for ${campaign.label}` : ", for every campaign"}.</p>
       </div>
-      <div className="seg" role="group" aria-label="Which campaigns">
+      <div className="seg-toggle" role="group" aria-label="Which campaigns">
         <button type="button" className={scope === "one" ? "on" : ""} aria-pressed={scope === "one"} onClick={() => setScope("one")}>This campaign</button>
         <button type="button" className={scope === "all" ? "on" : ""} aria-pressed={scope === "all"} onClick={() => setScope("all")}>All campaigns</button>
       </div>

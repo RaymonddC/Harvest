@@ -62,6 +62,7 @@ export default function Forecast() {
               <div className="legend" aria-hidden="true">
                 <span><i className="l-leaf" />Firm</span>
                 <span><i className="l-unsure" />Unsure, counted half</span>
+                <span><i className="l-projected" />Later rounds (projected)</span>
                 <span><i className="l-approved" />Approved deals</span>
                 <span><i className="l-amber" />Gap week</span>
                 <span><i className="l-pend" />Pending approval</span>
