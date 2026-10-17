@@ -44,3 +44,19 @@ def test_prompt_and_speech_hint_follow_the_settings(settings):
     assert live_session.stt_language_codes("bahasa indonesia", ["Javanese"]) == ["id-ID", "jv-ID"]
     plain = prompt.build_system_instruction(settings, farmer, "collect", None, campaign={"persona": {"switch": False}})
     assert "Speak only Javanese" in plain
+
+
+def test_demo_and_new_campaigns_call_in_english(settings, store):
+    from app import seed_data, services
+    from app.store import MemoryStore
+
+    demo = MemoryStore()
+    seed_data.load_seed(demo, settings)
+    for camp in demo.list("campaigns"):
+        assert camp["persona"]["language_mode"] == "fixed" and camp["persona"]["language"] == "English"
+    farmer = demo.get("farmers", "f01")  # an Indonesian-speaking farmer
+    text = prompt.build_system_instruction(settings, farmer, "collect", None, campaign=demo.get("campaigns", "current"))
+    assert "Start in English" in text and "Hello, this is an AI assistant" in text
+    new = services.create_campaign(store, settings, "coffee", 5000, start_date=str(settings.plan_start),
+                                   end_date=str(settings.plan_start))
+    assert store.get("campaigns", new["id"])["persona"]["language"] == "English"

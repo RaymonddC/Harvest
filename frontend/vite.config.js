@@ -13,7 +13,7 @@ const backend = process.env.HARVEST_BACKEND || "http://localhost:8000";
 // as they are, so one Hosting folder serves both.
 const VANILLA = ["call.html", "mic-test.html", "farmers-template.csv", "config.js", "favicon.svg",
   "js/call.js", "js/data.js", "js/audio-worklets.js", "css/app.css", "css/call.css",
-  "samples/gap-fill.json", "samples/farmer-lines.json", "samples/clips", "js/stand-in.js"];  // clips/ is a folder of agent mp3 and farmer wav files
+  "samples/gap-fill.json", "samples/farmer-lines.json", "samples/clips.json", "samples/clips", "js/stand-in.js"];  // clips/ is a folder of agent mp3 and farmer wav files
 
 function copyVanilla() {
   return {

@@ -273,14 +273,19 @@ def _more_campaigns(plan_start: dt.date, language: str, rng_seed: int = 7) -> di
     return out
 
 
-def load_seed(store, settings, more_campaigns: bool = True) -> None:
-    from . import services
+def load_seed(store, settings, more_campaigns: bool = True, english_agent: bool = True) -> None:
+    """english_agent: the demo campaigns' agent calls in English (switching to the farmer's language when they answer
+    in it). The tests keep the agent on each farmer's own language (Bahasa Indonesia), as they were written for."""
+    from . import agent_profile, services
 
     data = build_seed(settings.plan_start, settings.demo_language, settings.demo_crop,
                       settings.target_kg_per_week)
     if more_campaigns and settings.multi_crop:
         for coll, docs in _more_campaigns(settings.plan_start, settings.demo_language).items():
             data.setdefault(coll, {}).update(docs)
+    if english_agent:
+        for camp in data.get("campaigns", {}).values():
+            camp.setdefault("persona", dict(agent_profile.NEW_CAMPAIGN_PERSONA))
     for coll in ("farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes",
                  "campaigns", "promises", "deliveries", "messages", "official_prices"):
         store.clear(coll)

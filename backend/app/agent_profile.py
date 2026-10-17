@@ -51,6 +51,11 @@ MAX_QUESTIONS = 5
 MAX_NAME = 30
 MAX_QUESTION_LEN = 200
 
+# A new campaign's agent (and the demo's): English on every call, switching to the farmer's language when they answer
+# in it. Change it per campaign on the Agent page.
+NEW_CAMPAIGN_PERSONA = {"preset": "", "name": "", "voice": "", "style": "", "language_mode": "fixed", "language": "English",
+                        "switch": True, "also_speaks": []}
+
 DEFAULT_PERSONA = {"preset": "", "name": "", "voice": "", "style": "", "language_mode": "farmer", "language": "",
                    "switch": True, "also_speaks": []}
 

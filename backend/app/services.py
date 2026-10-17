@@ -553,6 +553,7 @@ def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_w
     if any(c["id"] == cid for c in camps):
         cid = f"{key}-{hashlib.sha1(now_iso().encode() + str(len(camps)).encode()).hexdigest()[:6]}"
     doc = {"crop": key, "name": (name or "").strip() or None, "kind": None, "status": "idle",
+           "persona": dict(agent_profile.NEW_CAMPAIGN_PERSONA),  # English calls by default (Agent page to change)
            "target_kg_per_week": round(target_kg_per_week), "created_at": now_iso(), **dates, **ops}
     doc["weeks"] = campaign_weeks(settings, {**doc, "weeks": weeks})
     store.set("campaigns", cid, doc)
