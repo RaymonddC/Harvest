@@ -10,14 +10,17 @@ const STAGE_COLOR = { to_call: "#E3A72F", calling: "#3C8FD0", no_reply: "#C2410C
 const CERT_COLOR = { ISPO: "#16774E", RSPO: "#3C8FD0", none: "#B9B8AF" };
 
 let mapsLoading = null;
+let mapsRefused = false; // Google refused the key (e.g. this address is not in the key's allowed websites)
+const refusedListeners = new Set();
 function loadMaps(key) {
   if (window.google?.maps) return Promise.resolve(window.google.maps);
   if (!mapsLoading) {
     mapsLoading = new Promise((resolve, reject) => {
       const cb = `harvestMaps${Date.now()}`;
       window[cb] = () => resolve(window.google.maps);
+      window.gm_authFailure = () => { mapsRefused = true; refusedListeners.forEach((f) => f()); };
       const s = document.createElement("script");
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&callback=${cb}`;
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&callback=${cb}`;
       s.async = true;
       s.onerror = () => reject(new Error("Google Maps did not load"));
       document.head.appendChild(s);
@@ -28,7 +31,7 @@ function loadMaps(key) {
 
 export default function FarmerMap({ state, cid, onOpen }) {
   const [by, setBy] = useState("stage");
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState(mapsRefused);
   const box = useRef(null);
   const crm = useMemo(() => crmOf(state, cid), [state, cid]);
   const points = crm.farmers.filter((x) => x.farmer.plot_lat != null && x.farmer.plot_lng != null).map((x) => ({
@@ -38,6 +41,12 @@ export default function FarmerMap({ state, cid, onOpen }) {
   }));
   const key = cfg.mapsKey;
   const google = key && !failed;
+
+  useEffect(() => {
+    const refused = () => setFailed(true);
+    refusedListeners.add(refused);
+    return () => refusedListeners.delete(refused);
+  }, []);
 
   useEffect(() => {
     if (!google || !box.current || !points.length) return undefined;
@@ -86,7 +95,7 @@ export default function FarmerMap({ state, cid, onOpen }) {
           </svg>
         )}
       <p className="map-legend small">{legend.map(([t, c]) => <span key={t}><i style={{ background: c }} />{t}</span>)}
-        {!google && <span className="muted">{failed ? "Google Maps did not load; showing the plots on a plain map." : "Plain map: set MAPS_API_KEY to show satellite imagery."}</span>}</p>
+        {!google && <span className="muted">{failed ? "Google Maps refused the key here (check the key's allowed websites); showing a plain map." : "Plain map: set MAPS_API_KEY to show satellite imagery."}</span>}</p>
     </section>
   );
 }

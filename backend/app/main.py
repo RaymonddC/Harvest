@@ -243,7 +243,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     @app.get("/config.js", include_in_schema=False)
     def config_js():
         cfg = {"apiBase": "", "millName": settings.mill_name,
-               "firebase": json.loads(settings.firebase_web_config) if settings.firebase_web_config else None}
+               "firebase": json.loads(settings.firebase_web_config) if settings.firebase_web_config else None,
+               "mapsKey": settings.maps_api_key or ""}
         return Response(f"window.HARVEST_CONFIG = {json.dumps(cfg)};", media_type="application/javascript")
 
     # ----- demo sign-in: pick a role, no password -----
