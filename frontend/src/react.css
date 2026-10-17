@@ -1240,3 +1240,10 @@ table.answers tr:focus-visible td { background: var(--leaf-soft); outline: none;
 @media (max-height: 640px) { .login-story .ls-scene { display: none; } }
 .login-pick.picker .role-tile { position: relative; }
 .role-start { position: absolute; top: 10px; right: 10px; margin: 0; }
+/* Sign-in, from the browser checks: a focus ring that stands out on white (5.5:1), firmer tile edges,
+   44px tap targets for the username toggle and the show-password button */
+.login-pick :focus-visible { outline: 3px solid var(--leaf); outline-offset: 2px; }
+.login-pick.picker .role-tile { border-color: #C3CCC7; }
+.login-pick.picker .role-tile.main { border-color: var(--leaf); }
+.own-account summary { min-height: 44px; display: flex; align-items: center; }
+.login-pick .pw-toggle { min-width: 44px; min-height: 44px; }
