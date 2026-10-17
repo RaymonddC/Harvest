@@ -37,7 +37,7 @@ export default function FarmersStep({ farmers, toCall, onAdd, cid, crop }) {
 
   return (
     <section className={`card ${farmers.length ? "done" : ""}`} aria-labelledby="farmers-title">
-      <StepTop n={1} done={farmers.length > 0} word={farmers.length ? "Done" : "To do"} />
+      <StepTop n={1} label="Who" done={farmers.length > 0} word={farmers.length ? "Ready" : "To do"} />
       <div className="step-head"><h2 id="farmers-title">Farmers</h2><span className="sub">Who the agent calls in this campaign.</span></div>
       <div className="drop">
         <div className="stack" id="avatars" aria-hidden="true">

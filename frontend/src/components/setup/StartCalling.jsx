@@ -71,18 +71,45 @@ export default function StartCalling({ state, toCall }) {
     if (r) navigate(channel === "twilio" ? "/forecast" : "/calls");
   };
   const who = `${toCall} ${toCall === 1 ? "farmer" : "farmers"}`;
+  // While calls run: this round's calls (since the campaign started calling), waiting, done and answered.
+  const since = campaign.started_at || "";
+  const round = running ? state.calls.filter((c) => c.campaign_id === cid && (c.created_at || "") >= since.slice(0, 19) && c.kind === campaign.kind) : [];
+  const roundWaiting = round.filter((c) => ["queued", "on_call"].includes(c.status)).length;
+  const roundDone = round.length - roundWaiting;
+  const answeredIds = new Set(state.harvests.filter((h) => h.call_id).map((h) => h.call_id));
+  const offerIds = new Set(state.offers.filter((o) => o.call_id).map((o) => o.call_id));
+  const roundGot = round.filter((c) => answeredIds.has(c.id) || offerIds.has(c.id)).length;
+  const gapLabel = campaign.gap_week ? `week ${campaign.gap_week}` : "the short week";
   return (
     <section className="card dark start-card" aria-labelledby="campaign-title">
-      <StepTop n={3} done={false} word={running ? "Calling" : toCall ? "Ready" : "Waiting"} cls={running ? "leaf" : ""} />
-      <div className="step-head">
-        <h2 id="campaign-title">Call the farmers</h2>
-        <span className="sub">The AI agent phones each farmer, asks about their next harvest and saves the answer. Nothing is agreed without your approval.</span>
-      </div>
-      <div className="stats" id="campaign-lines">
-        <div><b>{toCall}</b><span>to call</span></div>
-        <div><b>≤ {minutes} min</b><span>per call</span></div>
-        <div><b>W1 to W{campaign.weeks || s.weeks || 5}</b><span>asked about</span></div>
-      </div>
+      <StepTop n={3} label="Call" done={false} word={running ? "Calling now" : toCall ? "Ready to call" : "Nothing to call"} cls={running ? "leaf" : ""} />
+      {running ? (
+        <>
+          <div className="step-head">
+            <h2 id="campaign-title">{campaign.kind === "gap_fill" ? `Gap-fill calls running for ${gapLabel}` : "Harvest calls running"}</h2>
+            <span className="sub">{campaign.kind === "gap_fill"
+              ? "The agent is asking farmers who can harvest earlier to bring fruit into the short week, at a better price inside your range. Each deal waits for your approval."
+              : "The agent is asking each farmer for their next harvest. Answers go straight into the forecast."}</span>
+          </div>
+          <div className="stats" id="campaign-lines">
+            <div><b>{roundWaiting}</b><span>still to call</span></div>
+            <div><b>{roundDone}</b><span>calls done</span></div>
+            <div><b>{roundGot}</b><span>{campaign.kind === "gap_fill" ? "offers" : "answers"}</span></div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="step-head">
+            <h2 id="campaign-title">Call the farmers</h2>
+            <span className="sub">The AI agent phones the farmers who need a harvest call, asks about their next harvest and saves the answer. Nothing is agreed without your approval.</span>
+          </div>
+          <div className="stats" id="campaign-lines">
+            <div><b>{toCall}</b><span>to call</span></div>
+            <div><b>≤ {minutes} min</b><span>per call</span></div>
+            <div><b>W1 to W{campaign.weeks || s.weeks || 5}</b><span>asked about</span></div>
+          </div>
+        </>
+      )}
       <p className="call-mode">
         <Icon name="phone" size={14} />
         {phoneCalls ? <span><b>Real phone calls.</b> {s.phone_calls_note}</span>
@@ -90,7 +117,7 @@ export default function StartCalling({ state, toCall }) {
       </p>
       <div className="start-acts">
         {running ? <>
-          <span className="pill lg dot running" style={{ alignSelf: "flex-start", background: "var(--ink-2)", color: "var(--on-ink)" }}>{byPhone ? "Calling phones, one at a time" : campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Calling farmers now"}</span>
+          {byPhone && <span className="pill lg dot running" style={{ alignSelf: "flex-start", background: "var(--ink-2)", color: "var(--on-ink)" }}>Calling phones, one at a time</span>}
           {byPhone ? <Link className="btn mint big block" to="/forecast">Watch the calls</Link> : <Link className="btn mint big block" to="/calls">Open the demo phone</Link>}
           <ActButton need="campaign.run" className="btn on-ink block" busy="Stopping…" run={() => act(() => api(stopUrl(cid), { body: {} }), "Calling stopped.")}>Stop calling</ActButton>
         </> : phoneCalls ? <>

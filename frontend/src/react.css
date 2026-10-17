@@ -1140,3 +1140,48 @@ body.app .agent-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr
 .radio-row select { min-height: 38px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); font: inherit; max-width: 240px; }
 .lang-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-left: 26px; }
 .lang-chips small { flex-basis: 100%; }
+
+/* ---------- Calls: what each farmer said ---------- */
+.call-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+@media (max-width: 900px) { .call-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .call-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.call-stat { display: flex; flex-direction: column; gap: 1px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface); font: inherit; text-align: left; cursor: pointer; }
+.call-stat b { font-size: 24px; line-height: 1.1; }
+.call-stat span { font-size: 13px; font-weight: 700; color: var(--muted); }
+.call-stat small { font-size: 12px; color: var(--muted); }
+.call-stat.warn { border-color: #E9C488; background: #FFF9EF; }
+.call-stat.on { border-color: var(--leaf); box-shadow: 0 0 0 3px var(--leaf-soft); }
+.answers-card { gap: 12px; }
+table.answers { width: 100%; min-width: 860px; }
+table.answers th { text-align: left; font-size: 12.5px; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+table.answers td { padding: 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; font-size: 13.5px; }
+table.answers tr.clickable { cursor: pointer; }
+table.answers tr.clickable:hover td { background: #F6FBF8; }
+table.answers tr:focus-visible td { background: var(--leaf-soft); outline: none; }
+.cell-sub { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.ans-harvest, .ans-offer { display: flex; flex-direction: column; gap: 2px; }
+.ans-harvest small, .ans-offer small { color: var(--muted); font-size: 12px; }
+.tag { display: inline-block; padding: 0 6px; border-radius: 6px; font-weight: 700; font-size: 11.5px; }
+.tag.firm { background: var(--leaf-soft); color: var(--leaf-deep); }
+.tag.unsure { background: var(--amber-soft); color: var(--amber-text); }
+.ans-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.ans-list li { display: flex; flex-direction: column; font-size: 12.5px; }
+.ans-list span { color: var(--muted); }
+.phone-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); z-index: 60; display: flex; flex-direction: column;
+  background: #0E1512; box-shadow: -12px 0 32px rgba(0, 0, 0, .25); }
+.phone-drawer-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 14px; color: var(--on-ink); border-bottom: 1px solid rgba(255,255,255,.1); }
+.phone-drawer-head small { color: var(--on-ink-muted); flex: 1 1 160px; }
+.phone-drawer iframe { flex: 1; width: 100%; border: 0; }
+
+/* Pipeline drag and drop */
+.pcard[draggable="true"] { cursor: grab; }
+.pcard.dragging { opacity: .45; }
+.board .col.drop-on { outline: 2px dashed var(--leaf); outline-offset: -2px; background: var(--leaf-soft); }
+
+/* Step cards: the step's name next to its number; price details folded away */
+.step-label { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-right: auto; margin-left: 8px; }
+.card.dark .step-label { color: var(--on-ink-muted); }
+.price-more summary { cursor: pointer; font-weight: 700; color: var(--leaf-deep); font-size: 13.5px; }
+.price-more[open] { display: flex; flex-direction: column; gap: 8px; }
+.price-more-h { margin: 8px 0 0; font-size: 13.5px; }

@@ -91,6 +91,10 @@ class CampaignFarmersIn(BaseModel):
     remove: list[str] = []
 
 
+class ToCallIn(BaseModel):
+    to_call: bool
+
+
 class AllowNumberIn(BaseModel):
     phone: str
     label: str = ""
@@ -465,6 +469,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def campaign_farmers(campaign_id: str, body: CampaignFarmersIn):
         """Move farmers from the database into this campaign, or out of it."""
         return services.set_campaign_farmers(store, settings, campaign_id, body.add, body.remove)
+
+    @app.put("/api/farmers/{farmer_id}/to-call", dependencies=[Depends(need("farmers.manage"))])
+    def put_to_call(farmer_id: str, body: ToCallIn):
+        """Mark a farmer to always get the harvest call (or not): the To call stage on the pipeline board."""
+        if not store.get("farmers", farmer_id):
+            raise HTTPException(404, "Farmer not found.")
+        store.set("farmers", farmer_id, {"to_call": body.to_call}, merge=True)
+        return {"farmer_id": farmer_id, "to_call": body.to_call}
 
     @app.post("/api/allowed-numbers")
     def post_allowed_number(body: AllowNumberIn, actor: auth.Actor = Depends(need("campaign.run"))):

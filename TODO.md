@@ -245,5 +245,11 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     language rule and the speech-to-text hint follow it (the hint lists extra languages only when ticked). Still to
     check on a real call: switching mid-call, and the fixed opening wording for Thai, Vietnamese and Filipino.
 
+25. **Calls page shows answers; board drag and drop; clearer Campaign cards (17 Oct, same branch).** The Calls page
+    is a table of what each farmer said (harvest, firm or unsure, cycle, offer, extra answers) with filters; the demo
+    phone is a side panel. The pipeline board accepts drops that are real actions (To call: `PUT
+    /api/farmers/{id}/to-call`; Calling: call now; Offer to Deal: approve) and explains the others. The Campaign
+    step cards say Ready, fold the price details away, and the call card follows the running round.
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.
