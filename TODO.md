@@ -233,5 +233,11 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     week's dates, links to the calendar (`/calendar?date=`), and a click on a part lists the farmers behind it. Deals
     carry `delivered_kg`. Not built yet: follow-up tasks with due dates, an owner per farmer.
 
+23. **Overview home and three steps (17 Oct, same branch).** `/` is now the Overview: the chain from farmers to
+    deliveries with a count at each link, have and lack against the target (total and per week, click a part to filter
+    the board), the full To do list (`frontend/src/todo.js`, shared with the sidebar) and the farmer pipeline board.
+    The Live forecast moved to `/forecast`. Sidebar: Overview, Live forecast, Calendar; then 1 Prepare (Farmers,
+    Campaign), 2 Call (Calls), 3 Decide (Approvals); Settings (Agent).
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

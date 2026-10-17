@@ -68,7 +68,7 @@ export default function StartCalling({ state, toCall }) {
   const start = async (channel) => {
     const r = await act(() => api(startUrl(cid), { body: { kind: "collect", channel } }),
       channel === "twilio" ? (x) => `Calling ${x.queued} farmers' phones, one at a time.` : (x) => `${x.queued} demo calls ready on the Calls page.`);
-    if (r) navigate(channel === "twilio" ? "/" : "/calls");
+    if (r) navigate(channel === "twilio" ? "/forecast" : "/calls");
   };
   const who = `${toCall} ${toCall === 1 ? "farmer" : "farmers"}`;
   return (
@@ -91,7 +91,7 @@ export default function StartCalling({ state, toCall }) {
       <div className="start-acts">
         {running ? <>
           <span className="pill lg dot running" style={{ alignSelf: "flex-start", background: "var(--ink-2)", color: "var(--on-ink)" }}>{byPhone ? "Calling phones, one at a time" : campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Calling farmers now"}</span>
-          {byPhone ? <Link className="btn mint big block" to="/">Watch the calls</Link> : <Link className="btn mint big block" to="/calls">Open the demo phone</Link>}
+          {byPhone ? <Link className="btn mint big block" to="/forecast">Watch the calls</Link> : <Link className="btn mint big block" to="/calls">Open the demo phone</Link>}
           <ActButton need="campaign.run" className="btn on-ink block" busy="Stopping…" run={() => act(() => api(stopUrl(cid), { body: {} }), "Calling stopped.")}>Stop calling</ActButton>
         </> : phoneCalls ? <>
           <ActButton need="campaign.run" className="btn mint big block" busy="Starting…" disabled={!toCall} run={() => start("twilio")}>

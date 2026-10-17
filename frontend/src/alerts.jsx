@@ -32,9 +32,9 @@ export default function Alerts() {
     if (newEnded.length === 1) {
       const c = newEnded[0];
       toast(c.status === "done" ? `Call with ${c.farmer_name} finished.` : `Call with ${c.farmer_name} ${c.status === "declined" ? "was declined" : "dropped"}.`,
-        pathname !== "/" ? { action: { label: "Forecast", onClick: () => navigate("/") } } : undefined);
+        pathname !== "/forecast" ? { action: { label: "Forecast", onClick: () => navigate("/forecast") } } : undefined);
     } else if (newEnded.length > 1) {
-      toast(`${newEnded.length} calls finished.`, pathname !== "/" ? { action: { label: "Forecast", onClick: () => navigate("/") } } : undefined);
+      toast(`${newEnded.length} calls finished.`, pathname !== "/forecast" ? { action: { label: "Forecast", onClick: () => navigate("/forecast") } } : undefined);
     }
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;

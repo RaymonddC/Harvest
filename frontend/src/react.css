@@ -1075,3 +1075,49 @@ body.app .side .week-card a.wc-item:hover small { color: #CFE3D8; }
 .timeline small { color: var(--muted); }
 .timeline time { color: var(--faint); font-size: 11.5px; }
 .linkish { border: 0; background: none; padding: 0; font: inherit; text-align: left; color: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); }
+
+/* ---------- Overview: the chain, have and lack, what to do next ---------- */
+.nav-group.overview { padding-bottom: 8px; margin-bottom: 2px; border-bottom: 1px solid var(--pp-line, rgba(255,255,255,.12)); }
+@media (max-width: 860px) { .nav-group.overview { border-bottom: 0; padding: 0; margin: 0; } }
+.wc-more { font-size: 12px; font-weight: 700; color: #7FE0B4; text-decoration: none; padding-left: 17px; }
+.chain-card { padding: 14px 16px; margin-bottom: 18px; }
+.chain { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.chain li { position: relative; display: flex; align-items: center; }
+.chain li a { flex: 1; display: flex; flex-direction: column; gap: 1px; padding: 10px 12px; border-radius: 12px; background: var(--fill, #F4F6F4);
+  text-decoration: none; color: var(--ink); border: 1px solid transparent; }
+.chain li a:hover { border-color: var(--leaf); }
+.chain li.warn a { background: var(--amber-soft); }
+.chain b { font-size: 24px; line-height: 1.1; }
+.chain span { font-weight: 700; font-size: 13.5px; }
+.chain small { color: var(--muted); font-size: 12px; }
+.chain li > i { position: absolute; right: -9px; top: 50%; transform: translateY(-50%); z-index: 1; font-style: normal; color: var(--muted); font-weight: 800; }
+@media (max-width: 900px) { .chain { grid-template-columns: repeat(3, minmax(0, 1fr)); } .chain li > i { display: none; } }
+@media (max-width: 520px) { .chain { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ov-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 18px; align-items: start; margin-bottom: 18px; }
+@media (max-width: 1100px) { .ov-grid { grid-template-columns: 1fr; } }
+.have-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 700px) { .have-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.have-tile { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); }
+.have-tile span { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.have-tile span i { width: 10px; height: 10px; border-radius: 3px; }
+.have-tile b { font-size: 24px; }
+.have-tile small { font-size: 11.5px; color: var(--muted); }
+.have-tile.missing { border-color: #E9C488; background: #FFF9EF; }
+.have-tile.missing b { color: #8A5605; }
+.have-tile .tb-there { background: #0F6E47; } .have-tile .tb-waiting { background: #3C8FD0; }
+.have-tile .tb-unknown { background: repeating-linear-gradient(135deg, #C86FA0 0 3px, #E3B4CD 3px 5px); } .have-tile .tb-missing { background: #B97507; }
+.have-bar { display: flex; gap: 2px; height: 14px; margin: 12px 0 4px; }
+.have-bar i { display: block; height: 100%; }
+.have-bar i:first-child { border-radius: 4px 0 0 4px; } .have-bar i:last-child { border-radius: 0 4px 4px 0; }
+.have-bar .tb-there { background: #0F6E47; } .have-bar .tb-waiting { background: #3C8FD0; }
+.have-bar .tb-unknown { background: repeating-linear-gradient(135deg, #C86FA0 0 4px, #E3B4CD 4px 7px); } .have-bar .tb-missing { background: #B97507; }
+.todo-card { gap: 10px; }
+.todo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.todo-list li { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); }
+.todo-list li.amber { border-color: #E9C488; background: #FFF9EF; }
+.todo-list li.red { border-color: #F3C4AE; background: #FFF7F2; }
+.todo-list li.on { border-color: var(--leaf-mid, #A9D5BF); background: #F6FBF8; }
+.todo-n { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font-size: 12.5px; font-weight: 800; }
+.todo-list b { font-size: 14px; display: block; }
+.todo-list small { color: var(--muted); font-size: 12.5px; }
+.todo-done { display: flex; gap: 8px; align-items: center; margin: 0; color: var(--leaf-deep); font-weight: 600; }

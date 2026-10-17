@@ -1,59 +1,37 @@
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Link, Navigate, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { can, FLOW, fmtT, getSession, PAGES, SETTINGS } from "./lib.js";
+import { can, FLOW, fmtT, getSession, OVERVIEW, PAGES, SETTINGS } from "./lib.js";
 import AccountMenu from "./components/AccountMenu.jsx";
 import CropSwitcher from "./components/CropSwitcher.jsx";
 import { campaignFor, inCampaign, useCrop } from "./campaigns.jsx";
 import NextStep from "./components/NextStep.jsx";
-import { unknownSupply } from "./components/setup/NeedPanel.jsx";
+import { nextAutoText, todoItems } from "./todo.js";
 import { useUnsaved } from "./dialogs.jsx";
 import { useLive } from "./live.jsx";
 import { Dialog, DialogClose, Icon } from "./ui.jsx";
 
 // This week at a glance, under the page links: is calling on, is a week short, does anything
 // wait for a decision. Hidden on narrow screens, where the sidebar is a single row.
-// What is lacking in the picked campaign and what to do about it, most urgent first. Each line says the problem and
-// the next action, and links to where it is done. Ticks when nothing is left.
+// The first few items of the campaign's To do list (todo.js), each the problem and the next action, linking to
+// where it is done. The Overview page shows the whole list.
 function WeekCard({ state }) {
   const { cid } = useCrop();
   if (!state) return null;
   const campaign = campaignFor(state, cid);
-  const running = campaign.status === "running";
-  const rows = inCampaign(state, state.forecast, cid).sort((a, b) => a.week - b.week);
-  const gap = rows.find((r) => r.is_gap);
-  const over = rows.find((r) => r.is_surplus);
-  const waiting = inCampaign(state, state.offers, cid).filter((o) => ["pending", "escalated"].includes(o.status)).length;
-  const { toCall, unknown, usualKg } = unknownSupply(state, cid);
-  const confirming = inCampaign(state, state.calls, cid).filter((c) => c.kind === "confirm" && ["queued", "on_call"].includes(c.status)).length;
-  const items = [];
-  if (running) {
-    items.push({ to: campaign.channel === "twilio" ? "/" : "/calls", tone: "on", what: campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Harvest calls running",
-      next: campaign.channel === "twilio" ? "Watch the answers arrive" : "Answer them on the demo phone" });
-  }
-  if (waiting) items.push({ to: "/approvals", tone: "amber", what: `${waiting} offer${waiting > 1 ? "s" : ""} waiting for you`, next: "Approve or reject" });
-  if (!running && unknown.length) {
-    items.push({ to: "/setup#need", tone: "amber", what: `${unknown.length} farmers have not given their harvest`, next: `Call them: about ${fmtT(usualKg)} t a week is unknown` });
-  }
-  if (gap) {
-    const forward = (gap.shortlist || []).length;
-    items.push({ to: "/", tone: "amber", what: `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short`,
-      next: running && campaign.kind === "gap_fill" ? "Gap-fill calls are on it" : forward ? `Start gap-fill calls: ${forward} farmers can help` : "Add a rival quote or farmers who can harvest earlier" });
-  }
-  if (over) items.push({ to: "/", tone: "red", what: `Week ${over.week} is ${fmtT(over.surplus_kg)} t over capacity`, next: "Ask some farmers to deliver a week later" });
-  if (confirming) items.push({ to: "/calls", tone: "on", what: `${confirming} confirmation call${confirming > 1 ? "s" : ""} to make`, next: "The agent tells farmers their approved deal" });
-  if (!toCall.length && !running) items.push({ to: "/setup", tone: "amber", what: "No farmers to call", next: "Add farmers to this campaign" });
+  const items = todoItems(state, cid);
   return (
     <div className="week-card" aria-label="To do">
       <span className="wc-title">To do · {campaign.label || "this campaign"}</span>
-      {items.length ? items.slice(0, 4).map((it, i) => (
-        <Link key={i} className={`wc-item ${it.tone}`} to={it.to}>
+      {items.length ? items.slice(0, 4).map((it) => (
+        <Link key={it.key} className={`wc-item ${it.tone}`} to={it.to}>
           <i className="wc-dot" />
           <span><b>{it.what}</b><small>{it.next} →</small></span>
         </Link>
       )) : (
-        <div className="wc-item done"><i className="wc-dot" /><span><b>Nothing waiting</b><small>Every week is on track and every farmer has answered{campaign.weekly?.enabled ? `; next automatic calls ${(campaign.weekly.days || [0]).map((d) => ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][d]).join(", ")} at ${campaign.weekly.time || "06:00"}` : ""}.</small></span></div>
+        <div className="wc-item done"><i className="wc-dot" /><span><b>Nothing waiting</b><small>Every week is on track and every farmer has answered{nextAutoText(campaign) ? `; ${nextAutoText(campaign)}` : ""}.</small></span></div>
       )}
+      {items.length > 4 && <Link className="wc-more" to="/">All {items.length} on the Overview →</Link>}
     </div>
   );
 }
@@ -73,7 +51,7 @@ function DemoGuide({ state }) {
     ["Check the farmers and the price range", "/setup", state.farmers.length > 0 && state.limits.length > 0],
     ["Start calling", "/setup", anyRunning || calls.some((c) => c.status !== "queued")],
     ["Answer a call as the farmer", "/calls", calls.some((c) => ["done", "on_call"].includes(c.status))],
-    ["Fill the gap: gap-fill calls or the rival quote", "/", offers.length > 0],
+    ["Fill the gap: gap-fill calls or the rival quote", "/forecast", offers.length > 0],
     ["Approve the offers", "/approvals", offers.some((o) => o.status === "approved")],
     ["Answer the confirmation call", "/calls", offers.some((o) => o.confirmed_by_voice)],
   ];
@@ -107,7 +85,7 @@ function FlowLine({ pathname, go }) {
   return (
     <div className="flow-line" role="note">
       {step ? <span className="flow-step"><b>{step.n}</b>Step {step.n} of {FLOW.length} · {step.label}</span>
-        : <span className="flow-step settings">{SETTINGS.label}</span>}
+        : <span className="flow-step settings">{page.step === OVERVIEW.id ? OVERVIEW.label : SETTINGS.label}</span>}
       <span className="flow-text">{page.line}</span>
       {next && <Link className="flow-next" to={next.to} onClick={(e) => go(e, next.to)}>Then: {next.label} →</Link>}
     </div>
@@ -115,11 +93,11 @@ function FlowLine({ pathname, go }) {
 }
 
 // Keyboard shortcuts for people who use the app every day. Typing in a box never triggers them.
-const SHORTCUTS = [["g then f", "Live forecast"], ["g then s", "Campaign"], ["g then m", "Farmers"], ["g then c", "Calls"],
+const SHORTCUTS = [["g then o", "Overview"], ["g then f", "Live forecast"], ["g then s", "Campaign"], ["g then m", "Farmers"], ["g then c", "Calls"],
   ["g then k", "Calendar"], ["g then g", "Agent"], ["g then a", "Approvals"], ["g then u", "Users"],
   ["/", "Search the farmer list"], ["?", "Show these shortcuts"]];
-const GO = { f: "/", s: "/setup", m: "/farmers", c: "/calls", k: "/calendar", g: "/agent", a: "/approvals", u: "/users" };
-const PAGE_OF = { "/": "forecast", "/setup": "setup", "/farmers": "farmers", "/calls": "calls", "/calendar": "calendar",
+const GO = { o: "/", f: "/forecast", s: "/setup", m: "/farmers", c: "/calls", k: "/calendar", g: "/agent", a: "/approvals", u: "/users" };
+const PAGE_OF = { "/": "overview", "/forecast": "forecast", "/setup": "setup", "/farmers": "farmers", "/calls": "calls", "/calendar": "calendar",
   "/agent": "agent", "/approvals": "approvals", "/users": "users" };
 
 // Sidebar (phone: top row plus a bottom tab bar, from app.css), a top bar holding the page
@@ -193,6 +171,13 @@ export default function Shell({ title, head, children }) {
         {/* The middle scrolls on its own when it is taller than the window; the account stays below it. */}
         <div className="side-scroll">
         <nav aria-label="Planner pages">
+          <div className="nav-group overview" role="group" aria-label={OVERVIEW.label}>
+            {PAGES.filter((p) => p.step === OVERVIEW.id).map(({ key, to, label }) => (
+              <NavLink key={key} to={to} end onClick={(e) => go(e, to)} title={collapsed ? label : undefined}>
+                <Icon name={key} /><span className="label">{label}</span>
+              </NavLink>
+            ))}
+          </div>
           {FLOW.map((g) => (
             <div key={g.id} className="nav-group" role="group" aria-labelledby={`nav-${g.id}`}>
               <span className="nav-step" id={`nav-${g.id}`}><b>{g.n}</b>{g.label}</span>

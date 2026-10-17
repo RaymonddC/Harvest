@@ -15,7 +15,7 @@ export const unknownSupply = (state, cid) => toCallOf(state, cid);
 // farmers to deliver later.
 // The farmers behind one part of a week's bar: the ones whose harvest (or a projected later round) falls in it, the
 // ones with an offer waiting for it, the ones not answered yet, or the ones who could bring harvest forward into it.
-function farmersBehind(state, cid, d, part, unknown) {
+export function farmersBehind(state, cid, d, part, unknown) {
   const start = d.week_start;
   const endDate = new Date(`${start}T00:00:00Z`); endDate.setUTCDate(endDate.getUTCDate() + 6);
   const end = endDate.toISOString().slice(0, 10);
@@ -61,7 +61,7 @@ export default function NeedPanel({ state, cid, campaign, onPick }) {
   const startCollect = async () => {
     const r = await act(() => api(startUrl(cid), { body: { kind: "collect", channel: state.settings?.phone_calls ? "twilio" : "browser" } }),
       (x) => `${x.queued} harvest calls started.`);
-    if (r) navigate(state.settings?.phone_calls ? "/" : "/calls");
+    if (r) navigate(state.settings?.phone_calls ? "/forecast" : "/calls");
   };
   const status = gap ? `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short` : over ? `Week ${over.week} is ${fmtT(over.surplus_kg)} t over capacity` : "Every week is on track";
   return (
@@ -71,7 +71,7 @@ export default function NeedPanel({ state, cid, campaign, onPick }) {
           <h2 id="need-title">What the mill needs</h2>
           <span className={`need-status ${gap ? "short" : over ? "over" : "ok"}`}>{status}</span>
         </div>
-        <Link className="btn sm" to="/">See the forecast</Link>
+        <Link className="btn sm" to="/">See the Overview</Link>
       </div>
       <TargetBreakdown rows={rows} unknownKg={usualKg} compact onPick={onPick ? (d, part) => onPick(farmersBehind(state, cid, d, part, unknown)) : undefined} />
       <ol className="need-actions">
@@ -102,7 +102,7 @@ export default function NeedPanel({ state, cid, campaign, onPick }) {
               <b>Spread week {over.week}</b>
               <p>{fmtT(over.expected_kg)} t expected, the mill presses {fmtT(over.capacity_kg)} t. Ask some farmers to harvest a week later so the fruit does not wait and spoil.</p>
             </div>
-            <Link className="btn sm" to="/">Choose farmers</Link>
+            <Link className="btn sm" to="/forecast">Choose farmers</Link>
           </li>
         )}
       </ol>
