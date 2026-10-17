@@ -173,18 +173,20 @@ function Traceability() {
         <h2 id="trace-title">Traceability · {campaign.label}</h2>
         <a className="btn sm" href={apiUrl(`/api/traceability.csv?campaign=${encodeURIComponent(cid)}`)} download="traceability.csv">Traceability CSV</a>
       </div>
-      <div className="trace-stats">
-        <div><b>{pct(t.mapped)}%</b><span>{t.mapped} of {t.farmers} plots mapped</span><i style={{ width: `${pct(t.mapped)}%` }} /></div>
-        <div><b>{pct(t.certified)}%</b><span>{t.certified} certified (ISPO or RSPO)</span><i style={{ width: `${pct(t.certified)}%` }} /></div>
-        <div className={t.over_plot_yield.length ? "warn" : ""}><b>{t.over_plot_yield.length}</b><span>{t.over_plot_yield.length === 1 ? "farmer delivers" : "farmers deliver"} more than the plot can grow</span></div>
-      </div>
-      {t.over_plot_yield.length > 0 && (
-        <ul className="small trace-flags">
-          {t.over_plot_yield.slice(0, 5).map((x) => (
-            <li key={x.farmer_id}><b>{x.name}</b>: {fmtKg(x.delivered_kg_year)} kg in a year from a plot that grows about {fmtKg(x.max_kg_year)} kg. Check where the fruit comes from.</li>
-          ))}
-        </ul>
-      )}
+      <dl className="trace-rows">
+        <div><dt>Plot on the map</dt><dd><span className="meter" aria-hidden="true"><i style={{ width: `${pct(t.mapped)}%` }} /></span><b className="num">{t.mapped}</b> of {t.farmers} farmers</dd></div>
+        <div><dt>Certified (ISPO or RSPO)</dt><dd><span className="meter" aria-hidden="true"><i style={{ width: `${pct(t.certified)}%` }} /></span><b className="num">{t.certified}</b> of {t.farmers} farmers</dd></div>
+      </dl>
+      {t.over_plot_yield.length > 0 ? (
+        <div className="trace-flag" role="note">
+          <b>{t.over_plot_yield.length === 1 ? "One farmer delivers" : `${t.over_plot_yield.length} farmers deliver`} more than their plot can grow.</b>
+          <ul>
+            {t.over_plot_yield.slice(0, 5).map((x) => (
+              <li key={x.farmer_id}>{x.name}: {fmtKg(x.delivered_kg_year)} kg in a year from a plot that grows about {fmtKg(x.max_kg_year)} kg. Check where the fruit comes from.</li>
+            ))}
+          </ul>
+        </div>
+      ) : <p className="small muted" style={{ margin: 0 }}>No farmer delivers more than their plot can grow.</p>}
       <p className="small muted" style={{ margin: 0 }}>Each delivery in the CSV carries the farmer's plot location, area and certification. Add a plot on the farmer's Edit form.</p>
     </section>
   );

@@ -3,6 +3,7 @@ import { campaignFor, useCrop } from "../../campaigns.jsx";
 import { api, fmtPrice, fmtT, followCalls, gapFillBody, gapFillToast, startUrl } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar, Icon, Pill } from "../../ui.jsx";
+import FarmerFace from "../FarmerFace.jsx";
 import { shortDate } from "./Chart.jsx";
 
 // Who can fill the gap: farmers who can bring delivery forward, and logged rival quotes.
@@ -28,7 +29,6 @@ export function Hero({ gap, rows, state }) {
       <section className="hero ok" aria-live="polite">
         <span className="hero-mark"><Icon name="check" size={22} /></span>
         <div className="hero-text">
-          <span className="hero-eyebrow">{covered ? "Gap closed" : "No gap"}</span>
           <h2>{covered ? `Week ${covered} is covered` : "Every week is on track"}</h2>
           <p>{covered ? "Approved offers filled the gap. Every week is now within the gap threshold of the target."
             : `Each of the ${rows.length} weeks is within the gap threshold of the ${fmtT(target)} t target.`}</p>
@@ -48,8 +48,7 @@ export function Hero({ gap, rows, state }) {
   return (
     <section className="hero gap" aria-live="polite">
       <div className="hero-text">
-        <span className="hero-eyebrow">Gap alert · week {gap.week} · from {shortDate(gap.week_start)}</span>
-        <h2><span className="num">{fmtT(gap.gap_kg)} t</span> short</h2>
+        <h2>Week {gap.week} is <span className="num">{fmtT(gap.gap_kg)} t</span> short <small>from {shortDate(gap.week_start)}</small></h2>
         <p>{fmtT(gap.expected_kg)} of {fmtT(target)} t expected. {text}{calling ? " Gap-fill calls are running now." : ""}</p>
       </div>
       <div className="hero-acts">
@@ -80,7 +79,7 @@ export function FillList({ gap, state }) {
       {list.length || quotes.length ? (
         <div className="list-card">
           {top.map((p) => (
-            <div className="li" key={p.farmer_id || p.name}><Avatar name={p.name} cls="sm" /><span>{p.name}{p.village ? ` · ${p.village}` : ""}</span><strong>{fmtT(p.kg)} t</strong></div>
+            <div className="li" key={p.farmer_id || p.name}><FarmerFace name={p.name} id={p.farmer_id} size={32} /><span>{p.name}{p.village ? ` · ${p.village}` : ""}</span><strong>{fmtT(p.kg)} t</strong></div>
           ))}
           {rest.length > 0 && (
             <div className="li"><span className="avatar sm grey" aria-hidden="true">+{rest.length}</span>

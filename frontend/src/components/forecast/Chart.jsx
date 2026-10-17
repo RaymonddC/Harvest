@@ -96,7 +96,9 @@ export default function Chart({ rows }) {
             <Col key={r.week} r={r} target={target}>
               <div className="val num">
                 {/* On a phone the shortfall moves out of the pill (the KPI card above still shows it). */}
-                <span>{fmtT(r.expected_kg)}{r.is_gap && <span className="short"> · {fmtT(r.gap_kg)} t short</span>}{r.is_surplus && <span className="short over"> · {fmtT(r.surplus_kg)} t over</span>}</span>
+                <span>{fmtT(r.expected_kg)}</span>
+                {r.is_gap && <span className="short">{fmtT(r.gap_kg)} t short</span>}
+                {r.is_surplus && <span className="short over">{fmtT(r.surplus_kg)} t over</span>}
                 {r.pending_kg > 0 && <small><span>+{fmtT(r.pending_kg)} pending</span></small>}
               </div>
               <div className="pend" hidden={!r.pending_kg} style={{ height: pct(r.pending_kg) }} title={`${fmtT(r.pending_kg)} t waiting for approval`} />

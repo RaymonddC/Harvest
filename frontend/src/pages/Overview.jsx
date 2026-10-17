@@ -90,21 +90,23 @@ export default function Overview() {
           <div className="ov-grid">
             <section className="card" aria-labelledby="have-title">
               <div className="card-head">
-                <h2 id="have-title">Have and lack · {data.length} weeks, target {fmtT(target)} t</h2>
+                <div>
+                  <h2 id="have-title" className="have-say"><b className="num">{fmtT(have)} t</b> of the {fmtT(target)} t target is in hand</h2>
+                  <span className="sub">Next {data.length} weeks. {sum("missing") > 0 ? `${fmtT(sum("missing"))} t still has to be found` : "Nothing left to find"}{sum("unknown") > 0 ? `, and about ${fmtT(sum("unknown"))} t more should come once ${supply.unknown.length} farmers answer.` : "."}</span>
+                </div>
                 <Link className="btn sm" to="/forecast">Live forecast</Link>
-              </div>
-              <div className="have-tiles">
-                {parts.map((p) => (
-                  <div key={p.key} className={`have-tile ${p.key}`}>
-                    <span><i className={p.cls} />{p.label}</span>
-                    <b>{fmtT(p.kg)} t</b>
-                    <small>{target ? `${Math.round((p.kg / target) * 100)}% of the target · ` : ""}{p.note}</small>
-                  </div>
-                ))}
               </div>
               <div className="have-bar" role="img" aria-label={parts.map((p) => `${p.label} ${fmtT(p.kg)} t`).join(", ")}>
                 {parts.map((p) => p.kg > 0 && <i key={p.key} className={p.cls} style={{ flexGrow: p.kg }} />)}
               </div>
+              <dl className="have-ledger">
+                {parts.map((p) => (
+                  <div key={p.key} className={p.key}>
+                    <dt><i className={p.cls} />{p.label}</dt>
+                    <dd><b className="num">{fmtT(p.kg)} t</b><small>{p.note}</small></dd>
+                  </div>
+                ))}
+              </dl>
               <TargetBreakdown rows={rows} unknownKg={supply.usualKg} compact onPick={(d, part) => pick(farmersBehind(state, cid, d, part, supply.unknown))} />
             </section>
 
@@ -112,11 +114,10 @@ export default function Overview() {
               <h2 id="todo-title">What to do next</h2>
               {items.length ? (
                 <ol className="todo-list">
-                  {items.map((it, i) => (
+                  {items.map((it) => (
                     <li key={it.key} className={it.tone}>
-                      <span className="todo-n">{i + 1}</span>
                       <div><b>{it.what}</b><small>{it.next}</small></div>
-                      <Link className="btn sm" to={it.to}>Go</Link>
+                      <Link className="btn sm" to={it.to}>{it.verb || "Open"}</Link>
                     </li>
                   ))}
                 </ol>

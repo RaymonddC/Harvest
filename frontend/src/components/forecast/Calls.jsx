@@ -45,12 +45,26 @@ export function Calls({ calls, onShow }) {
   if (!onCall.length && !finished.length && !queued.length) {
     return <div className="rows" id="calls"><div className="empty"><p>No calls yet. Add farmers and a price range, then start the first round of calls.</p><Link className="btn solid" to="/setup">Go to the campaign</Link></div></div>;
   }
+  // What is waiting, in words: phones ringing now, missed calls waiting to be called back, and demo calls.
+  const ringing = queued.filter((c) => c.channel === "twilio" && c.dialed_at);
+  const callBack = queued.filter((c) => c.channel === "twilio" && !c.dialed_at && (c.attempt || 1) > 1);
+  const demo = queued.filter((c) => (c.channel || "browser") === "browser");
+  const toDial = queued.filter((c) => c.channel === "twilio" && !c.dialed_at && (c.attempt || 1) === 1);
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   return (
     <div className="rows" id="calls">
-      {[...onCall, ...finished].map((c) => <Row key={c.id} c={c} onShow={onShow} />)}
-      {queued.length > 0 && (
-        <div className="row"><span className="avatar sm grey" aria-hidden="true">{queued.length}</span>
-          <span className="name">{queued.length === 1 ? queued[0].farmer_name : `${queued.length} farmers`}</span><Pill>Queued</Pill></div>
+      <p className="calls-now">{onCall.length || ringing.length
+        ? <><span className="dot-live" aria-hidden="true" />{[onCall.length && plural(onCall.length, "call", "calls") + " on now", ringing.length && plural(ringing.length, "phone", "phones") + " ringing"].filter(Boolean).join(", ")}</>
+        : "No call is on right now."}</p>
+      {onCall.map((c) => <Row key={c.id} c={c} onShow={onShow} />)}
+      {finished.length > 0 && <p className="calls-sub">Last calls</p>}
+      {finished.map((c) => <Row key={c.id} c={c} onShow={onShow} />)}
+      {(callBack.length > 0 || demo.length > 0 || toDial.length > 0) && (
+        <ul className="calls-waiting small">
+          {toDial.length > 0 && <li>{plural(toDial.length, "farmer", "farmers")} still to be phoned in this round</li>}
+          {callBack.length > 0 && <li>{plural(callBack.length, "missed call", "missed calls")} to call back: press <b>Call phone</b> on the farmer when it suits</li>}
+          {demo.length > 0 && <li>{plural(demo.length, "demo call", "demo calls")} waiting on the Calls page</li>}
+        </ul>
       )}
     </div>
   );
