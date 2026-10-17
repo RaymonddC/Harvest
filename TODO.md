@@ -148,7 +148,7 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     (CSV with a `crop` column) and a price range on the Setup page before a gap-fill call can start; the demo data stays palm only.
     Not built: removing a campaign, renaming one, per-crop gap tolerance.
 
-14. **Call audio recording (decided 15 Oct; step 1 built 15 Oct; off until `CALL_AUDIO_DIR` is set).** See "Call audio recording" in
+14. **Call audio recording (PDP Law requirement: keep the consent notice, retention period, planners-only access and delete action; see CLAUDE.md) (decided 15 Oct; step 1 built 15 Oct; off until `CALL_AUDIO_DIR` is set).** See "Call audio recording" in
     `DECISIONS.md` for what, who, how long and the law and cost notes. **Built (step 1):** `app/call_audio.py` (a recorder that puts both
     sides on the call's clock, a stereo MP3 encoder, a local-folder store with the 90-day clean-up), wired into `run_call` (kept only
     when the farmer consented; a failure never stops a call finishing), `GET /api/calls/{id}/audio` (capability `calls.listen`, planner

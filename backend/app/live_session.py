@@ -247,7 +247,11 @@ async def keep_recording(recorder: CallRecorder, audio_store, store: Store, sett
                                                "saved_at": now, "expires_at": expires}}, merge=True)
         await asyncio.to_thread(audio_store.purge, settings.call_audio_retention_days)
     except Exception:  # noqa: BLE001
-        log.exception("call %s: the recording could not be saved", call_id)
+        log.exception("call %s: the recording could not be saved (the farmer was told the call is recorded)", call_id)
+        try:  # the planner must be able to see that a promised recording does not exist
+            store.set("calls", call_id, {"audio_error": {"at": services.now_iso()}}, merge=True)
+        except Exception:  # noqa: BLE001
+            log.exception("call %s: could not note the failed recording either", call_id)
 
 
 async def run_call(channel: Channel, store: Store, settings: Settings, call_id: str,
