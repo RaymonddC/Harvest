@@ -43,7 +43,7 @@ function returnTo(next) {
 // the harvest it saved (components/PhoneScene.js, Three.js, loaded only here). Still with "reduce motion"; left out
 // when the browser has no WebGL, and on narrow screens, where the panel is a short header strip.
 const NARROW = "(max-width: 860px)";
-function Field() {
+function Field({ brandRef, cardRef }) {
   const ref = useRef(null);
   const [failed, setFailed] = useState(() => window.matchMedia(NARROW).matches);
   useEffect(() => {
@@ -51,7 +51,17 @@ function Field() {
     let stop = null, alive = true;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     import("../components/PhoneScene.js")
-      .then(({ startPhone }) => { if (alive && ref.current) stop = startPhone(ref.current, { still }); })
+      .then(({ startPhone }) => {
+        if (!alive || !ref.current) return;
+        // The phone fills the space between the logo and the text card, its bottom edge just behind the card.
+        const fit = () => {
+          const top = (brandRef.current?.offsetTop || 0) + (brandRef.current?.offsetHeight || 0) + 16;
+          const card = cardRef.current;
+          const bottom = card ? card.offsetTop + 24 : ref.current.clientHeight;
+          return { top, bottom };
+        };
+        stop = startPhone(ref.current, { still, fit, watch: [cardRef.current] });
+      })
       .catch(() => setFailed(true));
     return () => { alive = false; stop?.(); };
   }, [failed]);
@@ -68,6 +78,8 @@ export default function Login() {
   const navigate = useNavigate();
   const { state } = useLive();
   const current = getSession();
+  const brandRef = useRef(null);
+  const cardRef = useRef(null);
   // The people to pick from: the built-in demo accounts (they share the demo password).
   const [people, setPeople] = useState(null);
   const [demoPassword, setDemoPassword] = useState("");
@@ -121,8 +133,9 @@ export default function Login() {
   return (
     <main className="login-split">
       <section className="login-story" aria-label="About Harvest-Call">
-        <div className="brand"><Logo size={36} />Harvest-Call</div>
-        <Field />
+        <Field brandRef={brandRef} cardRef={cardRef} />
+        <div className="brand" ref={brandRef}><Logo size={36} />Harvest-Call</div>
+        <div className="ls-card" ref={cardRef}>
         <div className="ls-body">
           <motion.p className="ls-title" {...rise(0)}>An AI agent phones your farmers and keeps the supply forecast up to date.</motion.p>
           <ol className="ls-steps">
@@ -136,6 +149,7 @@ export default function Login() {
             <div><dt>This week</dt><dd>{gap ? `Week ${gap.week} short` : "On track"}</dd></div>
           </motion.dl>
         )}
+        </div>
       </section>
 
       {/* Wilbert's "Who is signing in?" picker (until 12 Oct): one tile per person, one click signs in with the demo

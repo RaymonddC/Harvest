@@ -27,7 +27,8 @@ const LINES = [
 const RING = 2.2, PER_LINE = 1.9, SAVED = 3.2;
 const LOOP = RING + LINES.length * PER_LINE + SAVED;
 
-export function startPhone(canvas, { still = false } = {}) {
+// fit(): the band of the canvas (px from its top) the phone should fill; it may overlap the text card a little.
+export function startPhone(canvas, { still = false, fit = null, watch = [] } = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "low-power" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -192,14 +193,18 @@ export function startPhone(canvas, { still = false } = {}) {
     const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    // The canvas has its own box between the logo and the headline: fit the phone (4.6 high, with room for its
-    // tilt and the rings) to the box's height, or to its width when the box is narrow.
+    // The canvas fills the panel behind the text card. Fit the phone (4.6 high, with room for its tilt) to the
+    // band frame() gives, or to the panel's width when that is narrower, and shift the view so it sits in that band.
+    const band = fit?.() || { top: 0, bottom: h };
+    const bandH = Math.max(120, band.bottom - band.top);
     const view = 2 * Math.tan((camera.fov * Math.PI) / 360); // visible height per unit of distance
-    camera.position.z = Math.max(5.6 / view, 3.6 / (view * camera.aspect));
+    camera.position.z = Math.max((5.6 * h) / (bandH * view), 3.6 / (view * camera.aspect * 0.9));
+    camera.setViewOffset(w, h, 0, h / 2 - (band.top + band.bottom) / 2, w, h);
     camera.updateProjectionMatrix();
   }
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);
+  watch.forEach((el) => el && ro.observe(el));
   resize();
 
   let stopped = false;
