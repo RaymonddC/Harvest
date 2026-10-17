@@ -16,11 +16,11 @@ export const FLOW = [
   { n: 3, id: "decide", label: "Decide" },
 ];
 export const PAGES = [
-  { key: "overview", to: "/", label: "Overview", step: "overview", next: "setup",
+  { key: "overview", to: "/", label: "Overview", tab: "Summary", step: "overview", next: "setup",
     line: "Where everything stands: what we have and lack, what to do next, and every farmer's stage." },
-  { key: "forecast", to: "/forecast", label: "Live forecast", step: "overview", next: "approvals",
+  { key: "forecast", to: "/forecast", label: "Live forecast", tab: "Forecast", step: "overview", next: "approvals",
     line: "Every saved answer updates the weeks. When a week is short, gap-fill calls ask farmers to bring harvest forward." },
-  { key: "calendar", to: "/calendar", label: "Calendar", step: "overview", next: "setup",
+  { key: "calendar", to: "/calendar", label: "Calendar", tab: "Calendar", step: "overview", next: "setup",
     line: "The plan by day: calls, harvests, deal deliveries and weighbridge deliveries." },
   { key: "farmers", to: "/farmers", label: "Farmers", step: "prepare", next: "setup",
     line: "Every farmer the mill works with. A campaign only calls the farmers you put in it." },

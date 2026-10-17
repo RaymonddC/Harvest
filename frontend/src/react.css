@@ -1121,3 +1121,10 @@ body.app .side .week-card a.wc-item:hover small { color: #CFE3D8; }
 .todo-list b { font-size: 14px; display: block; }
 .todo-list small { color: var(--muted); font-size: 12.5px; }
 .todo-done { display: flex; gap: 8px; align-items: center; margin: 0; color: var(--leaf-deep); font-weight: 600; }
+
+/* The Overview's tabs: Summary, Forecast, Calendar (one sidebar item). */
+.ov-tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.ov-tabs a { display: inline-flex; align-items: center; gap: 7px; padding: 10px 14px; margin-bottom: -1px; border-bottom: 3px solid transparent;
+  color: var(--muted); font-weight: 700; font-size: 14.5px; text-decoration: none; white-space: nowrap; }
+.ov-tabs a:hover { color: var(--ink); }
+.ov-tabs a[aria-current="page"] { color: var(--leaf-deep); border-bottom-color: var(--leaf); }

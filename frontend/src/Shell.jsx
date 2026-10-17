@@ -76,6 +76,8 @@ function DemoGuide({ state }) {
   );
 }
 
+const OVERVIEW_PATHS = PAGES.filter((p) => p.step === OVERVIEW.id).map((p) => p.to);
+
 // Which step of the flow this page is, what it is for, and the page that usually comes next.
 function FlowLine({ pathname, go }) {
   const page = PAGES.find((p) => p.to === pathname);
@@ -171,12 +173,12 @@ export default function Shell({ title, head, children }) {
         {/* The middle scrolls on its own when it is taller than the window; the account stays below it. */}
         <div className="side-scroll">
         <nav aria-label="Planner pages">
+          {/* One item for the Overview and its tabs (Summary, Forecast, Calendar): lit on any of them. */}
           <div className="nav-group overview" role="group" aria-label={OVERVIEW.label}>
-            {PAGES.filter((p) => p.step === OVERVIEW.id).map(({ key, to, label }) => (
-              <NavLink key={key} to={to} end onClick={(e) => go(e, to)} title={collapsed ? label : undefined}>
-                <Icon name={key} /><span className="label">{label}</span>
-              </NavLink>
-            ))}
+            <Link to="/" onClick={(e) => go(e, "/")} title={collapsed ? OVERVIEW.label : undefined}
+              className={OVERVIEW_PATHS.includes(pathname) ? "active" : ""} aria-current={OVERVIEW_PATHS.includes(pathname) ? "page" : undefined}>
+              <Icon name="overview" /><span className="label">{OVERVIEW.label}</span>
+            </Link>
           </div>
           {FLOW.map((g) => (
             <div key={g.id} className="nav-group" role="group" aria-labelledby={`nav-${g.id}`}>
@@ -216,6 +218,13 @@ export default function Shell({ title, head, children }) {
             <div className={`banner ${status === "error" ? "error" : ""}`} role="status">
               {status === "error" ? "Cannot reach the live data. Check the backend URL in config.js, then reload." : "Reconnecting to live data…"}
             </div>
+          )}
+          {OVERVIEW_PATHS.includes(pathname) && (
+            <nav className="ov-tabs" aria-label="Overview">
+              {PAGES.filter((p) => p.step === OVERVIEW.id).map((p) => (
+                <NavLink key={p.key} to={p.to} end onClick={(e) => go(e, p.to)}><Icon name={p.key} size={16} />{p.tab}</NavLink>
+              ))}
+            </nav>
           )}
           <FlowLine pathname={pathname} go={go} />
           {children}
