@@ -6,7 +6,7 @@ import { Avatar, Icon, SubmitButton } from "../ui.jsx";
 // Username and password, plus the built-in demo accounts (their shared password is shown so judges
 // can get in with one click). Used by the sign-in page and by the Switch user dialog.
 // onSignedIn(session) runs after a successful sign-in; exclude hides the account already signed in.
-export default function SignInForm({ onSignedIn, exclude, initialError = "", autoFocus = true, submitLabel = "Sign in" }) {
+export default function SignInForm({ onSignedIn, exclude, initialError = "", autoFocus = true, submitLabel = "Sign in", noDemo = false }) {
   const shake = useAnimationControls();
   const passwordRef = useRef(null);
   const [form, setForm] = useState({ username: "", password: "" });
@@ -59,7 +59,7 @@ export default function SignInForm({ onSignedIn, exclude, initialError = "", aut
         <SubmitButton className="btn solid big block" busy={busy} busyText="Signing in…">{submitLabel}</SubmitButton>
       </motion.form>
 
-      {accounts.length > 0 && (
+      {!noDemo && accounts.length > 0 && (
         <div className="demo-box">
           <div className="demo-head">
             <span>Demo accounts</span>

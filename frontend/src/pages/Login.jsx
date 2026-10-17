@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import SignInForm from "../components/SignInForm.jsx";
 import { campaignsOf, inCampaign } from "../campaigns.jsx";
-import { getSession, OLD_URLS, roleLabel } from "../lib.js";
+import { api, getSession, OLD_URLS, roleLabel, signIn } from "../lib.js";
 import { useLive } from "../live.jsx";
-import { Icon } from "../ui.jsx";
+import { Icon, Spinner } from "../ui.jsx";
+
+const ROLE_ICON = { planner: "forecast", coordinator: "setup", viewer: "eye", farmer: "phone" };
 
 // What the product does, in the order it happens.
 const STEPS = [
@@ -50,6 +52,16 @@ export default function Login() {
   const navigate = useNavigate();
   const { state } = useLive();
   const current = getSession();
+  // The people to pick from: the built-in demo accounts (they share the demo password).
+  const [people, setPeople] = useState(null);
+  const [demoPassword, setDemoPassword] = useState("");
+  const [busy, setBusy] = useState(null);
+  const [notice, setNotice] = useState(params.get("expired") ? "Your session ended. Pick a person to continue." : "");
+  useEffect(() => {
+    api("/api/auth/demo", { method: "GET", auth: false })
+      .then((r) => { setPeople(r.accounts || []); setDemoPassword(r.password || ""); })
+      .catch((err) => setNotice(`${err.message || "Cannot reach the server."} Check the backend URL in config.js.`));
+  }, []);
   useEffect(() => {
     document.body.className = "login-page";
     document.title = "Sign in · Harvest-Call";
@@ -58,6 +70,16 @@ export default function Login() {
   const done = (session) => {
     if (session.role === "farmer") location.assign("/call.html");
     else navigate(returnTo(params.get("next") || "/"), { replace: true });
+  };
+  const pick = async (person) => {
+    setBusy(person.id);
+    setNotice("");
+    try {
+      done(await signIn(person.username, demoPassword));
+    } catch (err) {
+      setNotice(err.status ? err.message : `${err.message || "Cannot reach the server."} Check the backend URL in config.js.`);
+      setBusy(null);
+    }
   };
 
   // The main campaign's figures (the forecast holds every campaign's weeks; counting them all said "17 weeks").
@@ -87,18 +109,30 @@ export default function Login() {
         )}
       </section>
 
-      <section className="login-pick" aria-labelledby="login-title">
+      {/* Wilbert's "Who is signing in?" picker (until 12 Oct): one tile per person, one click signs in with the demo
+          password; real accounts sign in with a username below. */}
+      <section className="login-pick picker" aria-labelledby="login-title">
         <motion.div className="lp-head" {...rise(0)}>
-          <h1 id="login-title">Sign in</h1>
-          <p className="muted">Welcome back. Sign in to plan this week's supply.</p>
+          <h1 id="login-title">Who is signing in?</h1>
+          <p className="muted">Demo mode: just pick a person. What each person can do depends on their role. All data is synthetic.</p>
         </motion.div>
-
-        <motion.div {...rise(1)}>
-          <SignInForm onSignedIn={done} initialError={params.get("expired") ? "Your session ended. Sign in again." : ""} />
+        {notice && <p className="banner error" role="alert">{notice}</p>}
+        <motion.div className="roles" role="group" aria-label="People" {...rise(1)}>
+          {(people || []).map((p, i) => (
+            <button key={p.id} type="button" className={`role-tile ${i === 0 ? "main" : ""}`} disabled={!!busy} aria-busy={busy === p.id || undefined} onClick={() => pick(p)}>
+              <span className="role-icon"><Icon name={ROLE_ICON[p.role] || "users"} size={20} /></span>
+              <span className="role-name">{p.name}</span>
+              <span className="role-desc">{`${p.role_label}. ${p.description || ""}`.trim()}</span>
+              <span className="role-go">{busy === p.id ? <><Spinner />Signing in…</> : p.role === "farmer" ? "Open the call client" : "Open the overview"}</span>
+            </button>
+          ))}
         </motion.div>
-
-        <motion.p className="small muted" {...rise(3)}>No microphone, or nobody to play the farmer? <a href="/call.html?sample=1">Watch a sample call</a>.</motion.p>
-        {current && <p className="small muted">Signed in as {current.name} ({roleLabel(current)}). Signing in again switches you.</p>}
+        <motion.p className="small muted" {...rise(2)}>No microphone, or nobody to play the farmer? <a href="/call.html?sample=1">Watch a sample call</a>.</motion.p>
+        <details className="own-account" open={!!params.get("expired") && !people?.length}>
+          <summary>Sign in with a username</summary>
+          <SignInForm onSignedIn={done} noDemo autoFocus={false} initialError={params.get("expired") && !people?.length ? "Your session ended. Sign in again." : ""} />
+        </details>
+        {current && <p className="small muted">Currently signed in as {current.name} ({roleLabel(current)}). Picking someone switches you.</p>}
       </section>
     </main>
   );
