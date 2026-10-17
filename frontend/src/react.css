@@ -1282,6 +1282,7 @@ table.answers tr:focus-visible td { background: var(--leaf-soft); outline: none;
   border-left: 1px solid var(--line); }
 .board .col:first-child { border-left: 0; padding-left: 2px; }
 .board .col .col-head { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 2px 10px;
+  min-height: 78px; box-sizing: border-box; /* same height in every column, so the coloured rules line up */
   padding-bottom: 10px; border-bottom: 2px solid var(--stage, var(--line-strong)); }
 .board .col-n { font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; color: var(--ink); }
 .board .col-name { display: flex; flex-direction: column; min-width: 0; padding-top: 1px; }

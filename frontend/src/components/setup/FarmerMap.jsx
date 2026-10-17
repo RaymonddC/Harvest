@@ -68,7 +68,16 @@ export default function FarmerMap({ state, cid, onOpen }) {
     return () => { alive = false; markers.forEach((m) => m.setMap(null)); };
   }, [google, key, by, points.length, cid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!points.length) return null;
+  if (!points.length) {
+    return (
+      <section className="card map-card" aria-labelledby="map-title">
+        <div className="card-head"><div><h2 id="map-title">Plots on the map</h2>
+          <span className="sub">None of the {crm.farmers.length} farmers has a plot location yet.</span></div></div>
+        <p className="small muted" style={{ margin: 0 }}>Add a plot’s latitude and longitude on the farmer’s form (Edit), or in the CSV upload
+          (columns plot_lat and plot_lng). Each farmer with a location shows here, coloured by stage or certification.</p>
+      </section>
+    );
+  }
   const lats = points.map((p) => p.lat), lngs = points.map((p) => p.lng);
   const [minLat, maxLat, minLng, maxLng] = [Math.min(...lats), Math.max(...lats), Math.min(...lngs), Math.max(...lngs)];
   const W = 640, H = 300, pad = 18;
