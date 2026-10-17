@@ -44,7 +44,7 @@ export default function Approvals() {
   const head = (
     <div className="page-head">
       <div>
-        <h1>{week ? `Approve gap-fill deals · week ${week}` : "Approve gap-fill deals"}</h1>
+        <h1>{week ? `Approve gap-fill deals for week ${week}` : "Approve gap-fill deals"}</h1>
         <p>Every offer the agent made waits here. No deal is final until you approve it; the farmer then hears the confirmation by voice.</p>
       </div>
     </div>

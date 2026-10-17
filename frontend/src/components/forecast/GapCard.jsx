@@ -81,7 +81,7 @@ export function FillList({ gap, state }) {
       {list.length || quotes.length ? (
         <div className="list-card">
           {top.map((p) => (
-            <div className="li" key={p.farmer_id || p.name}><FarmerFace name={p.name} id={p.farmer_id} size={32} /><span>{p.name}{p.village ? ` · ${p.village}` : ""}</span><strong>{fmtT(p.kg)} t</strong></div>
+            <div className="li" key={p.farmer_id || p.name}><FarmerFace name={p.name} id={p.farmer_id} size={32} /><span>{p.name}{p.village ? `, ${p.village}` : ""}</span><strong>{fmtT(p.kg)} t</strong></div>
           ))}
           {rest.length > 0 && (
             <div className="li"><span className="avatar sm grey" aria-hidden="true">+{rest.length}</span>

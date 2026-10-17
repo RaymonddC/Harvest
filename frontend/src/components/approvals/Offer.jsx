@@ -20,7 +20,7 @@ function detail(o) {
   else if (n.rung > 0) parts.push(`Accepted step ${n.rung + 1} of the offer ladder`);
   else parts.push("Accepted the first offer");
   if (o.from_week) parts.push(`moves delivery from week ${o.from_week}`);
-  return parts.join(" · ");
+  return parts.join(", ");
 }
 
 // What approving this offer does to the week it delivers in, from that week's shortfall today.
@@ -104,7 +104,7 @@ export default function Offer({ o, l, row, quote, confirming = false, imp = null
           </>
         ) : (
           <>
-            <Pill cls={o.status === "approved" ? "mint" : ""}>{confirmed ? "Approved · confirmed by voice" : confirming ? "Approved · calling now" : o.status === "approved" ? "Approved" : "Rejected"}</Pill>
+            <Pill cls={o.status === "approved" ? "mint" : ""}>{confirmed ? "Approved, confirmed by voice" : confirming ? "Approved, calling now" : o.status === "approved" ? "Approved" : "Rejected"}</Pill>
             {!confirmed && <ActButton need="offers.decide" className="btn ghost" busy="Undoing…" disabled={confirming} title={confirming ? "The confirmation call is in progress. Undo is available again if it ends without a confirmation." : undefined}
               run={() => act(() => api(`/api/offers/${o.id}/undo`), "Back to pending.")}>Undo</ActButton>}
           </>

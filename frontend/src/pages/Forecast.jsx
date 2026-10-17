@@ -18,11 +18,11 @@ import { useLive } from "../live.jsx";
 import Shell from "../Shell.jsx";
 import { SegToggle } from "../ui.jsx";
 
-const PERIODS = [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]];
+const PERIODS = [["day", "Day"], ["week", "Week"], ["month", "Month"]];  // a year view was nearly empty for a season-long plan
 const PERIOD_KEY = "harvestPeriod";
 
 export default function Forecast() {
-  const [period, setPeriodState] = useState(() => { try { return localStorage.getItem(PERIOD_KEY) || "week"; } catch { return "week"; } });
+  const [period, setPeriodState] = useState(() => { try { const p = localStorage.getItem(PERIOD_KEY); return PERIODS.some(([k]) => k === p) ? p : "week"; } catch { return "week"; } });
   const setPeriod = (p) => { setPeriodState(p); try { localStorage.setItem(PERIOD_KEY, p); } catch { /* storage blocked */ } };
   const { state } = useLive();
   const [shown, setShown] = useState(null); // call in the detail dialog
@@ -80,7 +80,7 @@ export default function Forecast() {
             {period !== "week" ? (state && <SupplyChart cid={cid} period={period} refreshKey={JSON.stringify(rows.map((r) => r.expected_kg))} />) : <>
             <div className="card-head" style={{ marginTop: -6 }}>
               <div className="legend" aria-hidden="true">
-                <span><i className="l-leaf" />Firm</span>
+                <span><i className="l-leaf" />Expected: firm answers</span>
                 <span><i className="l-unsure" />Unsure, counted half</span>
                 <span><i className="l-projected" />Later rounds (projected)</span>
                 <span><i className="l-approved" />Approved deals</span>

@@ -115,17 +115,17 @@ export default function Calls() {
                     <tr key={c.id} className={open ? "clickable" : ""} onClick={open ? () => setShown(c) : undefined}
                       tabIndex={open ? 0 : undefined} onKeyDown={open ? (e) => { if (e.key === "Enter") setShown(c); } : undefined}>
                       <td>
-                        <div className="who-cell"><Avatar name={c.farmer_name} cls="sm" /><div><b>{c.farmer_name}</b><span>{f.village || ""}{f.language ? ` · ${f.language}` : ""}</span></div></div>
+                        <div className="who-cell"><Avatar name={c.farmer_name} cls="sm" /><div><b>{c.farmer_name}</b><span>{f.village || ""}{f.language ? `, ${f.language}` : ""}</span></div></div>
                       </td>
                       <td>
                         <Pill cls={chip.cls}>{chip.text}</Pill>
-                        <small className="cell-sub">{KIND_WORD[c.kind] || c.kind} · {fmtWhen(when(c)) || "waiting"}{c.channel === "twilio" ? " · phone" : c.channel === "browser" ? " · demo" : ""}</small>
+                        <small className="cell-sub">{KIND_WORD[c.kind] || c.kind}, {fmtWhen(when(c)) || "waiting"}{c.channel === "twilio" ? ", phone" : c.channel === "browser" ? ", demo" : ""}</small>
                       </td>
                       <td>
                         {h ? (
                           <span className="ans-harvest">
                             <b>{fmtKg(h.kg)} kg</b> ready {day(h.ready_date)}
-                            <small><span className={h.confidence === "unsure" ? "tag unsure" : "tag firm"}>{h.confidence === "unsure" ? "unsure" : "firm"}</span>{h.every_days ? ` · every ${h.every_days} days` : ""}{h.edited_by ? ` · edited by ${h.edited_by}` : ""}</small>
+                            <small><span className={h.confidence === "unsure" ? "tag unsure" : "tag firm"}>{h.confidence === "unsure" ? "unsure" : "firm"}</span>{h.every_days ? `, every ${h.every_days} days` : ""}{h.edited_by ? `, edited by ${h.edited_by}` : ""}</small>
                           </span>
                         ) : c.harvest_read_back ? <span className="muted small">Read back, not saved ({fmtKg(c.harvest_read_back.kg)} kg): open to save</span>
                           : open ? <span className="muted small">{c.kind === "confirm" ? "Confirmation of the deal" : "No harvest given"}</span> : <span className="muted small">–</span>}

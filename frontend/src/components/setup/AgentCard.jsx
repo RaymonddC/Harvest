@@ -130,7 +130,7 @@ export default function AgentCard({ state, cid }) {
             <label className="field">Voice
               <select value={persona.voice} onChange={(e) => setPersona({ voice: e.target.value, preset: "" })}>
                 <option value="">Default voice</option>
-                {Object.entries(opts.voices).map(([v, d]) => <option key={v} value={v}>{v} · {d}</option>)}
+                {Object.entries(opts.voices).map(([v, d]) => <option key={v} value={v}>{v}, {d}</option>)}
               </select>
             </label>
             <label className="field">Speaking style

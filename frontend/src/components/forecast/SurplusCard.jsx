@@ -44,7 +44,7 @@ export default function SurplusCard({ row, cid }) {
             left -= f.kg;
             return (
               <li key={f.farmer_id} className={`row ${enough ? "muted" : ""}`}>
-                <span className="name">{f.name}<small className="muted">{f.village} · {fmtT(f.kg)} t on {shortDate(f.ready_date)}</small></span>
+                <span className="name">{f.name}<small className="muted">{f.village}, {fmtT(f.kg)} t on {shortDate(f.ready_date)}</small></span>
                 {can("farmers.manage") && <ActButton className="btn sm" busy="Moving…" run={() => move(f)}>A week later</ActButton>}
               </li>
             );

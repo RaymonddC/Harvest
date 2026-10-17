@@ -28,8 +28,8 @@ export default function Meter({ state, week, offers }) {
       <div className="meter big" role="progressbar" aria-labelledby="meter-title" aria-valuenow={Math.round(share * 100)}><i style={{ width: `${share * 100}%` }} /></div>
       <p className={`ws-left ${remaining < 50 ? "done" : ""}`}>{remaining < 50 ? "Gap closed" : `${fmtT(remaining)} t still short`}</p>
       <div className="ws-stats">
-        <Stat label="Waiting for you" cls={waiting.length ? "amber" : ""}>{waiting.length ? `${waiting.length} · ${fmtT(sum(waiting))} t` : "None"}</Stat>
-        <Stat label="Approved">{approved.length ? `${approved.length} · ${fmtT(sum(approved))} t` : "None"}</Stat>
+        <Stat label="Waiting for you" cls={waiting.length ? "amber" : ""}>{waiting.length ? `${fmtT(sum(waiting))} t in ${waiting.length} ${waiting.length === 1 ? "offer" : "offers"}` : "None"}</Stat>
+        <Stat label="Approved">{approved.length ? `${fmtT(sum(approved))} t in ${approved.length} ${approved.length === 1 ? "deal" : "deals"}` : "None"}</Stat>
         <Stat label="Approved value">{approved.length ? `${cur === "IDR" ? "Rp " : ""}${plainPrice(value, cur)}` : "–"}</Stat>
       </div>
       {remaining < 50 && original > 0 ? (

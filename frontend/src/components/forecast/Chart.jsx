@@ -32,7 +32,7 @@ const Line = ({ label, kg }) => <div><span>{label}</span><b className="num">{fmt
 function TipBody({ r, target }) {
   return (
     <>
-      <strong>{r.label} · {shortDate(r.week_start)}</strong>
+      <strong>{r.label}, {shortDate(r.week_start)}</strong>
       <Line label="Firm answers" kg={r.firm_kg} />
       {r.unsure_weighted_kg > 0 && <Line label={r.unsure_count ? `${r.unsure_count} unsure, counted half` : "Unsure, counted half"} kg={r.unsure_weighted_kg} />}
       {r.projected_kg > 0 && <Line label="Later harvest rounds (projected)" kg={r.projected_kg} />}

@@ -13,7 +13,7 @@ export default function PriceSpot({ price, l, cur, market, rival }) {
   return (
     <div className={`spot ${over || under ? "out" : ""}`} role="img"
       aria-label={`${plainPrice(price, cur)}, ${where}: floor ${plainPrice(l.floor_price, cur)}, ceiling ${plainPrice(l.ceiling_price, cur)}`}
-      title={`Floor ${plainPrice(l.floor_price, cur)} · ceiling ${plainPrice(l.ceiling_price, cur)}`}>
+      title={`Floor ${plainPrice(l.floor_price, cur)}, ceiling ${plainPrice(l.ceiling_price, cur)}`}>
       <i className="ok" style={{ width: at(l.ceiling_price) }} />
       <i className="cap" style={{ left: at(l.ceiling_price) }} />
       {market != null && <i className="mk market" style={{ left: at(market) }} />}

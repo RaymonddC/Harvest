@@ -23,13 +23,13 @@ const OUTCOME = { completed: "done", declined: "declined", no_answer: "no answer
 
 function label(e, names) {
   switch (e.type) {
-    case "call": return `${e.planned ? "Waiting: " : ""}${e.farmer_name} · ${(KIND_WORD[e.kind] || "call").replace(" call", "")}${e.outcome && OUTCOME[e.outcome] ? ` · ${OUTCOME[e.outcome]}` : ""}`;
-    case "call_plan": return `Weekly calls · ${names[e.campaign_id] || ""}`;
+    case "call": return `${e.planned ? "Waiting: " : ""}${e.farmer_name}, ${(KIND_WORD[e.kind] || "call").replace(" call", "")}${e.outcome && OUTCOME[e.outcome] ? `, ${OUTCOME[e.outcome]}` : ""}`;
+    case "call_plan": return `Weekly calls, ${names[e.campaign_id] || ""}`;
     case "campaign_start": return `${names[e.campaign_id] || "Campaign"} starts`;
     case "campaign_end": return `${names[e.campaign_id] || "Campaign"} ends`;
-    case "harvest": return `${e.farmer_name} · ${fmtT(e.kg)} t${e.projected ? " (projected)" : e.confidence === "unsure" ? " (unsure)" : ""}`;
-    case "deal": return `Deal · ${e.farmer_name} · ${fmtT(e.kg)} t${e.status === "approved" ? "" : " · waiting"}`;
-    case "delivery": return `Delivered · ${e.farmer_name} · ${fmtT(e.kg)} t`;
+    case "harvest": return `${e.farmer_name}, ${fmtT(e.kg)} t${e.projected ? " (projected)" : e.confidence === "unsure" ? " (unsure)" : ""}`;
+    case "deal": return `Deal, ${e.farmer_name}, ${fmtT(e.kg)} t${e.status === "approved" ? "" : ", waiting"}`;
+    case "delivery": return `Delivered, ${e.farmer_name}, ${fmtT(e.kg)} t`;
     default: return "";
   }
 }
@@ -170,7 +170,7 @@ export default function Calendar() {
           <h2>{new Date(day + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</h2>
           {dayWeek.map((w) => (
             <p key={`${w.campaign_id}-${w.label}`} className={`cal-weekline ${w.is_gap ? "short" : ""}`}>
-              {scope === "all" ? `${names[w.campaign_id] || ""} · ` : ""}{w.label}: {fmtT(w.expected_kg)} of {fmtT(w.target_kg)} t expected{w.is_gap ? ` · ${fmtT(w.gap_kg)} t short` : ""}
+              {scope === "all" ? `${names[w.campaign_id] || ""}, ` : ""}{w.label}: {fmtT(w.expected_kg)} of {fmtT(w.target_kg)} t expected{w.is_gap ? `, ${fmtT(w.gap_kg)} t short` : ""}
             </p>
           ))}
           {dayEvents.length ? (
@@ -184,7 +184,7 @@ export default function Calendar() {
                       {[e.time, scope === "all" && names[e.campaign_id], e.type === "deal" && e.price_per_kg ? `${fmtKg(e.price_per_kg)} ${e.currency}/kg` : null,
                         e.type === "deal" && e.status === "approved" ? (e.confirmed_by_voice ? "confirmed by voice" : "confirmation call waiting") : null,
                         e.type === "call_plan" ? (e.channel === "twilio" ? "rings the farmers' phones" : "queued for the browser") : null,
-                        e.type === "harvest" && e.projected ? "from how often they harvest" : null].filter(Boolean).join(" · ")}
+                        e.type === "harvest" && e.projected ? "from how often they harvest" : null].filter(Boolean).join(", ")}
                     </small>
                   </div>
                 </li>

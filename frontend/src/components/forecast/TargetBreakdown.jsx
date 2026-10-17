@@ -87,7 +87,7 @@ export default function TargetBreakdown({ rows, unknownKg, compact = false, onPi
               <div className="tbd-tipwrap">
                 {hover === d.id && (
                   <div className="tbd-tip" role="tooltip">
-                    <b>{d.label} · target {fmtT(d.target_kg)} t</b>
+                    <b>{d.label}, target {fmtT(d.target_kg)} t</b>
                     {PARTS.map((p) => <span key={p.key}><i className={p.cls} />{p.label}<b>{fmtT(d[p.key])} t</b></span>)}
                     {d.over > 0 && <span className="over">Over the target by {fmtT(d.over)} t</span>}
                     {onPick && <span className="tip-hint">Click a part to see its farmers</span>}

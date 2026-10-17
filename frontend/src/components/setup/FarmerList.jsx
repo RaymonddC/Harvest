@@ -136,7 +136,7 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
                 <td className="c-crop">{cropLabel(f.crop)}</td>
                 {showCampaign && (
                   <td className="c-camp">
-                    {f.type === "supplier" ? <span className="muted small">Supplier · every {cropLabel(f.crop)} campaign</span> : (
+                    {f.type === "supplier" ? <span className="muted small">Supplier, every {cropLabel(f.crop)} campaign</span> : (
                       <select className="cell-select" aria-label={`Campaign of ${f.name}`} value={ofFarmer(f) || ""} disabled={!can("farmers.manage")}
                         onChange={(e) => moveFarmer(act, f, ofFarmer(f), e.target.value, labelOf(e.target.value))}>
                         <option value="">No campaign</option>
@@ -147,7 +147,7 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
                 )}
                 {showCampaign && (
                   <td className="c-plot">{f.plot_lat != null && f.plot_lng != null
-                    ? <span className="small">{f.plot_ha ? `${f.plot_ha} ha` : "Mapped"}{f.certification ? ` · ${f.certification}` : ""}</span>
+                    ? <span className="small">{f.plot_ha ? `${f.plot_ha} ha` : "Mapped"}{f.certification ? `, ${f.certification}` : ""}</span>
                     : <span className="small muted">Not mapped</span>}</td>
                 )}
                 {extraCol && <td>{extraCol.render(f)}</td>}

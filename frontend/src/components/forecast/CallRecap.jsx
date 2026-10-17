@@ -88,7 +88,7 @@ export default function CallRecap({ call, onClose }) {
               <Avatar name={c.farmer_name} person />
               <div>
                 <RDialog.Title className="sheet-title">{c.farmer_name}</RDialog.Title>
-                <span className="sub">{[village, KIND_WORD[c.kind], clock(c.started_at || c.created_at), length(c)].filter(Boolean).join(" · ")}</span>
+                <span className="sub">{[village, KIND_WORD[c.kind], clock(c.started_at || c.created_at), length(c)].filter(Boolean).join(", ")}</span>
               </div>
               <RDialog.Close className="sheet-x" aria-label="Close"><span aria-hidden="true">×</span></RDialog.Close>
             </header>

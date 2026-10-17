@@ -1701,3 +1701,8 @@ body.app table.roles-table th, body.app table.roles-table td { overflow-wrap: an
 .auto-days button { min-width: 0; padding: 0 2px; }
 body.app table.users-table td, body.app table.users-table th { overflow-wrap: anywhere; }
 .cal-nav { flex-wrap: wrap; row-gap: 6px; }
+
+/* Forecast legends share one vocabulary: green is expected, grey is delivered (as on the board's Delivered lane),
+   deep green is an approved deal, amber is short, red is over capacity */
+.legend i.l-arrived { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: #6B7280; }
+.supply-chart .sb-del { background: #6B7280; }

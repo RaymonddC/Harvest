@@ -54,7 +54,7 @@ export default function AccountMenu({ session }) {
           <Menu.Content className="hc-menu acc-menu" side="top" align="start" sideOffset={8} collisionPadding={12}>
             <div className="acc-head">
               <Avatar name={session.name} person />
-              <span><b>{session.name}</b><small>{roleLabel(session)}{session.username ? ` · @${session.username}` : ""}</small></span>
+              <span><b>{session.name}</b><small>{roleLabel(session)}{session.username ? `, @${session.username}` : ""}</small></span>
             </div>
             <Menu.Separator className="hc-menu-sep" />
             {can("users.admin") && <Menu.Item className="hc-menu-item" onSelect={() => navigate("/users")}>Manage users and roles</Menu.Item>}
