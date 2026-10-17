@@ -290,17 +290,66 @@ def close_stale_chats(store: Store, settings: Settings, now: dt.datetime | None 
 
 # ---------- one agent turn ----------
 
+# Text models tried when TEXT_MODEL is not available to the project (Google retires names, and Vertex and AI Studio
+# do not offer the same ones); then the newest "flash" model the project lists is used.
+FALLBACK_MODELS = ("gemini-2.5-flash", "gemini-2.0-flash-001")
+SKIP_IN_NAME = ("image", "tts", "audio", "live", "lite", "embedding", "thinking", "exp")
+_model_in_use: str | None = None
+
+
+def _is_not_found(e: Exception) -> bool:
+    return getattr(e, "code", None) == 404 or "NOT_FOUND" in str(e)
+
+
+async def _listed_flash_models(client) -> list[str]:
+    names = []
+    try:
+        pager = await client.aio.models.list(config={"query_base": True, "page_size": 200})
+        async for m in pager:
+            name = (m.name or "").rsplit("/", 1)[-1]
+            if name.startswith("gemini") and "flash" in name and not any(w in name for w in SKIP_IN_NAME):
+                names.append(name)
+    except Exception:  # noqa: BLE001
+        log.warning("whatsapp: could not list the project's models", exc_info=True)
+    return sorted(set(names), reverse=True)  # newest version first ("gemini-3..." before "gemini-2...")
+
+
 def _generate(settings: Settings):
     from .live_session import genai_client
 
     client = genai_client()
 
-    async def generate(contents: list[types.Content], instruction: str):
+    async def call(model: str, contents: list[types.Content], instruction: str):
         return await client.aio.models.generate_content(
-            model=settings.text_model, contents=contents,
+            model=model, contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=instruction, tools=[types.Tool(function_declarations=TOOL_DECLARATIONS)],
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)))
+
+    async def generate(contents: list[types.Content], instruction: str):
+        global _model_in_use
+        first = _model_in_use or settings.text_model
+        try:
+            return await call(first, contents, instruction)
+        except Exception as e:  # noqa: BLE001
+            if not _is_not_found(e):
+                raise
+            log.warning("whatsapp: text model %s is not available to this project; looking for another", first)
+        tried = {first}
+        for model in [*FALLBACK_MODELS, *await _listed_flash_models(client)]:
+            if model in tried:
+                continue
+            tried.add(model)
+            try:
+                resp = await call(model, contents, instruction)
+            except Exception as e:  # noqa: BLE001
+                if _is_not_found(e):
+                    continue
+                raise
+            _model_in_use = model
+            log.warning("whatsapp: using text model %s (set TEXT_MODEL to it to skip this search)", model)
+            return resp
+        raise services.ServiceError(f"No Gemini text model is available to this project (tried {', '.join(sorted(tried))}).")
 
     return generate
 

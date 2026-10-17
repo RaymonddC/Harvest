@@ -262,3 +262,31 @@ def test_connect_points_the_sender_webhook_at_the_service(settings):
         whatsapp.connect_webhook(s, http=FakeHttp([{"sid": "XE2", "sender_id": "whatsapp:+10000000000"}]))
     with pytest.raises(services.ServiceError, match="not set up"):
         whatsapp.connect_webhook(settings, http=http)
+
+
+def test_a_retired_text_model_falls_back_to_one_the_project_has(settings, monkeypatch):
+    class NotFound(Exception):
+        code = 404
+
+    asked = []
+
+    class Models:
+        async def generate_content(self, model, contents, config):
+            asked.append(model)
+            if model != "gemini-9-flash":
+                raise NotFound("NOT_FOUND")
+            return "ok"
+
+        async def list(self, config=None):
+            async def pages():
+                for n in ["publishers/google/models/gemini-9-flash", "publishers/google/models/gemini-9-flash-image"]:
+                    yield type("M", (), {"name": n})()
+            return pages()
+
+    client = type("C", (), {"aio": type("A", (), {"models": Models()})()})()
+    monkeypatch.setattr("app.live_session.genai_client", lambda: client)
+    monkeypatch.setattr(whatsapp, "_model_in_use", None)
+    gen = whatsapp._generate(dataclasses.replace(settings, text_model="gemini-retired"))
+    assert run(gen([], "x")) == "ok"
+    assert asked[0] == "gemini-retired" and asked[-1] == "gemini-9-flash" and whatsapp._model_in_use == "gemini-9-flash"
+    assert run(gen([], "x")) == "ok" and asked[-1] == "gemini-9-flash"  # remembered: no second search
