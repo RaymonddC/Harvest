@@ -1388,7 +1388,7 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
             store.set("calls", call_id, {"retry_queued": True}, merge=True)
             queue_call(store, farmer, call["kind"], gap_week=call.get("gap_week"),
                        offer_id=call.get("offer_id"), attempt=call.get("attempt", 1) + 1,
-                       channel=call.get("channel", "browser"))
+                       channel=call.get("channel", "browser"), campaign_id=call.get("campaign_id"))
     refresh_campaign_status(store, settings)  # after any retry was queued: the last call ending ends the campaign
     if call.get("channel") == "twilio" and call.get("kind") in ("collect", "gap_fill"):
         _after_phone_call(store, settings)

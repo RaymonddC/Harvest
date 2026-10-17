@@ -137,3 +137,13 @@ def test_calendar_planned_mondays_start_from_today(store, settings):
     services.set_weekly_schedule(store, settings, "current", True)
     out = calendar_view.events(store, settings, dt.date(2026, 10, 1), dt.date(2026, 10, 31), today=dt.date(2026, 10, 14))
     assert [e["date"] for e in out["events"] if e["type"] == "call_plan"] == ["2026-10-19", "2026-10-26"]
+
+
+def test_a_retry_stays_in_the_campaign_of_the_missed_call(store, settings):
+    from app import services
+    farmer = next(f for f in store.list("farmers") if f.get("type", "farmer") == "farmer")
+    cid = services.queue_call(store, farmer, "collect", channel="twilio", campaign_id="current")
+    services.finish_call(store, settings, cid, ended_cleanly=False, outcome="no_answer", summary=None,
+                         consent=None, transcript=[])
+    retry = next(c for c in store.list("calls") if c.get("attempt") == 2 and c["farmer_id"] == farmer["id"])
+    assert retry["campaign_id"] == "current"
