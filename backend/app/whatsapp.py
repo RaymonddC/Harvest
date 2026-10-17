@@ -99,6 +99,39 @@ def _send(settings: Settings, to: str, body: str, opening_for: dict | None = Non
     return getattr(msg, "sid", None)
 
 
+SENDERS_URL = "https://messaging.twilio.com/v2/Channels/Senders"
+
+
+def connect_webhook(settings: Settings, http=None) -> dict:
+    """Point the WhatsApp sender's incoming-message webhook at this service (/twilio/whatsapp), with the service's
+    own Twilio credentials, so nobody has to paste the URL into the Twilio console. Reports what it found and did."""
+    if not whatsapp_ready(settings):
+        raise services.ServiceError(note(settings))
+    if not settings.public_base_url:
+        raise services.ServiceError("PUBLIC_BASE_URL is not set, so there is no address to give Twilio.")
+    import httpx
+
+    http = http or httpx.Client(auth=(settings.twilio_account_sid, settings.twilio_auth_token), timeout=20)
+    url = f"{settings.public_base_url.rstrip('/')}/twilio/whatsapp"
+    sender_id = f"whatsapp:{normalize_phone(settings.twilio_whatsapp_from)}"
+    r = http.get(SENDERS_URL, params={"Channel": "whatsapp", "PageSize": 50})
+    if r.status_code >= 400:
+        raise services.ServiceError(f"Twilio would not list the WhatsApp senders ({r.status_code}): {r.text[:200]}")
+    senders = r.json().get("senders") or []
+    sender = next((s for s in senders if s.get("sender_id") == sender_id), None)
+    if not sender:
+        found = ", ".join(s.get("sender_id", "?") for s in senders) or "none"
+        raise services.ServiceError(f"{sender_id} is not a WhatsApp sender on this Twilio account (senders: {found}). "
+                                    "Register it in Twilio under Messaging > Senders > WhatsApp senders.")
+    body = {"webhook": {"callback_url": url, "callback_method": "POST"}}
+    u = http.post(f"{SENDERS_URL}/{sender['sid']}", json=body)
+    if u.status_code in (404, 405):
+        u = http.put(f"{SENDERS_URL}/{sender['sid']}", json=body)
+    if u.status_code >= 400:
+        raise services.ServiceError(f"Twilio did not take the webhook ({u.status_code}): {u.text[:200]}")
+    return {"sender": sender_id, "status": sender.get("status"), "webhook": url}
+
+
 # ---------- the chat's state, kept on the call between messages ----------
 
 def session_state(s: CallSession) -> dict:

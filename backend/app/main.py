@@ -687,6 +687,11 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         """Demo chat: type what the farmer would write; the agent answers."""
         return {"reply": await whatsapp.reply_as_farmer(store, settings, call_id, body.text)}
 
+    @app.post("/api/whatsapp/connect", dependencies=[Depends(need("users.admin"))])
+    def whatsapp_connect():
+        """Point the WhatsApp sender's incoming messages at this service (instead of setting it in the Twilio console)."""
+        return whatsapp.connect_webhook(settings)
+
     @app.post("/api/chats/{call_id}/end", dependencies=[Depends(need("campaign.run"))])
     def chat_end(call_id: str):
         call = store.get("calls", call_id)

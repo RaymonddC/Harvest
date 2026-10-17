@@ -231,3 +231,34 @@ def test_the_phone_instruction_is_unchanged_and_the_chat_one_shares_its_tool_rul
     assert voice.startswith("You are a polite phone assistant") and "WhatsApp" not in voice
     assert chat.startswith("You are a polite WhatsApp assistant") and prompt.TOOL_RULES.split("\n")[1] in chat
     assert "Ending the chat" in chat and "Ending the call" not in chat
+
+
+class FakeHttp:
+    def __init__(self, senders, update_status=200):
+        self.senders, self.update_status, self.calls = senders, update_status, []
+
+    def _resp(self, status, data):
+        return type("R", (), {"status_code": status, "json": lambda self: data, "text": str(data)})()
+
+    def get(self, url, params=None):
+        self.calls.append(("GET", url))
+        return self._resp(200, {"senders": self.senders})
+
+    def post(self, url, json=None):
+        self.calls.append(("POST", url, json))
+        return self._resp(self.update_status, {})
+
+    put = post
+
+
+def test_connect_points_the_sender_webhook_at_the_service(settings):
+    s = live(settings)
+    http = FakeHttp([{"sid": "XE1", "sender_id": "whatsapp:+14155238886", "status": "ONLINE"}])
+    r = whatsapp.connect_webhook(s, http=http)
+    assert r["webhook"] == "https://gw.example/twilio/whatsapp" and r["status"] == "ONLINE"
+    assert http.calls[-1] == ("POST", f"{whatsapp.SENDERS_URL}/XE1",
+                              {"webhook": {"callback_url": "https://gw.example/twilio/whatsapp", "callback_method": "POST"}})
+    with pytest.raises(services.ServiceError, match="not a WhatsApp sender"):
+        whatsapp.connect_webhook(s, http=FakeHttp([{"sid": "XE2", "sender_id": "whatsapp:+10000000000"}]))
+    with pytest.raises(services.ServiceError, match="not set up"):
+        whatsapp.connect_webhook(settings, http=http)
