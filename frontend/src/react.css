@@ -967,3 +967,48 @@ body.app .side .week-card a.wc-item:hover small { color: #CFE3D8; }
 .week-card .wc-item.red .wc-dot { background: #F08A5D; }
 .week-card .wc-item.done .wc-dot { background: #2FBF7F; }
 #need { scroll-margin-top: 120px; }
+
+/* ---------- Where each week's target stands (stacked bars, part of a whole) ----------
+   Palette validated with the dataviz validator (light surface): there #0F6E47, waiting #3C8FD0, not answered #C86FA0
+   (hatched: its CVD distance to blue is in the 6-8 band, so it carries texture too), still to add #B97507. */
+.tbd { display: flex; flex-direction: column; gap: 12px; }
+.tbd .tb-there { background: #0F6E47; }
+.tbd .tb-waiting { background: #3C8FD0; }
+.tbd .tb-unknown { background: repeating-linear-gradient(135deg, #C86FA0 0 4px, #E3B4CD 4px 7px); }
+.tbd .tb-missing { background: #B97507; }
+.tbd-head { display: flex; flex-direction: column; gap: 6px; }
+.tbd-week { font-size: 12.5px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tbd-figs { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; color: var(--muted); }
+.tbd-figs span { display: inline-flex; align-items: center; gap: 6px; }
+.tbd-figs b { color: var(--ink); font-size: 18px; }
+.tbd-figs .need b { color: #8A5605; }
+.tbd-figs i, .tbd-legend i, .tbd-tip i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+.tbd-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); }
+.tbd-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tbd-legend .tb-target { width: 2px; height: 12px; border-radius: 0; background: var(--ink); }
+.tbd-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tbd-rows li { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: center; border-radius: 8px; outline: none; }
+.tbd-rows li:focus-visible { box-shadow: 0 0 0 3px var(--leaf-soft); }
+.tbd-rows li.before { opacity: .45; }
+.tbd-label { display: flex; flex-direction: column; line-height: 1.2; }
+.tbd-label b { font-size: 13.5px; }
+.tbd-label small { font-size: 11.5px; color: var(--muted); }
+.tbd-track { position: relative; height: 22px; }
+.tbd-bar { display: flex; gap: 2px; height: 100%; }
+.tbd-bar i { display: block; height: 100%; min-width: 2px; }
+.tbd-bar i:first-child { border-radius: 4px 0 0 4px; }
+.tbd-bar i:last-child { border-radius: 0 4px 4px 0; }
+.tbd-bar i:only-child { border-radius: 4px; }
+.tbd-rows li.on .tbd-bar { filter: brightness(1.06); }
+.tbd-target { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); transform: translateX(-1px); }
+.tbd-tip { position: absolute; z-index: 5; top: calc(100% + 8px); left: 0; min-width: 240px; display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px; border-radius: 10px; background: var(--ink); color: var(--on-ink); font-size: 12.5px; box-shadow: var(--shadow); pointer-events: none; }
+.tbd-tip span { display: flex; align-items: center; gap: 8px; }
+.tbd-tip span b { margin-left: auto; }
+.tbd-tip .over { color: #F5C766; }
+.tbd-toggle { align-self: flex-start; }
+.tbd-table th, .tbd-table td { font-size: 13px; }
+.tbd.compact .tbd-figs b { font-size: 16px; }
+.tbd.compact .tbd-rows li { grid-template-columns: 84px 1fr; }
+.tbd.compact .tbd-track { height: 18px; }
+@media (max-width: 640px) { .tbd-rows li { grid-template-columns: 70px 1fr; } .tbd-tip { min-width: 0; width: 100%; } }

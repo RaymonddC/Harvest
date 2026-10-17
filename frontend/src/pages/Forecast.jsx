@@ -9,7 +9,9 @@ import GapNote from "../components/forecast/GapNote.jsx";
 import Kpis from "../components/forecast/Kpis.jsx";
 import SupplyChart from "../components/forecast/SupplyChart.jsx";
 import SurplusCard from "../components/forecast/SurplusCard.jsx";
+import TargetBreakdown from "../components/forecast/TargetBreakdown.jsx";
 import TrackRecord from "../components/forecast/TrackRecord.jsx";
+import { unknownSupply } from "../components/setup/NeedPanel.jsx";
 import { apiUrl, fmtT } from "../lib.js";
 import { campaignFor, forCrop, inCampaign, useCrop } from "../campaigns.jsx";
 import { useLive } from "../live.jsx";
@@ -61,6 +63,12 @@ export default function Forecast() {
         )}
       </AnimatePresence>
       <Kpis rows={rows} calls={campaignCalls} toCall={view ? view.farmers.filter((f) => f.to_call).length : 0} />
+      {state && rows.length > 0 && (
+        <section className="card" aria-labelledby="stand-title">
+          <div className="card-head"><h2 id="stand-title">Where each week's target stands</h2></div>
+          <TargetBreakdown rows={rows} unknownKg={unknownSupply(state, cid).usualKg} />
+        </section>
+      )}
       <div className="cols">
         <div className="col-main">
           <section className="card" aria-labelledby="chart-title">

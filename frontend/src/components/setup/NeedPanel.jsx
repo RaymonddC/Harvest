@@ -3,6 +3,7 @@ import { forCrop, inCampaign } from "../../campaigns.jsx";
 import { api, fmtT, gapFillBody, gapFillToast, startUrl } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Icon } from "../../ui.jsx";
+import TargetBreakdown from "../forecast/TargetBreakdown.jsx";
 
 // Who in the campaign has not told us their next harvest yet (no harvest on record from week 1 on), and how much
 // they usually bring: the supply the forecast is still guessing about.
@@ -30,7 +31,6 @@ export default function NeedPanel({ state, cid, campaign }) {
   const forwardKg = gap ? (gap.shortlist || []).reduce((n, p) => n + (p.kg || 0), 0) : 0;
   const quoteKg = quotes.reduce((n, q) => n + q.kg, 0);
   const cover = gap ? Math.min(100, Math.round(((forwardKg + quoteKg) / Math.max(gap.gap_kg, 1)) * 100)) : 0;
-  const max = Math.max(...rows.map((r) => Math.max(r.expected_kg, r.target_kg, r.capacity_kg || 0)), 1);
   const startCollect = async () => {
     const r = await act(() => api(startUrl(cid), { body: { kind: "collect", channel: state.settings?.phone_calls ? "twilio" : "browser" } }),
       (x) => `${x.queued} harvest calls started.`);
@@ -46,18 +46,7 @@ export default function NeedPanel({ state, cid, campaign }) {
         </div>
         <Link className="btn sm" to="/">See the forecast</Link>
       </div>
-      <div className="need-weeks" role="img" aria-label={rows.map((r) => `${r.label}: ${fmtT(r.expected_kg)} of ${fmtT(r.target_kg)} t`).join("; ")}>
-        {rows.map((r) => (
-          <div key={r.id} className={`nw ${r.is_gap ? "short" : ""} ${r.is_surplus ? "over" : ""} ${r.before_start ? "before" : ""}`}>
-            <div className="nw-plot">
-              <i className="nw-target" style={{ bottom: `${(r.target_kg / max) * 100}%` }} />
-              <i className="nw-bar" style={{ height: `${(r.expected_kg / max) * 100}%` }} />
-            </div>
-            <b>{r.label}</b>
-            <small>{fmtT(r.expected_kg)}/{fmtT(r.target_kg)} t</small>
-          </div>
-        ))}
-      </div>
+      <TargetBreakdown rows={rows} unknownKg={usualKg} compact />
       <ol className="need-actions">
         <li className={unknown.length ? "todo" : "done"}>
           <span className="na-icon"><Icon name="phone" size={16} /></span>
@@ -75,7 +64,7 @@ export default function NeedPanel({ state, cid, campaign }) {
           <div>
             <b>{gap ? `Fill week ${gap.week}` : "No short week"}</b>
             <p>{gap
-              ? <>{fmtT(gap.gap_kg)} t short. {gap.shortlist?.length ? `${gap.shortlist.length} farmers could bring about ${fmtT(forwardKg)} t forward` : "No farmer on record can bring harvest forward"}{quoteKg ? `, and a rival quote offers ${fmtT(quoteKg)} t` : ""}: about <b>{cover}%</b> of the gap. The agent offers a better price, inside your range; you approve each deal.{cover < 100 ? " For the rest, log a quote from another supplier (Approvals) or add farmers who can harvest earlier." : ""}</>
+              ? <>{fmtT(gap.gap_kg)} t short{usualKg && !gap.before_start ? `; up to ${fmtT(Math.min(usualKg, gap.gap_kg))} t of it may come once the farmers answer, the rest needs to be added` : ""}. {gap.shortlist?.length ? `${gap.shortlist.length} farmers could bring about ${fmtT(forwardKg)} t forward` : "No farmer on record can bring harvest forward"}{quoteKg ? `, and a rival quote offers ${fmtT(quoteKg)} t` : ""}: about <b>{cover}%</b> of the gap. The agent offers a better price, inside your range; you approve each deal.{cover < 100 ? " For the rest, log a quote from another supplier (Approvals) or add farmers who can harvest earlier." : ""}</>
               : <>Every week is within the target. Gap-fill calls are not needed now.</>}</p>
           </div>
           {gap && !running && (gap.shortlist?.length || quoteKg) ? <ActButton need="campaign.run" className="btn sm solid" busy="Queuing…" run={() => act(() => api(startUrl(cid), { body: gapFillBody(state) }), gapFillToast)}>Start gap-fill calls</ActButton> : null}
