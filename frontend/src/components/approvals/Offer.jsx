@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { api, plainPrice } from "../../lib.js";
+import { api, apiUrl, offerPoUrl, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar, Pill } from "../../ui.jsx";
 import PriceSpot from "./PriceSpot.jsx";
@@ -106,6 +106,7 @@ export default function Offer({ o, l, row, quote, confirming = false, imp = null
           <ActButton need="offers.decide" className="btn sm ghost" busy="Sending…"
             run={() => act(() => api(`/api/offers/${o.id}/send-confirmation`), (m) => (m && m.status === "sent" ? "Text sent to the farmer." : `Recorded, not sent: ${m?.reason || ""}`))}>
             {o.text_status ? "Send text again" : "Send text"}</ActButton>
+          <a className="btn sm" href={apiUrl(offerPoUrl(o.id))} download>Purchase order (PDF)</a>
         </div>
       )}
       {checks.length > 0 && (

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { campaignsOf } from "../../campaigns.jsx";
-import { api } from "../../lib.js";
+import { api, can } from "../../lib.js";
 import { useLive } from "../../live.jsx";
 import { useAct } from "../../toast.jsx";
 import { Dialog, DialogClose, SubmitButton } from "../../ui.jsx";
 
 const LANGUAGES = ["Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese", "Thai", "Vietnamese", "Filipino"];
-const EMPTY = { name: "", phone: "", crop: "palm", language: "Bahasa Indonesia", village: "", usual_kg_week: "", can_pull_forward: false, campaign_id: "" };
+const EMPTY = { name: "", phone: "", crop: "palm", language: "Bahasa Indonesia", village: "", usual_kg_week: "", can_pull_forward: false, campaign_id: "", allow_calls: false };
 
 // Add a farmer (farmer = {}, or { crop, campaign_id } to start in a campaign) or edit one (farmer = the record);
 // null keeps it closed. Moving an existing farmer between campaigns is done on the Farmers or Campaign page.
@@ -31,7 +31,7 @@ export default function FarmerForm({ farmer, onClose }) {
   const save = async (e) => {
     e.preventDefault();
     const body = { ...f, usual_kg_week: f.usual_kg_week ? Number(f.usual_kg_week) : null };
-    if (editing) delete body.campaign_id;
+    if (editing) { delete body.campaign_id; delete body.allow_calls; }
     setSaving(true);
     await act(() => (editing ? api(`/api/farmers/${farmer.id}`, { method: "PUT", body }) : api("/api/farmers", { body })),
       () => { onClose(); return editing ? "Farmer saved." : "Farmer added."; });
@@ -64,6 +64,11 @@ export default function FarmerForm({ farmer, onClose }) {
           <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
             <input type="checkbox" checked={f.can_pull_forward} onChange={set("can_pull_forward")} /> Can bring the harvest forward
           </label>
+          {!editing && state?.settings?.phone_calls && can("campaign.run") && !state.settings.allow_any_number && (
+            <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
+              <input type="checkbox" checked={f.allow_calls} onChange={set("allow_calls")} /> Allow real phone calls to this number (adds it to the allowlist)
+            </label>
+          )}
           <p className="sub" style={{ margin: "-4px 0 0" }}>When a week is short of supply, the agent may ask this farmer to harvest a week or two earlier to fill it. Leave it off if their crop cannot be picked early.</p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

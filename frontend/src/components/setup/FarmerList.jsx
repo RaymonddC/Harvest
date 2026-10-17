@@ -1,7 +1,7 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useState } from "react";
 import { campaignsOf, useMembership } from "../../campaigns.jsx";
-import { api, can, cropLabel, fmtKg, maskPhone } from "../../lib.js";
+import { api, can, cropLabel, fmtKg, maskPhone, numberAllowed } from "../../lib.js";
 import { useConfirm } from "../../dialogs.jsx";
 import { useLive } from "../../live.jsx";
 import { useAct } from "../../toast.jsx";
@@ -84,8 +84,15 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
   const go = (n) => { setPage(n); document.getElementById("farmer-list").scrollIntoView({ block: "start" }); };
   const sortBy = (s) => { setSort(s); setPage(1); };
   const dial = async (f) => {
-    if (await confirm({ title: `Call ${f.name}'s phone?`, body: `This places a real phone call to ${maskPhone(f.phone)}. The AI agent talks to whoever answers.`, confirm: "Call by phone" })) {
-      act(() => api(`/api/farmers/${f.id}/dial`, { body: {} }), `Calling ${f.name}'s phone…`);
+    const allowed = numberAllowed(state, f.phone);
+    const body = allowed
+      ? `This places a real phone call to ${maskPhone(f.phone)}. The AI agent talks to whoever answers.`
+      : `${maskPhone(f.phone)} is not on the real-call allowlist yet. Allowing it lets the agent phone this number (and send texts to it) from now on. The AI agent talks to whoever answers.`;
+    if (await confirm({ title: `Call ${f.name}'s phone?`, body, confirm: allowed ? "Call by phone" : "Allow and call" })) {
+      act(async () => {
+        if (!allowed) await api("/api/allowed-numbers", { body: { phone: f.phone, label: f.name, farmer_id: f.id } });
+        return api(`/api/farmers/${f.id}/dial`, { body: {} });
+      }, `Calling ${f.name}'s phone…`);
     }
   };
   const remove = async (f) => {

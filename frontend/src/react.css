@@ -774,3 +774,6 @@ button.camp.new:disabled { opacity: .55; cursor: not-allowed; }
   font: inherit; font-size: 14px; color: var(--ink); }
 .cell-select { min-height: 34px; font-size: 13px; }
 .cal-chip { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+.phone-allow { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.po-line { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }

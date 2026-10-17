@@ -56,7 +56,7 @@ def channel_note(settings: Settings) -> str:
     return f"Text messages go out by {settings.messaging_channel.upper()} to numbers on the allowlist."
 
 
-def _why_not(settings: Settings, to: str) -> str | None:
+def _why_not(store: Store, settings: Settings, to: str) -> str | None:
     if settings.messaging_channel not in ("sms", "whatsapp"):
         return "Messaging is off (MESSAGING_CHANNEL)."
     if not (settings.twilio_account_sid and settings.twilio_auth_token):
@@ -66,8 +66,10 @@ def _why_not(settings: Settings, to: str) -> str | None:
         return "No sender number (TWILIO_FROM_NUMBER or TWILIO_WHATSAPP_FROM)."
     if not to:
         return "No phone number."
-    if "*" not in settings.real_call_allowlist and to not in settings.real_call_allowlist:
-        return f"{to} is not on the allowlist (REAL_CALL_ALLOWLIST)."
+    from . import services
+
+    if not services.number_allowed(store, settings, to):
+        return f"{to} is not on the allowlist."
     return None
 
 
@@ -75,7 +77,7 @@ def send(store: Store, settings: Settings, to: str, body: str, kind: str, **refs
     """Record a message and send it when allowed. Never raises: a failed text must not break a call or approval."""
     number = normalize_phone(to) if to else ""
     doc = {"to": number, "body": body, "kind": kind, "channel": settings.messaging_channel, "created_at": _now(), **refs}
-    reason = _why_not(settings, number)
+    reason = _why_not(store, settings, number)
     if reason:
         doc.update(status="not_sent", reason=reason)
     else:

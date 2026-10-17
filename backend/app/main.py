@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import access, agent_profile, auth, calendar_view, messaging, seed_data, services, track_record
+from . import access, agent_profile, auth, calendar_view, messaging, purchase_order, seed_data, services, track_record
 from .call_audio import make_audio_store
 from .config import Settings, get_settings
 from .live_session import BrowserChannel, run_call
@@ -43,6 +43,7 @@ class FarmerIn(BaseModel):
     usual_kg_week: float | None = None
     can_pull_forward: bool = False
     campaign_id: str | None = None  # on add: a campaign to put the farmer in; "" for none (the database only)
+    allow_calls: bool = False  # on add: also put the number on the real-call allowlist
 
 
 class CsvIn(BaseModel):
@@ -73,6 +74,12 @@ class CampaignEditIn(BaseModel):
 class CampaignFarmersIn(BaseModel):
     add: list[str] = []
     remove: list[str] = []
+
+
+class AllowNumberIn(BaseModel):
+    phone: str
+    label: str = ""
+    farmer_id: str | None = None
 
 
 class RivalOfferIn(BaseModel):
@@ -259,7 +266,10 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "weeks": settings.weeks, "target_kg_per_week": settings.target_kg_per_week,
                             "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop,
                             "phone_calls": services.phone_calls_ready(settings),
-                            "phone_calls_note": services.phone_calls_note(settings),
+                            "phone_calls_note": services.phone_calls_note(settings, store),
+                            "web_allowlist_max": settings.web_allowlist_max,
+                            "allow_any_number": "*" in settings.real_call_allowlist,
+                            "server_allowlist": sorted(n for n in settings.real_call_allowlist if n != "*"),
                             "agent_options": agent_profile.options(),
                             "messaging_note": messaging.channel_note(settings),
                             "weekly_job": bool(settings.job_token)}
@@ -325,12 +335,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         services.recompute_forecast(store, settings)
         return doc
 
-    @app.post("/api/farmers", dependencies=[Depends(need("farmers.manage"))])
-    def add_farmer(body: FarmerIn):
+    @app.post("/api/farmers")
+    def add_farmer(body: FarmerIn, actor: auth.Actor = Depends(need("farmers.manage"))):
         row = body.model_dump()
         row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
         cid = row.pop("campaign_id", None)
+        allow = row.pop("allow_calls", False)
+        if allow and "campaign.run" not in actor.capabilities:
+            raise HTTPException(403, "Your role cannot allow real phone calls.")
         fid = services.add_farmer(store, row, cid, settings)
+        if allow:
+            services.allow_number(store, settings, row["phone"], row["name"], fid, actor)
         services.recompute_forecast(store, settings)
         return {"id": fid}
 
@@ -339,6 +354,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         row = body.model_dump()
         row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
         row.pop("campaign_id", None)  # moving between campaigns: PUT /api/campaigns/{id}/farmers
+        row.pop("allow_calls", None)  # the allowlist: /api/allowed-numbers
         return services.update_farmer(store, farmer_id, row)
 
     @app.delete("/api/farmers/{farmer_id}", dependencies=[Depends(need("farmers.manage"))])
@@ -407,6 +423,29 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def campaign_farmers(campaign_id: str, body: CampaignFarmersIn):
         """Move farmers from the database into this campaign, or out of it."""
         return services.set_campaign_farmers(store, settings, campaign_id, body.add, body.remove)
+
+    @app.post("/api/allowed-numbers")
+    def post_allowed_number(body: AllowNumberIn, actor: auth.Actor = Depends(need("campaign.run"))):
+        """Let real phone calls (and texts) reach this number."""
+        return services.allow_number(store, settings, body.phone, body.label, body.farmer_id, actor)
+
+    @app.delete("/api/allowed-numbers/{number_id}", dependencies=[Depends(need("campaign.run"))])
+    def delete_allowed_number(number_id: str):
+        return services.disallow_number(store, number_id)
+
+    def _pdf(made: tuple[str, bytes]) -> Response:
+        name, data = made
+        return Response(data, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+    @app.get("/api/offers/{offer_id}/purchase-order.pdf")
+    def offer_purchase_order(offer_id: str):
+        """The purchase order of an approved deal, as a PDF."""
+        return _pdf(purchase_order.for_offer(store, settings, offer_id))
+
+    @app.get("/api/calls/{call_id}/purchase-order.pdf")
+    def call_purchase_order(call_id: str):
+        """The purchase order from a finished call: its approved deal, else a draft from the harvest it saved."""
+        return _pdf(purchase_order.for_call(store, settings, call_id))
 
     @app.get("/api/calendar")
     def calendar(start: str, end: str, campaign: str = ""):
