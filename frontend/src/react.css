@@ -1504,8 +1504,8 @@ body.app .btn.solid:hover:not(:disabled), body.app .btn.leaf:hover:not(:disabled
 body.app .btn.solid { background: var(--g-deep); border-color: var(--g-deep); }
 body.app .btn.solid:hover:not(:disabled) { background: #14492F; border-color: #14492F; }
 body.app .btn.leaf { background: var(--g-action); border-color: var(--g-action); }
-body.app .btn:not(.solid):not(.leaf):not(.mint):not(.ghost):not(.on-ink) { border-color: #CFCEC5; background: #fff; }
-body.app .btn:not(.solid):not(.leaf):not(.mint):not(.ghost):not(.on-ink):hover:not(:disabled) { border-color: var(--g-action); color: var(--g-deep); }
+body.app .btn:not(.solid):not(.leaf):not(.mint):not(.ghost):not(.on-ink):not(.danger-solid):not(.danger) { border-color: #CFCEC5; background: #fff; }
+body.app .btn:not(.solid):not(.leaf):not(.mint):not(.ghost):not(.on-ink):not(.danger-solid):not(.danger):hover:not(:disabled) { border-color: var(--g-action); color: var(--g-deep); }
 body.app .btn.sm { padding: 0 14px; }
 @media (prefers-reduced-motion: reduce) { body.app .btn:active { transform: none; } }
 
@@ -1706,3 +1706,25 @@ body.app table.users-table td, body.app table.users-table th { overflow-wrap: an
    deep green is an approved deal, amber is short, red is over capacity */
 .legend i.l-arrived { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: #6B7280; }
 .supply-chart .sb-del { background: #6B7280; }
+
+/* ---------- Campaign step cards, compact: each card as tall as its content, tighter type and spacing ---------- */
+body.app .steps.linked { align-items: start; gap: 18px; }
+body.app .steps.linked > .card { align-self: start; padding: 18px 20px; gap: 12px; }
+body.app .steps.linked > .card:not(:last-child)::after { top: 31px; }
+body.app .steps.linked .step-head h2 { font-size: 16px; }
+body.app .steps.linked .step-head .sub { font-size: 13px; line-height: 1.45; }
+/* Step 1: a plain summary instead of a dashed drop box */
+body.app .steps.linked .drop { border: 0; background: none; padding: 0; align-items: flex-start; text-align: left; gap: 6px; justify-content: flex-start; }
+body.app .steps.linked .drop .big { font-size: 15px; }
+body.app .steps.linked .drop .stack .avatar, body.app .steps.linked .drop .stack .avatar-face { width: 28px; height: 28px; }
+body.app .steps.linked .drop .btn { min-height: 36px; padding: 0 14px; font-size: 13px; }
+body.app .steps.linked .drop > div:last-child, body.app .steps.linked .drop .acts { justify-content: flex-start; }
+/* Step 2: the save row sits right under the range, not pushed to the bottom */
+body.app .steps.linked .card .save-row, body.app .steps.linked .card form > :last-child { margin-top: 4px; }
+/* Step 3: shorter blocks inside the dark card */
+body.app .start-card .stats div { padding: 0 12px; }
+body.app .start-card .stats b { font-size: 16px; }
+body.app .start-card .call-mode { font-size: 12.5px; padding: 8px 10px; }
+body.app .start-card .start-acts .btn.big { min-height: 44px; font-size: 14.5px; }
+body.app .start-card .auto-days button { min-height: 32px; font-size: 12.5px; }
+@media (max-width: 860px) { body.app .start-card .auto-days button, body.app .steps.linked .drop .btn { min-height: 44px; } }
