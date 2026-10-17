@@ -1474,3 +1474,58 @@ body.app .hero.gap, body.app .hero.ok, .hero.gap, .hero.ok { border-color: var(-
 .seg-fields legend { font-size: 13px; font-weight: 700; padding: 0 4px; }
 .avatar-face { flex: none; border-radius: 10px; }
 .avatar-face.quiet { opacity: .6; filter: saturate(.5); }
+
+/* ==========================================================================================
+   Design system pass (see DESIGN.md). Green has four jobs, the canvas is warm, cards float on a whisper of shadow,
+   every button is a pill that presses in, and tables are rows split by one hairline.
+   ========================================================================================== */
+body.app {
+  --g-deep: #0F3D2A;    /* sidebar, dark bands, the main dark button */
+  --g-action: #16774E;  /* filled actions, links, switches, progress */
+  --g-text: #12573A;    /* green words: positive figures, active tabs */
+  --g-wash: #E4F1E9;    /* tints: selected rows, soft chips */
+  --canvas-warm: #F3F2EC;
+  --text: #1B231F;
+  --hairline: #E5E4DD;
+  --card-shadow: 0 0 0.5px rgba(16, 24, 20, .16), 0 1px 2px rgba(16, 24, 20, .10);
+  --card-shadow-lift: 0 0 0.5px rgba(16, 24, 20, .16), 0 2px 4px rgba(16, 24, 20, .08), 0 8px 16px rgba(16, 24, 20, .06);
+  background: var(--canvas-warm);
+  color: var(--text);
+}
+body.app .card, body.app .kpi, body.app .facts-line, body.app .camp, body.app .offers-card, body.app .week-summary {
+  border: 0; border-radius: 12px; box-shadow: var(--card-shadow);
+}
+body.app .hc-sheet { box-shadow: var(--card-shadow-lift); }
+
+/* Buttons: one pill shape, pressed in on click, no coloured glow under them */
+body.app .btn { border-radius: 999px; padding: 0 18px; box-shadow: none !important; transition: transform .12s ease, background-color .15s, border-color .15s, color .15s; }
+body.app .btn:active:not(:disabled) { transform: scale(.96); }
+body.app .btn.solid:hover:not(:disabled), body.app .btn.leaf:hover:not(:disabled) { transform: none; }
+body.app .btn.solid { background: var(--g-deep); border-color: var(--g-deep); }
+body.app .btn.solid:hover:not(:disabled) { background: #14492F; border-color: #14492F; }
+body.app .btn.leaf { background: var(--g-action); border-color: var(--g-action); }
+body.app .btn:not(.solid):not(.leaf):not(.mint):not(.ghost):not(.on-ink) { border-color: #CFCEC5; background: #fff; }
+body.app .btn:not(.solid):not(.leaf):not(.mint):not(.ghost):not(.on-ink):hover:not(:disabled) { border-color: var(--g-action); color: var(--g-deep); }
+body.app .btn.sm { padding: 0 14px; }
+@media (prefers-reduced-motion: reduce) { body.app .btn:active { transform: none; } }
+
+/* Tables: rows split by one hairline, no fill on the header, numbers line up */
+body.app table th { background: none; color: var(--muted); font-size: 12.5px; font-weight: 700; border-bottom: 1px solid var(--hairline); }
+body.app table td { border-bottom: 1px solid var(--hairline); }
+body.app table tr:last-child td { border-bottom: 0; }
+body.app table tbody tr:hover td { background: #FAFAF6; }
+body.app .num, body.app td.r { font-variant-numeric: tabular-nums; }
+
+/* Green has a job, not a mood: green words for good figures and the active place */
+body.app .tabs a[aria-current="page"], body.app .tabs .on { color: var(--g-text); }
+body.app .pill.mint { background: var(--g-wash); color: var(--g-text); }
+body.app a:not(.btn) { color: var(--g-action); }
+
+/* Inputs: calm, square-ish, green when focused */
+body.app input[type="text"], body.app input[type="search"], body.app input[type="date"], body.app input[type="number"], body.app select, body.app textarea {
+  border-color: #D6D5CD; border-radius: 10px; background: #fff;
+}
+body.app input:focus-visible, body.app select:focus-visible, body.app textarea:focus-visible { outline: 3px solid var(--g-wash); outline-offset: 0; border-color: var(--g-action); }
+body.app table.farmers td:nth-child(2), body.app table.farmers td:nth-child(3), body.app table.farmers td:nth-child(4),
+body.app table.farmers td:nth-child(6) { white-space: nowrap; }
+body.app table.farmers .who-cell span { white-space: nowrap; }
