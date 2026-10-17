@@ -160,7 +160,9 @@ def _google_post(settings):
 
     creds, project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
     session = AuthorizedSession(creds)
-    quota = settings.gcp_project or project
+    # A service account (Cloud Run) is billed to its own project; naming a quota project would need an extra role
+    # (serviceusage.serviceUsageConsumer). A person's local sign-in has no project of its own, so it names one.
+    quota = None if getattr(creds, "service_account_email", None) else (settings.gcp_project or project)
 
     def post(body: dict) -> list[dict]:
         r = session.post(MATRIX_URL, json=body, timeout=60, headers={
