@@ -255,7 +255,7 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                 </span>
                 {near && (
                   <span className={`plot-line small ${near.far ? "far" : ""}`}>
-                    Nearest mill: {near.mill.name}, about {Math.round(near.roadKm)} km, {fmtMinutes(near.minutes)} by truck{near.far ? " (far: fruit may lose quality on the way)" : ""}
+                    Nearest mill: {near.mill.name}, {near.byRoad ? "" : "about "}{Math.round(near.roadKm)} km by road, {fmtMinutes(near.minutes)} by truck{near.byRoad ? "" : " (estimated)"}{near.far ? "; far: fruit may lose quality on the way" : ""}
                   </span>
                 )}
               </div>

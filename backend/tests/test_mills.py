@@ -46,3 +46,27 @@ def test_purchase_order_names_the_nearest_mill(store, settings):
     farmer = next(f for f in store.list("farmers") if f.get("plot_lat") is not None)
     assert purchase_order._deliver_to(store, farmer).startswith("Sawit Maju mill")
     assert purchase_order._deliver_to(store, {"id": "x"}) is None
+
+
+def test_road_routes_replace_the_estimate_until_something_moves(store, settings):
+    ms = store.list("mills")
+    sent = []
+
+    def post(body):
+        sent.append(body)
+        n_o, n_d = len(body["origins"]), len(body["destinations"])
+        # the second mill is always the shorter drive: 1,800 s and 25 km
+        return [{"originIndex": o, "destinationIndex": d, "condition": "ROUTE_EXISTS",
+                 "duration": "1800s" if d == 1 else "3600s", "distanceMeters": 25000 if d == 1 else 50000}
+                for o in range(n_o) for d in range(n_d)]
+    out = mills.refresh_routes(store, settings, post=post)
+    mapped = [f for f in store.list("farmers") if f.get("plot_lat") is not None]
+    assert out["updated"] == len(mapped) and all(len(b["origins"]) * len(b["destinations"]) <= 625 for b in sent)
+    f = store.get("farmers", mapped[0]["id"])
+    n = mills.nearest(store.list("mills"), f)
+    second = sorted(ms, key=lambda m: m["id"])[1]["id"]
+    assert n["source"] == "road" and n["mill_id"] == second and n["road_km"] == 25.0 and n["minutes"] == round(30 * mills.TRUCK_FACTOR)
+    assert mills.refresh_routes(store, settings, post=post)["updated"] == 0  # nothing moved: nothing fetched
+    mills.update(store, ms[0]["id"], ms[0]["name"], float(ms[0]["lat"]) + 0.01, ms[0]["lng"])
+    assert mills.nearest(store.list("mills"), store.get("farmers", f["id"]))["source"] == "estimate"
+    assert mills.refresh_routes(store, settings, post=post)["updated"] == len(mapped)

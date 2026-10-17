@@ -1,6 +1,8 @@
-// The nearest mill to a farmer's plot and the truck time to it. The same sums as backend/app/mills.py: keep in step.
-//   road km = straight line x 1.3 (rural roads wind), minutes = road km at 30 km/h (a loaded truck), far = over 2 h
-// (fresh fruit loses oil quality while it waits, so the time to the mill matters).
+// The nearest mill to a farmer's plot and the truck time to it. The same rules as backend/app/mills.py: keep in step.
+//   by road   the route Google's Routes API found (saved on the farmer as mill_route), while the plot and the mills
+//             are where they were when it was fetched (the signature below)
+//   estimate  otherwise: road km = straight line x 1.3 (rural roads wind), minutes = road km at 30 km/h
+// far = over 2 h (fresh fruit loses oil quality while it waits, so the time to the mill matters).
 export const ROAD_FACTOR = 1.3;
 export const TRUCK_KMH = 30;
 export const FAR_MINUTES = 120;
@@ -12,8 +14,19 @@ export function kmBetween(lat1, lng1, lat2, lng2) {
   return 2 * r * Math.asin(Math.sqrt(a));
 }
 
+export function routeSignature(f, mills) {
+  const ms = mills.filter((m) => m.lat != null && m.lng != null).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return `${Number(f.plot_lat).toFixed(5)},${Number(f.plot_lng).toFixed(5)}|` + ms.map((m) => `${m.id}:${Number(m.lat).toFixed(5)},${Number(m.lng).toFixed(5)}`).join(";");
+}
+
 export function nearestMill(mills, f) {
   if (!f || f.plot_lat == null || f.plot_lng == null || !mills?.length) return null;
+  const r = f.mill_route;
+  const routed = r && r.minutes != null && mills.find((m) => m.id === r.mill_id);
+  if (routed && r.sig === routeSignature(f, mills)) {
+    const km = kmBetween(Number(f.plot_lat), Number(f.plot_lng), Number(routed.lat), Number(routed.lng));
+    return { mill: routed, km, roadKm: r.road_km, minutes: r.minutes, far: r.minutes > FAR_MINUTES, byRoad: true };
+  }
   let best = null;
   for (const m of mills) {
     if (m.lat == null || m.lng == null) continue;
@@ -23,7 +36,7 @@ export function nearestMill(mills, f) {
   if (!best) return null;
   const road = best.km * ROAD_FACTOR;
   const minutes = Math.round((road / TRUCK_KMH) * 60);
-  return { mill: best.mill, km: best.km, roadKm: road, minutes, far: minutes > FAR_MINUTES };
+  return { mill: best.mill, km: best.km, roadKm: road, minutes, far: minutes > FAR_MINUTES, byRoad: false };
 }
 
 export const fmtMinutes = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`);

@@ -92,6 +92,7 @@ class Settings:
     bigquery_dataset: str | None = None  # BigQuery dataset the hourly job copies the supply data into (off when unset)
     bigquery_location: str = "asia-southeast1"
     maps_api_key: str | None = None  # Google Maps browser key for the plot map, passed to the dashboard in config.js
+    mill_routes: bool = True  # road routes from plots to mills via the Routes API (mills.py)
     daily_brief: bool = True  # Gemini's daily summary and task list (daily_brief.py), written by the hourly job
     twilio_whatsapp_from: str | None = None  # the WhatsApp sender, when messaging_channel is "whatsapp"
     planner_alert_to: tuple[str, ...] = ()  # numbers that get the planner's alerts (gaps, waiting offers)
@@ -164,6 +165,7 @@ def get_settings() -> Settings:
         bigquery_dataset=os.environ.get("BIGQUERY_DATASET") or None,
         bigquery_location=os.environ.get("BIGQUERY_LOCATION") or "asia-southeast1",
         maps_api_key=os.environ.get("MAPS_API_KEY") or None,
+        mill_routes=os.environ.get("MILL_ROUTES", "true").lower() not in ("0", "false", "no", "off"),
         daily_brief=os.environ.get("DAILY_BRIEF", "true").lower() not in ("0", "false", "no", "off"),
         twilio_whatsapp_from=os.environ.get("TWILIO_WHATSAPP_FROM") or None,
         planner_alert_to=tuple(normalize_phone(n) for n in (os.environ.get("PLANNER_ALERT_TO") or "").split(",")

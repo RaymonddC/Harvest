@@ -181,6 +181,7 @@ function Mills({ state, points, far, form, setForm, placing, setPlacing }) {
   const act = useAct();
   const mills = state.mills || [];
   const edit = can("farmers.manage");
+  const routed = points.filter((p) => p.near?.byRoad).length;
   const rows = mills.map((m) => {
     const mine = points.filter((p) => p.near?.mill.id === m.id);
     return { m, n: mine.length, kg: mine.reduce((s, p) => s + Number(p.f.usual_kg_week || 0), 0),
@@ -200,6 +201,16 @@ function Mills({ state, points, far, form, setForm, placing, setPlacing }) {
         {far > 0 && <span className="pill red">{far} plot{far > 1 ? "s" : ""} over 2 h from a mill</span>}
         {edit && !form && <button type="button" className="btn sm" onClick={() => setForm({ name: "", lat: "", lng: "" })}>Add a mill</button>}
       </div>
+      {mills.length > 0 && points.length > 0 && (
+        <p className="small muted routes-line" style={{ margin: 0 }}>
+          {routed === points.length ? `Road distance and driving time from Google for all ${points.length} plots.`
+            : `Road distance from Google for ${routed} of ${points.length} plots; the rest are estimated (no route found yet, or a plot or mill moved).`}
+          {edit && routed < points.length && (
+            <ActButton className="btn sm ghost" busy="Asking Google…" run={() => act(() => api("/api/mills/routes", { body: {} }),
+              (r) => (r.updated ? `Road routes for ${r.updated} plots${r.no_road ? `; ${r.no_road} have no road Google can find` : ""}.` : "Already up to date."))}>Get road times</ActButton>
+          )}
+        </p>
+      )}
       {mills.length ? (
         <table className="mills-table">
           <thead><tr><th>Mill</th><th className="r">Farmers nearest</th><th className="r">Usual supply</th><th className="r">Average truck time</th><th className="r">Longest</th>{edit && <th aria-label="Actions" />}</tr></thead>
@@ -222,7 +233,7 @@ function Mills({ state, points, far, form, setForm, placing, setPlacing }) {
           </tbody>
         </table>
       ) : <p className="small muted" style={{ margin: 0 }}>No mill yet. Add one to see each plot’s nearest mill and truck time.</p>}
-      <p className="small muted" style={{ margin: 0 }}>Truck time is an estimate: the straight line plus 30% for winding roads, at 30 km/h. The purchase order and the confirmation call name each farmer’s nearest mill.</p>
+      <p className="small muted" style={{ margin: 0 }}>Truck time is Google’s driving time plus 30% for a loaded truck; an estimated one is the straight line plus 30% for winding roads, at 30 km/h. The purchase order and the confirmation call name each farmer’s nearest mill.</p>
       {form && (
         <div className="mill-form">
           <input aria-label="Mill name" placeholder="Mill name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />

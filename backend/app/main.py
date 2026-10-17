@@ -521,15 +521,29 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.post("/api/mills", dependencies=[Depends(need("farmers.manage"))])
     def add_mill(body: MillIn):
-        return mill_call(mills.add, body.name, body.lat, body.lng)
+        out = mill_call(mills.add, body.name, body.lat, body.lng)
+        mills.refresh_in_background(store, settings)
+        return out
 
     @app.put("/api/mills/{mill_id}", dependencies=[Depends(need("farmers.manage"))])
     def edit_mill(mill_id: str, body: MillIn):
-        return mill_call(mills.update, mill_id, body.name, body.lat, body.lng)
+        out = mill_call(mills.update, mill_id, body.name, body.lat, body.lng)
+        mills.refresh_in_background(store, settings)
+        return out
 
     @app.delete("/api/mills/{mill_id}", dependencies=[Depends(need("farmers.manage"))])
     def delete_mill(mill_id: str):
-        return mill_call(mills.delete, mill_id)
+        out = mill_call(mills.delete, mill_id)
+        mills.refresh_in_background(store, settings)
+        return out
+
+    @app.post("/api/mills/routes", dependencies=[Depends(need("farmers.manage"))])
+    def mill_routes():
+        """Fetch the road routes from Google now for every plot whose route is out of date."""
+        try:
+            return mills.refresh_routes(store, settings)
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, f"Could not get road routes from Google: {str(e)[:300]}") from None
 
     @app.get("/api/mills/catchment")
     def mill_catchment(campaign: str = ""):

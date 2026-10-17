@@ -273,9 +273,9 @@ def _more_campaigns(plan_start: dt.date, language: str, rng_seed: int = 7) -> di
     return out
 
 
-# Two mills in Riau, inside the demo plots' area, so each farmer has a nearest one (mills.py).
-DEMO_MILLS = {"mill-main": {"name": "Sawit Maju mill, Pekanbaru", "lat": 0.62, "lng": 101.52},
-              "mill-siak": {"name": "Sawit Maju mill, Siak", "lat": 0.95, "lng": 101.9}}
+# Two mills in Riau towns on the road network (so Google can route to them), so each farmer has a nearest one (mills.py).
+DEMO_MILLS = {"mill-main": {"name": "Sawit Maju mill, Pekanbaru", "lat": 0.5071, "lng": 101.4478},
+              "mill-perawang": {"name": "Sawit Maju mill, Perawang", "lat": 0.6466, "lng": 101.607}}
 
 
 def load_seed(store, settings, more_campaigns: bool = True, english_agent: bool = True) -> None:

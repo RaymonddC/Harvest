@@ -81,6 +81,7 @@ jobs:
           MAPS_API_KEY: ${{ vars.MAPS_API_KEY }}
           BIGQUERY_LOCATION: ${{ vars.BIGQUERY_LOCATION }}
           DAILY_BRIEF: ${{ vars.DAILY_BRIEF }}
+          MILL_ROUTES: ${{ vars.MILL_ROUTES }}
           REAL_CALL_ALLOWLIST: ${{ vars.REAL_CALL_ALLOWLIST }}
           # Text messages and planner alerts (optional).
           MESSAGING_CHANNEL: ${{ vars.MESSAGING_CHANNEL }}

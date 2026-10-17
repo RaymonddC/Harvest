@@ -461,6 +461,13 @@ def scheduled_calls(store: Store, settings: Settings, now: dt.datetime | None = 
             out["bigquery"] = bq_export.export(store, settings)
         except Exception as e:  # noqa: BLE001 - a BigQuery problem must not stop the calls
             out["bigquery"] = {"error": str(e)[:300]}
+    if settings.mill_routes:  # road routes for new or moved plots and mills (usually nothing to fetch)
+        from . import mills
+
+        try:
+            out["mill_routes"] = mills.refresh_routes(store, settings)
+        except Exception as e:  # noqa: BLE001 - the estimate stays; the calls must still start
+            out["mill_routes"] = {"error": str(e)[:300]}
     from . import daily_brief
 
     if settings.daily_brief and daily_brief.due(store, local):  # once a day from 07:00: Gemini's summary and the task list
