@@ -19,7 +19,7 @@ import math
 from collections import defaultdict
 
 from . import forecast as fc
-from . import services
+from . import mills, services
 from .config import Settings, today_local
 from .rules_engine import CROP_LABELS, normalize_crop
 from .store import Store
@@ -380,7 +380,8 @@ def traceability_csv(store: Store, settings: Settings, campaign: str | None = No
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(["delivery_id", "date", "farmer_id", "farmer", "village", "crop", "gross_kg", "deduction_pct", "net_kg",
-                "plot_lat", "plot_lng", "plot_ha", "certification", "plot_mapped", "over_plot_yield"])
+                "plot_lat", "plot_lng", "plot_ha", "certification", "plot_mapped", "over_plot_yield", "nearest_mill", "road_km"])
+    mill_list = store.list("mills")
     for d in sorted(deliveries, key=lambda x: x.get("date") or ""):
         f = farmers.get(d.get("farmer_id"), {})
         fl = flags.get(d.get("farmer_id")) or {}
@@ -388,7 +389,8 @@ def traceability_csv(store: Store, settings: Settings, campaign: str | None = No
                     d.get("crop"), d.get("kg"), d.get("deduction_pct", 0), d.get("net_kg", d.get("kg")),
                     f.get("plot_lat", ""), f.get("plot_lng", ""), f.get("plot_ha", ""), f.get("certification", ""),
                     "yes" if f.get("plot_lat") is not None and f.get("plot_lng") is not None else "no",
-                    "yes" if fl.get("too_much") else "no"])
+                    "yes" if fl.get("too_much") else "no",
+                    *((n["mill_name"], n["road_km"]) if (n := mills.nearest(mill_list, f)) else ("", ""))])
     return out.getvalue()
 
 

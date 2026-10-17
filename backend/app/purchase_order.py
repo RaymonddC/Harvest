@@ -13,7 +13,7 @@ import datetime as dt
 from fpdf import FPDF
 
 from . import forecast as fc
-from . import services
+from . import mills, services
 from .config import Settings
 from .rules_engine import crop_label
 from .store import Store
@@ -51,6 +51,12 @@ def _number(prefix: str, created: str | None, ref: str) -> str:
     return f"{prefix}-{day}-{tail}"
 
 
+def _deliver_to(store: Store, farmer: dict) -> str | None:
+    """The nearest mill's weighbridge and how far it is from the plot (mills.py); None without mills or a plot."""
+    n = mills.nearest_for(store, farmer)
+    return f"{mills.travel_text(n)} (weighbridge)" if n else None
+
+
 def for_offer(store: Store, settings: Settings, offer_id: str) -> tuple[str, bytes]:
     offer = store.get("offers", offer_id)
     if not offer:
@@ -71,6 +77,7 @@ def for_offer(store: Store, settings: Settings, offer_id: str) -> tuple[str, byt
         "reference": offer.get("reference_price"),
         "delivery": (f"Week from {_day(week_start)} to {_day(dt.date.fromisoformat(week_start) + dt.timedelta(days=6))}"
                      if week_start else "To be agreed"),
+        "deliver_to": _deliver_to(store, farmer),
         "approved": f"{offer.get('decided_by') or 'Planner'}, {_day(offer.get('decided_at'))}",
         "voice": "Yes" if offer.get("confirmed_by_voice") else "Not yet (confirmation call waiting)",
         "source": "Rival supplier quote" if str(offer.get("source", "")).startswith("rival_quote")
@@ -110,6 +117,7 @@ def for_harvest(store: Store, settings: Settings, harvest: dict) -> tuple[str, b
         "reference": price,
         "delivery": f"Harvest ready {_day(harvest.get('ready_date'))}"
                     + (" (the farmer was unsure)" if harvest.get("confidence") == "unsure" else ""),
+        "deliver_to": _deliver_to(store, farmer),
         "approved": "Not approved: draft",
         "voice": "Harvest confirmed on the call (read back)" if harvest.get("call_id") else "Entered by a planner",
         "source": f"AI agent call {harvest.get('call_id')}" if harvest.get("call_id") else "Planner",
@@ -290,7 +298,7 @@ def _render(settings: Settings, p: dict) -> bytes:
     # Terms
     rows = [
         ("Delivery", p["delivery"]),
-        ("Deliver to", f"{settings.mill_name} weighbridge"),
+        ("Deliver to", p.get("deliver_to") or f"{settings.mill_name} weighbridge"),
         ("Payment", "On the weight recorded at the mill weighbridge, at the price above"),
         ("Approved by", p["approved"]),
         ("Farmer confirmed", p["voice"]),

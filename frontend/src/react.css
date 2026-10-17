@@ -1790,3 +1790,40 @@ tr.is-live td { background: #F2F8F4; }
 .brief-tasks .linkish { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--g-action, #16774E); cursor: pointer; text-align: left; }
 .brief-tasks .linkish:hover { text-decoration: underline; }
 @media (max-width: 640px) { .brief-tasks li { grid-template-columns: 1fr auto; } .brief-tasks li span { grid-column: 1 / -1; grid-row: 2; } }
+
+/* Farmers: mills under the plot map */
+.map-legend i.sq { border-radius: 2px; }
+.map-hint { margin: 0; color: var(--g-action, #16774E); font-weight: 600; }
+.plot-map.placing { cursor: crosshair; }
+.mills { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--hairline, #E5E4DD); }
+.mills-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mills-head h3 { margin: 0; font-size: 15px; margin-right: auto; }
+.mills-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.mills-table th { text-align: left; font-weight: 600; color: var(--g-text-3, #6B7280); font-size: 12.5px; padding: 6px 8px; border-bottom: 1px solid var(--hairline, #E5E4DD); }
+.mills-table td { padding: 8px; border-bottom: 1px solid var(--hairline, #E5E4DD); }
+.mills-table .r { text-align: right; }
+.mills-table td.warn { color: #C2410C; font-weight: 600; }
+.mills-table .actions { white-space: nowrap; }
+.mill-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mill-form input { flex: 1 1 140px; min-width: 0; }
+.mill-form input[aria-label="Mill name"] { flex: 2 1 200px; }
+@media (max-width: 640px) { .mills-table th:nth-child(5), .mills-table td:nth-child(5) { display: none; } }
+
+/* Farmers: mills under the plot map */
+.map-legend i.sq { border-radius: 2px; }
+.map-hint { margin: 0; color: var(--g-action, #16774E); font-weight: 600; }
+.plot-map.placing { cursor: crosshair; }
+.mills { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--hairline, #E5E4DD); }
+.mills-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mills-head h3 { margin: 0; font-size: 15px; margin-right: auto; }
+.mills-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.mills-table th { text-align: left; font-weight: 600; color: var(--g-text-3, #6B7280); font-size: 12.5px; padding: 6px 8px; border-bottom: 1px solid var(--hairline, #E5E4DD); }
+.mills-table td { padding: 8px; border-bottom: 1px solid var(--hairline, #E5E4DD); }
+.mills-table .r { text-align: right; }
+.mills-table td.warn { color: #C2410C; font-weight: 600; }
+.mills-table .actions { white-space: nowrap; }
+.mill-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mill-form input { flex: 1 1 140px; min-width: 0; }
+.mill-form input[aria-label="Mill name"] { flex: 2 1 200px; }
+@media (max-width: 640px) { .mills-table th:nth-child(5), .mills-table td:nth-child(5) { display: none; } }
+.plot-line.far { color: #C2410C; }

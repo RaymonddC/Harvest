@@ -8,6 +8,7 @@ import { ActButton, Avatar, needs, Pill } from "../../ui.jsx";
 import CallRecap from "../forecast/CallRecap.jsx";
 import { campaignsOf, farmerCampaign } from "../../campaigns.jsx";
 import { crmOf, REASONS, STAGES } from "../../crm.js";
+import { fmtMinutes, nearestMill } from "../../mills.js";
 
 const day = (iso, opts = { day: "numeric", month: "short" }) => (iso ? new Date(iso.length === 10 ? iso + "T00:00:00" : iso).toLocaleDateString("en-GB", opts) : "");
 const when = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
@@ -221,6 +222,7 @@ function activityOf(state, f) {
 export default function FarmerSheet({ farmer, state, onClose }) {
   const [shownCall, setShownCall] = useState(null);
   const f = farmer && state ? state.farmers.find((x) => x.id === farmer.id) || farmer : farmer;
+  const near = f ? nearestMill(state?.mills, f) : null;
   const harvest = f && state ? state.harvests.find((h) => h.farmer_id === f.id) : null;
   const calls = f && state ? state.calls.filter((c) => c.farmer_id === f.id)
     .sort((a, b) => (b.started_at || b.created_at || "").localeCompare(a.started_at || a.created_at || "")) : [];
@@ -251,6 +253,11 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                     : <span className="muted">Plot not mapped (needed for traceability)</span>}
                   {f.certification && <>, <b>{f.certification}</b></>}
                 </span>
+                {near && (
+                  <span className={`plot-line small ${near.far ? "far" : ""}`}>
+                    Nearest mill: {near.mill.name}, about {Math.round(near.roadKm)} km, {fmtMinutes(near.minutes)} by truck{near.far ? " (far: fruit may lose quality on the way)" : ""}
+                  </span>
+                )}
               </div>
               <RDialog.Close className="sheet-x" aria-label="Close"><span aria-hidden="true">×</span></RDialog.Close>
             </header>

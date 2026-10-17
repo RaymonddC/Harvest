@@ -289,7 +289,8 @@ def calendar(settings: Settings) -> str:
 
 def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_week: int | None,
                              harvest: dict | None = None, offer: dict | None = None,
-                             today: dt.date | None = None, campaign: dict | None = None) -> str:
+                             today: dt.date | None = None, campaign: dict | None = None,
+                             deliver_to: str | None = None) -> str:
     today = today or today_local()
     profile = profile_of(campaign)  # the campaign's persona (and its languages) and the planner's own questions
     language = call_language(profile["persona"], farmer.get("language"), settings.demo_language)
@@ -316,6 +317,9 @@ def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_we
             kg=offer["kg"], crop=crop_label(offer["crop"]), price=offer["price_per_kg"],
             currency=offer.get("currency", "IDR"), deliver_label=fc.week_label(dw),
             deliver_start=fc.week_start(dw, settings.plan_start).strftime("%A %d %B")))
+        if deliver_to:  # the nearest mill to their plot (mills.py)
+            parts.append(f"When you read the terms, say where to bring the fruit: {deliver_to}. Say the place name and the "
+                         "distance simply; do not read out the minutes unless they ask.\n")
     elif kind == "gap_fill" and gap_week:
         who = "supplier" if farmer.get("type") == "supplier" else "farmer"
         if harvest:

@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import (access, agent_profile, auth, calendar_view, crm, messaging, mill_ops, purchase_order, seed_data, services,
+from . import (access, agent_profile, auth, calendar_view, crm, messaging, mill_ops, mills, purchase_order, seed_data, services,
                track_record)
 from .call_audio import make_audio_store
 from .config import Settings, get_settings
@@ -118,6 +118,12 @@ class AgentCallsIn(BaseModel):
 
 class RivalOfferIn(BaseModel):
     campaign_id: str | None = None
+
+
+class MillIn(BaseModel):
+    name: str
+    lat: float
+    lng: float
 
 
 class LoginIn(BaseModel):
@@ -504,6 +510,31 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
             camp = services.need_campaign(store, settings, campaign)
             ids = {f["id"] for f in services.campaign_members(store, settings, camp["id"])}
         return crm.overview(store, ids)
+
+    # ----- mills: where the fruit goes, and how far each plot is from the nearest one -----
+
+    def mill_call(fn, *args):
+        try:
+            return fn(store, *args)
+        except mills.MillError as e:
+            raise HTTPException(400 if "not found" not in str(e) else 404, str(e)) from None
+
+    @app.post("/api/mills", dependencies=[Depends(need("farmers.manage"))])
+    def add_mill(body: MillIn):
+        return mill_call(mills.add, body.name, body.lat, body.lng)
+
+    @app.put("/api/mills/{mill_id}", dependencies=[Depends(need("farmers.manage"))])
+    def edit_mill(mill_id: str, body: MillIn):
+        return mill_call(mills.update, mill_id, body.name, body.lat, body.lng)
+
+    @app.delete("/api/mills/{mill_id}", dependencies=[Depends(need("farmers.manage"))])
+    def delete_mill(mill_id: str):
+        return mill_call(mills.delete, mill_id)
+
+    @app.get("/api/mills/catchment")
+    def mill_catchment(campaign: str = ""):
+        ids = {f["id"] for f in store.list("farmers") if f.get("campaign_id") == campaign} if campaign else None
+        return {"mills": mills.catchment(store, ids)}
 
     @app.post("/api/brief", dependencies=[Depends(need("campaign.run"))])
     def write_brief():

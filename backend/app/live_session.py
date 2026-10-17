@@ -24,7 +24,7 @@ from fastapi import WebSocket
 from google.genai import types
 
 from . import agent_profile, forecast as fc
-from . import services
+from . import mills, services
 from .config import Settings
 from .call_audio import CallRecorder, make_audio_store
 from .prompt import KICKOFF, build_system_instruction
@@ -297,7 +297,8 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
     handlers = ToolHandlers(store, settings, session)
     transcript = Transcript()
     instruction = build_system_instruction(settings, farmer, call["kind"], services.call_gap_week(call, settings),
-                                           harvest=harvest, offer=offer, campaign=campaign)
+                                           harvest=harvest, offer=offer, campaign=campaign,
+                                           deliver_to=mills.travel_text(mills.nearest_for(store, farmer)) if call["kind"] == "confirm" else None)
     store.set("calls", call_id, {"status": "on_call", "started_at": services.now_iso()}, merge=True)
     connect = connect or default_connect
     # The call's language from the campaign's agent settings (each farmer's own, or one for every call), and the

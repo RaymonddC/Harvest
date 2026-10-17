@@ -273,6 +273,11 @@ def _more_campaigns(plan_start: dt.date, language: str, rng_seed: int = 7) -> di
     return out
 
 
+# Two mills in Riau, inside the demo plots' area, so each farmer has a nearest one (mills.py).
+DEMO_MILLS = {"mill-main": {"name": "Sawit Maju mill, Pekanbaru", "lat": 0.62, "lng": 101.52},
+              "mill-siak": {"name": "Sawit Maju mill, Siak", "lat": 0.95, "lng": 101.9}}
+
+
 def load_seed(store, settings, more_campaigns: bool = True, english_agent: bool = True) -> None:
     """english_agent: the demo campaigns' agent calls in English (switching to the farmer's language when they answer
     in it). The tests keep the agent on each farmer's own language (Bahasa Indonesia), as they were written for."""
@@ -294,6 +299,9 @@ def load_seed(store, settings, more_campaigns: bool = True, english_agent: bool 
             if coll == "deliveries":
                 doc = {**doc, "farmer_name": data["farmers"].get(doc["farmer_id"], {}).get("name", doc["farmer_id"])}
             store.set(coll, doc_id, doc)
+    if not store.list("mills"):  # the mills are the planner's setup: a reset keeps them, a new store gets two
+        for mill_id, mill in DEMO_MILLS.items():
+            store.set("mills", mill_id, mill)
     services.recompute_forecast(store, settings)
 
 

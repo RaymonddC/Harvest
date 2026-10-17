@@ -18,6 +18,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 
+from . import mills
 from .config import Settings
 from .store import Store
 
@@ -28,7 +29,8 @@ HORIZON_DAYS = 35
 S, F, I, B, D, T = "STRING", "FLOAT", "INTEGER", "BOOLEAN", "DATE", "TIMESTAMP"
 TABLES = {
     "farmers": [("id", S), ("village", S), ("crop", S), ("campaign_id", S), ("usual_kg_week", F), ("plot_ha", F),
-                ("certification", S), ("agent_calls", B), ("type", S)],
+                ("certification", S), ("agent_calls", B), ("type", S), ("nearest_mill", S), ("road_km", F),
+                ("truck_minutes", F)],
     "calls": [("id", S), ("farmer_id", S), ("campaign_id", S), ("kind", S), ("channel", S), ("status", S), ("outcome", S),
               ("attempt", I), ("created_at", T), ("started_at", T), ("ended_at", T), ("duration_s", F), ("consent", B),
               ("sentiment", S), ("sentiment_score", F)],
@@ -57,7 +59,12 @@ def rows(store: Store) -> dict[str, list[dict]]:
         ins = c.get("insights") or {}
         calls.append({**c, "duration_s": _secs(c.get("started_at"), c.get("ended_at")),
                       "sentiment": ins.get("sentiment"), "sentiment_score": ins.get("score")})
-    data = {"farmers": store.list("farmers"), "calls": calls, "harvests": store.list("harvests"),
+    mill_list = store.list("mills")
+    farmers = []
+    for f in store.list("farmers"):
+        n = mills.nearest(mill_list, f) or {}
+        farmers.append({**f, "nearest_mill": n.get("mill_name"), "road_km": n.get("road_km"), "truck_minutes": n.get("minutes")})
+    data = {"farmers": farmers, "calls": calls, "harvests": store.list("harvests"),
             "offers": store.list("offers"), "deliveries": store.list("deliveries"), "forecast": store.list("forecast")}
     out = {}
     for table, cols in TABLES.items():
