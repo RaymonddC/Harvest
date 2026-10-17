@@ -112,18 +112,18 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
         </div>
       </div>
       <div className="table-wrap">
-        <table className="farmers" style={{ minWidth: 680 }}>
+        <table className="farmers fit">
           <thead>
             <tr>
               <SortHead col={COLUMNS[0]} sort={sort} setSort={sortBy} style={{ paddingLeft: 22 }} />
-              <th>Phone</th>
-              <SortHead col={COLUMNS[1]} sort={sort} setSort={sortBy} />
-              <SortHead col={COLUMNS[2]} sort={sort} setSort={sortBy} />
-              {showCampaign && <SortHead col={{ key: "campaign", label: "Campaign" }} sort={sort} setSort={sortBy} />}
-              {showCampaign && <th>Plot</th>}
+              <th className="c-phone">Phone</th>
+              <SortHead col={COLUMNS[1]} sort={sort} setSort={sortBy} className="c-lang" />
+              <SortHead col={COLUMNS[2]} sort={sort} setSort={sortBy} className="c-crop" />
+              {showCampaign && <SortHead col={{ key: "campaign", label: "Campaign" }} sort={sort} setSort={sortBy} className="c-camp" />}
+              {showCampaign && <th className="c-plot">Plot</th>}
               {extraCol && <th>{extraCol.label}</th>}
-              <th title="On: the AI agent phones this farmer. Off: you call them yourself.">Agent calls</th>
-              <SortHead col={COLUMNS[3]} sort={sort} setSort={sortBy} className="r" />
+              <th className="c-agent" title="On: the AI agent phones this farmer. Off: you call them yourself.">Agent calls</th>
+              <SortHead col={COLUMNS[3]} sort={sort} setSort={sortBy} className="r c-kg" />
               <th style={{ paddingRight: 22 }}><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
@@ -131,11 +131,11 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
             {rows.slice(first, first + PAGE).map((f) => (
               <tr key={f.id}>
                 <td style={{ paddingLeft: 22 }}><button type="button" className="who-cell who-link" onClick={() => onOpen?.(f)} aria-label={`Open ${f.name}`}><Avatar name={f.name} id={f.id} cls="sm" /><div><b>{f.name}</b><span>{f.village || ""}</span></div></button></td>
-                <td className="num">{maskPhone(f.phone)}</td>
-                <td>{f.language}</td>
-                <td>{cropLabel(f.crop)}</td>
+                <td className="num c-phone">{maskPhone(f.phone)}</td>
+                <td className="c-lang">{f.language}</td>
+                <td className="c-crop">{cropLabel(f.crop)}</td>
                 {showCampaign && (
-                  <td>
+                  <td className="c-camp">
                     {f.type === "supplier" ? <span className="muted small">Supplier · every {cropLabel(f.crop)} campaign</span> : (
                       <select className="cell-select" aria-label={`Campaign of ${f.name}`} value={ofFarmer(f) || ""} disabled={!can("farmers.manage")}
                         onChange={(e) => moveFarmer(act, f, ofFarmer(f), e.target.value, labelOf(e.target.value))}>
@@ -146,12 +146,12 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
                   </td>
                 )}
                 {showCampaign && (
-                  <td>{f.plot_lat != null && f.plot_lng != null
+                  <td className="c-plot">{f.plot_lat != null && f.plot_lng != null
                     ? <span className="small">{f.plot_ha ? `${f.plot_ha} ha` : "Mapped"}{f.certification ? ` · ${f.certification}` : ""}</span>
                     : <span className="small muted">Not mapped</span>}</td>
                 )}
                 {extraCol && <td>{extraCol.render(f)}</td>}
-                <td>
+                <td className="c-agent">
                   <label className={`mini-switch ${f.agent_calls ? "on" : ""}`} title={f.agent_calls ? "The agent calls this farmer" : "You call this farmer"}>
                     <input type="checkbox" role="switch" checked={!!f.agent_calls} disabled={!can("campaign.run")} aria-label={`Agent calls ${f.name}`}
                       onChange={() => act(() => api(`/api/farmers/${f.id}/agent-calls`, { method: "PUT", body: { agent_calls: !f.agent_calls } }),
@@ -159,7 +159,7 @@ export default function FarmerList({ farmers, onEdit, onOpen, title = "Farmers",
                     <span className="track" aria-hidden="true"><i /></span>
                   </label>
                 </td>
-                <td className="r num">{f.usual_kg_week ? fmtKg(f.usual_kg_week) : "–"}</td>
+                <td className="r num c-kg">{f.usual_kg_week ? fmtKg(f.usual_kg_week) : "–"}</td>
                 <td className="r" style={{ paddingRight: 22, whiteSpace: "nowrap" }}>
                   {phoneCalls && <><ActButton need="campaign.run" className="btn sm leaf" busy="Calling…" run={() => dial(f)}>Call phone</ActButton>{" "}</>}
                   <ActButton need="campaign.run" className="btn sm" busy="Queuing…" run={() => act(() => api(`/api/farmers/${f.id}/call`, { body: {} }), `Call to ${f.name} queued. Answer it in the call client.`)}>{phoneCalls ? "Browser call" : "Call now"}</ActButton>{" "}

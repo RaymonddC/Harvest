@@ -116,7 +116,7 @@ export default function Users() {
           <div><h2 id="users-title">People</h2><div className="sub">{data.users.length} users, {active} can sign in</div></div>
         </div>
         <div className="table-wrap">
-          <table style={{ minWidth: 640 }}>
+          <table className="users-table">
             <thead><tr><th style={{ paddingLeft: 22 }}>Name</th><th>Username</th><th>Role</th><th>Status</th><th style={{ paddingRight: 22 }}><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
               {data.users.map((u) => (
@@ -139,7 +139,7 @@ export default function Users() {
       <section className="card" aria-labelledby="roles-title">
         <div className="card-head"><h2 id="roles-title">What each role may do</h2></div>
         <div className="table-wrap">
-          <table style={{ minWidth: 640 }}>
+          <table className="roles-table">
             <thead><tr><th style={{ paddingLeft: 22 }}>Right</th>{data.roles.map((r) => <th key={r.id} className="r" title={r.description}>{r.label}{r.demo && <div className="sub">demo</div>}</th>)}</tr></thead>
             <tbody>
               {caps.map(([key, label]) => (

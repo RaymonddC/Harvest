@@ -1663,3 +1663,41 @@ body.app .start-card select { color: #1B231F; background: #fff; }
 /* Re-measure fixes: agent selects at 3:1, out-of-month day numbers readable (4.5:1) */
 body.app .agent-col select { border-color: #8E8D84; }
 body.app .cal-day.out .cal-num { color: #6B726D; }
+
+/* ---------- Nothing scrolls sideways: tables fit their card, the board wraps its lanes ---------- */
+.call-stat { align-items: center; justify-content: center; padding: 0 16px; line-height: 1.2; white-space: nowrap; }
+.call-stat b, .call-stat span, .call-stat small { line-height: 1.2; }
+.call-stat b { font-size: 15px; }
+.call-stat span { font-size: 13.5px; font-weight: 600; }
+
+body.app .table-wrap { overflow-x: visible; }
+body.app table.fit, body.app table.answers { min-width: 0 !important; width: 100%; }
+body.app table.answers td, body.app table.answers th { overflow-wrap: anywhere; }
+@media (max-width: 1280px) { body.app table.farmers .c-lang, body.app table.farmers .c-crop { display: none; } }
+@media (max-width: 1100px) { body.app table.farmers .c-plot, body.app table.answers .c-other { display: none; } }
+@media (max-width: 900px) { body.app table.farmers .c-phone, body.app table.farmers .c-kg, body.app table.answers .c-offer { display: none; } }
+@media (max-width: 640px) { body.app table.farmers .c-camp { display: none; } body.app table.farmers td:last-child .btn:not(.more) { display: none; } }
+
+/* Board: lanes share the width (empty lanes take less); below 1100px they wrap into rows instead of scrolling */
+body.app .board { overflow-x: visible; grid-auto-flow: row; grid-template-columns: var(--lanes, repeat(7, minmax(0, 1fr))); }
+@media (max-width: 1100px) {
+  body.app .board { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important; row-gap: 18px; }
+  body.app .board .col { border-left: 0; padding-left: 2px; }
+}
+/* the last pieces that still overflowed */
+@media (max-width: 1500px) { body.app table.farmers .c-lang, body.app table.farmers .c-crop { display: none; } }
+@media (max-width: 1100px) { body.app table.farmers .c-phone, body.app table.farmers .c-kg { display: none; } }
+body.app table.farmers .cell-select { max-width: 170px; }
+.auto-days { flex-wrap: wrap; }
+body.app .board .col { min-width: 0; }
+body.app .board .pcard { min-width: 0; }
+@media (max-width: 640px) {
+  body.app table.users-table th:nth-child(2), body.app table.users-table td:nth-child(2),
+  body.app table.users-table th:nth-child(4), body.app table.users-table td:nth-child(4) { display: none; }
+}
+body.app table.roles-table { table-layout: fixed; }
+body.app table.roles-table th, body.app table.roles-table td { overflow-wrap: anywhere; font-size: 13px; }
+.auto-days { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.auto-days button { min-width: 0; padding: 0 2px; }
+body.app table.users-table td, body.app table.users-table th { overflow-wrap: anywhere; }
+.cal-nav { flex-wrap: wrap; row-gap: 6px; }

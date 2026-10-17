@@ -105,7 +105,7 @@ export default function Calls() {
           <div className="table-wrap">
             <table className="answers">
               <thead>
-                <tr><th>Farmer</th><th>Call</th><th>Harvest they gave</th><th>Offer</th><th>Other answers</th></tr>
+                <tr><th>Farmer</th><th>Call</th><th>Harvest they gave</th><th className="c-offer">Offer</th><th className="c-other">Other answers</th></tr>
               </thead>
               <tbody>
                 {list.map(({ c, h, o, answers, f }) => {
@@ -130,11 +130,11 @@ export default function Calls() {
                         ) : c.harvest_read_back ? <span className="muted small">Read back, not saved ({fmtKg(c.harvest_read_back.kg)} kg): open to save</span>
                           : open ? <span className="muted small">{c.kind === "confirm" ? "Confirmation of the deal" : "No harvest given"}</span> : <span className="muted small">–</span>}
                       </td>
-                      <td>
+                      <td className="c-offer">
                         {o ? <span className="ans-offer"><b>{fmtKg(o.kg)} kg</b> at {plainPrice(o.price_per_kg, o.currency || "IDR")}<small>{({ pending: "waiting for you", escalated: "above the ceiling", approved: "approved", rejected: "rejected" })[o.status] || o.status}</small></span>
                           : <span className="muted small">–</span>}
                       </td>
-                      <td>
+                      <td className="c-other">
                         {answers.length ? (
                           <ul className="ans-list">
                             {answers.slice(0, 3).map((a) => <li key={a.question}><span>{a.question}</span><b>{a.answer === "skipped" ? "no answer" : String(a.answer)}</b></li>)}

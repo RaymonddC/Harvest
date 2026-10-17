@@ -97,7 +97,7 @@ export default function FarmerPipeline({ state, cid, title, filter, onClearFilte
       )}
       {view === "board" ? (
         <LayoutGroup>
-        <div className="board" role="list">
+        <div className="board" role="list" style={{ "--lanes": STAGES.map((s) => (rows.some((x) => x.stage === s.key) ? "minmax(0, 1.4fr)" : "minmax(0, .7fr)")).join(" ") }}>
           {STAGES.map((s) => {
             const items = rows.filter((x) => x.stage === s.key);
             return (
