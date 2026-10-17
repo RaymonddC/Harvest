@@ -53,11 +53,11 @@ function Field({ brandRef, cardRef }) {
     import("../components/PhoneScene.js")
       .then(({ startPhone }) => {
         if (!alive || !ref.current) return;
-        // The phone fills the space between the logo and the text card, its bottom edge just behind the card.
+        // The phone fills the space between the logo and the text card, its lower part behind the see-through card.
         const fit = () => {
           const top = (brandRef.current?.offsetTop || 0) + (brandRef.current?.offsetHeight || 0) + 16;
           const card = cardRef.current;
-          const bottom = card ? card.offsetTop + 24 : ref.current.clientHeight;
+          const bottom = card ? card.offsetTop + card.offsetHeight * 0.4 : ref.current.clientHeight;
           return { top, bottom };
         };
         stop = startPhone(ref.current, { still, fit, watch: [cardRef.current] });

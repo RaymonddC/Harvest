@@ -125,21 +125,21 @@ export function startPhone(canvas, { still = false, fit = null, watch = [] } = {
       // The farmer's initials with a soft pulse, and three dots.
       const pulse = 1 + 0.06 * Math.sin(tt * 6);
       ctx.save();
-      ctx.translate(W / 2, 520);
+      ctx.translate(W / 2, 430);
       ctx.scale(pulse, pulse);
       roundRect(-110, -110, 220, 220, 110, "#1F6B47");
       ctx.restore();
       ctx.fillStyle = C.text;
       ctx.font = `800 80px ${FONT}`;
       ctx.textAlign = "center";
-      ctx.fillText("PW", W / 2, 548);
+      ctx.fillText("PW", W / 2, 458);
       ctx.font = `600 28px ${FONT}`;
       ctx.fillStyle = C.sub;
-      ctx.fillText("Air Molek", W / 2, 700);
+      ctx.fillText("Air Molek", W / 2, 600);
       ctx.textAlign = "left";
       for (let i = 0; i < 3; i++) {
         const on = Math.floor(tt * 3) % 3 === i;
-        roundRect(W / 2 - 46 + i * 36, 760, 18, 18, 9, on ? C.mint : "#2C3A33");
+        roundRect(W / 2 - 46 + i * 36, 650, 18, 18, 9, on ? C.mint : "#2C3A33");
       }
       return;
     }
@@ -152,22 +152,24 @@ export function startPhone(canvas, { still = false, fit = null, watch = [] } = {
     ctx.beginPath();
     ctx.rect(0, 224, W, H - 224);
     ctx.clip();
-    // Bubbles from the newest upwards, so the latest line is always in view.
-    let y = H - 40;
+    // Bubbles from the newest upwards, so the latest line is always in view. The newest sits at 70% of the screen:
+    // on the sign-in page the lower part of the phone is behind the see-through text card.
+    const BOTTOM = Math.round(H * 0.7);
+    let y = BOTTOM;
     const saved = callT >= LINES.length * PER_LINE;
     if (saved) {
       const k = Math.min(1, (callT - LINES.length * PER_LINE) / 0.4);
       ctx.globalAlpha = k;
-      roundRect(30, H - 250, W - 60, 210, 26, C.card);
+      roundRect(30, BOTTOM - 210, W - 60, 210, 26, C.card);
       ctx.fillStyle = C.cardText;
       ctx.font = `800 30px ${FONT}`;
-      ctx.fillText("✓  Added to the forecast", 60, H - 186);
+      ctx.fillText("✓  Added to the forecast", 60, BOTTOM - 146);
       ctx.font = `700 40px ${FONT}`;
-      ctx.fillText("1,600 kg on 14 Nov", 60, H - 128);
+      ctx.fillText("1,600 kg on 14 Nov", 60, BOTTOM - 88);
       ctx.font = `600 24px ${FONT}`;
-      ctx.fillText("Confirmed by Pak Wahyu", 60, H - 82);
+      ctx.fillText("Confirmed by Pak Wahyu", 60, BOTTOM - 42);
       ctx.globalAlpha = 1;
-      y = H - 280;
+      y = BOTTOM - 240;
     }
     for (let i = shown - 1; i >= 0 && y > 224; i--) {
       const l = LINES[i];
