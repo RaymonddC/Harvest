@@ -15,7 +15,8 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import access, agent_profile, auth, calendar_view, messaging, seed_data, services, track_record
+from . import (access, agent_profile, auth, calendar_view, messaging, mill_ops, purchase_order, seed_data, services,
+               track_record)
 from .call_audio import make_audio_store
 from .config import Settings, get_settings
 from .live_session import BrowserChannel, run_call
@@ -43,6 +44,11 @@ class FarmerIn(BaseModel):
     usual_kg_week: float | None = None
     can_pull_forward: bool = False
     campaign_id: str | None = None  # on add: a campaign to put the farmer in; "" for none (the database only)
+    allow_calls: bool = False  # on add: also put the number on the real-call allowlist
+    plot_lat: str = ""  # traceability: where the farmer's plot is, its area and certification (all optional)
+    plot_lng: str = ""
+    plot_ha: str = ""
+    certification: str = ""
 
 
 class CsvIn(BaseModel):
@@ -59,20 +65,40 @@ class CampaignIn(BaseModel):
 class NewCampaignIn(BaseModel):
     crop: str
     target_kg_per_week: float
-    weeks: int
+    weeks: int | None = None  # older screens; the dashboard sends start_date and end_date
     name: str | None = None
     farmer_ids: list[str] | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    daily_capacity_kg: float | None = None
+    working_days: int | None = None
+    truck_kg: float | None = None
 
 
 class CampaignEditIn(BaseModel):
     name: str | None = None
     target_kg_per_week: float | None = None
     weeks: int | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    daily_capacity_kg: float | None = None
+    working_days: int | None = None
+    truck_kg: float | None = None
 
 
 class CampaignFarmersIn(BaseModel):
     add: list[str] = []
     remove: list[str] = []
+
+
+class ToCallIn(BaseModel):
+    to_call: bool
+
+
+class AllowNumberIn(BaseModel):
+    phone: str
+    label: str = ""
+    farmer_id: str | None = None
 
 
 class RivalOfferIn(BaseModel):
@@ -115,12 +141,36 @@ class AnswerIn(BaseModel):
 class ScheduleIn(BaseModel):
     enabled: bool = False
     channel: str = "browser"
+    days: list[int] | None = None  # 0 = Monday ... 6 = Sunday
+    time: str | None = None  # "06:00", on the hour, Asia/Jakarta
 
 
 class DeliveryIn(BaseModel):
     farmer_id: str
-    kg: float
+    kg: float  # gross weight at the weighbridge
     date: str
+    unripe_pct: float | None = None  # grading deductions, percent of the gross weight
+    dirt_pct: float | None = None
+    other_pct: float | None = None
+
+
+class RescheduleIn(BaseModel):
+    to_date: str
+    reason: str = ""
+
+
+class OfficialPriceIn(BaseModel):
+    crop: str = "palm"
+    province: str
+    valid_from: str
+    price_per_kg: float
+    source: str = ""
+    url: str = ""
+
+
+class FollowOfficialIn(BaseModel):
+    enabled: bool
+    province: str | None = None
 
 
 class DialIn(BaseModel):
@@ -259,7 +309,10 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
                             "weeks": settings.weeks, "target_kg_per_week": settings.target_kg_per_week,
                             "gap_tolerance": settings.gap_tolerance, "multi_crop": settings.multi_crop,
                             "phone_calls": services.phone_calls_ready(settings),
-                            "phone_calls_note": services.phone_calls_note(settings),
+                            "phone_calls_note": services.phone_calls_note(settings, store),
+                            "web_allowlist_max": settings.web_allowlist_max,
+                            "allow_any_number": "*" in settings.real_call_allowlist,
+                            "server_allowlist": sorted(n for n in settings.real_call_allowlist if n != "*"),
                             "agent_options": agent_profile.options(),
                             "messaging_note": messaging.channel_note(settings),
                             "weekly_job": bool(settings.job_token)}
@@ -325,12 +378,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         services.recompute_forecast(store, settings)
         return doc
 
-    @app.post("/api/farmers", dependencies=[Depends(need("farmers.manage"))])
-    def add_farmer(body: FarmerIn):
+    @app.post("/api/farmers")
+    def add_farmer(body: FarmerIn, actor: auth.Actor = Depends(need("farmers.manage"))):
         row = body.model_dump()
         row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
         cid = row.pop("campaign_id", None)
+        allow = row.pop("allow_calls", False)
+        if allow and "campaign.run" not in actor.capabilities:
+            raise HTTPException(403, "Your role cannot allow real phone calls.")
         fid = services.add_farmer(store, row, cid, settings)
+        if allow:
+            services.allow_number(store, settings, row["phone"], row["name"], fid, actor)
         services.recompute_forecast(store, settings)
         return {"id": fid}
 
@@ -339,6 +397,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         row = body.model_dump()
         row["can_pull_forward"] = "yes" if row["can_pull_forward"] else ""
         row.pop("campaign_id", None)  # moving between campaigns: PUT /api/campaigns/{id}/farmers
+        row.pop("allow_calls", None)  # the allowlist: /api/allowed-numbers
         return services.update_farmer(store, farmer_id, row)
 
     @app.delete("/api/farmers/{farmer_id}", dependencies=[Depends(need("farmers.manage"))])
@@ -392,12 +451,15 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     @app.post("/api/campaigns", dependencies=[Depends(need("campaign.run"))])
     def campaign_create(body: NewCampaignIn):
         return services.create_campaign(store, settings, body.crop, body.target_kg_per_week, body.weeks,
-                                        body.name, body.farmer_ids)
+                                        body.name, body.farmer_ids, body.start_date, body.end_date,
+                                        body.daily_capacity_kg, body.working_days, body.truck_kg)
 
     @app.put("/api/campaigns/{campaign_id}", dependencies=[Depends(need("campaign.run"))])
     def campaign_edit(campaign_id: str, body: CampaignEditIn):
         """Rename a campaign or change its weekly target or weeks to plan."""
-        return services.update_campaign(store, settings, campaign_id, body.name, body.target_kg_per_week, body.weeks)
+        return services.update_campaign(store, settings, campaign_id, body.name, body.target_kg_per_week, body.weeks,
+                                        body.start_date, body.end_date, body.daily_capacity_kg, body.working_days,
+                                        body.truck_kg)
 
     @app.delete("/api/campaigns/{campaign_id}", dependencies=[Depends(need("campaign.run"))])
     def campaign_delete(campaign_id: str):
@@ -407,6 +469,88 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def campaign_farmers(campaign_id: str, body: CampaignFarmersIn):
         """Move farmers from the database into this campaign, or out of it."""
         return services.set_campaign_farmers(store, settings, campaign_id, body.add, body.remove)
+
+    @app.put("/api/farmers/{farmer_id}/to-call", dependencies=[Depends(need("farmers.manage"))])
+    def put_to_call(farmer_id: str, body: ToCallIn):
+        """Mark a farmer to always get the harvest call (or not): the To call stage on the pipeline board."""
+        if not store.get("farmers", farmer_id):
+            raise HTTPException(404, "Farmer not found.")
+        store.set("farmers", farmer_id, {"to_call": body.to_call}, merge=True)
+        return {"farmer_id": farmer_id, "to_call": body.to_call}
+
+    @app.post("/api/allowed-numbers")
+    def post_allowed_number(body: AllowNumberIn, actor: auth.Actor = Depends(need("campaign.run"))):
+        """Let real phone calls (and texts) reach this number."""
+        return services.allow_number(store, settings, body.phone, body.label, body.farmer_id, actor)
+
+    @app.delete("/api/allowed-numbers/{number_id}", dependencies=[Depends(need("campaign.run"))])
+    def delete_allowed_number(number_id: str):
+        return services.disallow_number(store, number_id)
+
+    def _pdf(made: tuple[str, bytes]) -> Response:
+        name, data = made
+        return Response(data, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+    @app.get("/api/offers/{offer_id}/purchase-order.pdf")
+    def offer_purchase_order(offer_id: str):
+        """The purchase order of an approved deal, as a PDF."""
+        return _pdf(purchase_order.for_offer(store, settings, offer_id))
+
+    @app.get("/api/calls/{call_id}/purchase-order.pdf")
+    def call_purchase_order(call_id: str):
+        """The purchase order from a finished call: its approved deal, else a draft from the harvest it saved."""
+        return _pdf(purchase_order.for_call(store, settings, call_id))
+
+    @app.get("/api/deliveries/{delivery_id}/receipt.pdf")
+    def delivery_receipt(delivery_id: str):
+        """Goods receipt and payment for one delivery: gross, deductions, net, price and amount (PDF)."""
+        return _pdf(purchase_order.for_delivery(store, settings, delivery_id))
+
+    @app.get("/api/supply")
+    def supply(period: str = "week", start: str = "", end: str = "", campaign: str = ""):
+        """Expected supply, net deliveries, target and mill capacity by day, week, month or year."""
+        a, b = mill_ops._day(start), mill_ops._day(end)
+        if not a or not b:
+            raise HTTPException(400, "Dates must look like 2026-10-19.")
+        return mill_ops.supply_series(store, settings, campaign or None, period, a, b)
+
+    @app.get("/api/surplus")
+    def surplus(week: int, campaign: str = ""):
+        """Farmers whose harvest falls in a week over the mill's capacity: the ones to ask to deliver later."""
+        return {"farmers": mill_ops.surplus_farmers(store, settings, campaign or None, week)}
+
+    @app.post("/api/farmers/{farmer_id}/reschedule")
+    def reschedule(farmer_id: str, body: RescheduleIn, actor: auth.Actor = Depends(need("farmers.manage"))):
+        """Move a farmer's harvest later (agreed with them) when the mill is over capacity that week."""
+        return mill_ops.reschedule_harvest(store, settings, farmer_id, body.to_date, body.reason, actor)
+
+    @app.post("/api/official-prices")
+    def post_official_price(body: OfficialPriceIn, actor: auth.Actor = Depends(need("limits.edit"))):
+        """Record the published farmgate price (e.g. the provincial plantation office's TBS price)."""
+        return mill_ops.add_official_price(store, settings, body.crop, body.province, body.valid_from, body.price_per_kg,
+                                           body.source, body.url, actor)
+
+    @app.delete("/api/official-prices/{price_id}", dependencies=[Depends(need("limits.edit"))])
+    def delete_official_price(price_id: str):
+        if not store.get("official_prices", price_id):
+            raise HTTPException(404, "Price not found.")
+        store.delete("official_prices", price_id)
+        return {"deleted": price_id}
+
+    @app.put("/api/limits/{crop}/follow-official", dependencies=[Depends(need("limits.edit"))])
+    def put_follow_official(crop: str, body: FollowOfficialIn):
+        """Let the crop's price range follow the latest official price (the floor and ceiling move with it)."""
+        return mill_ops.follow_official(store, settings, crop, body.province, body.enabled)
+
+    @app.get("/api/traceability")
+    def traceability(campaign: str = ""):
+        """How many of the campaign's farmers have a mapped, certified plot, and who delivers more than the plot grows."""
+        return mill_ops.traceability_summary(store, settings, campaign or None)
+
+    @app.get("/api/traceability.csv")
+    def traceability_csv(campaign: str = ""):
+        return PlainTextResponse(mill_ops.traceability_csv(store, settings, campaign or None), media_type="text/csv",
+                                 headers={"Content-Disposition": "attachment; filename=traceability.csv"})
 
     @app.get("/api/calendar")
     def calendar(start: str, end: str, campaign: str = ""):
@@ -450,15 +594,24 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     @app.put("/api/campaigns/{campaign_id}/schedule", dependencies=[Depends(need("campaign.run"))])
     def campaign_schedule(campaign_id: str, body: ScheduleIn):
         """Start this campaign by itself every Monday morning (Cloud Scheduler calls /api/jobs/weekly)."""
-        return services.set_weekly_schedule(store, settings, campaign_id, body.enabled, body.channel)
+        return services.set_weekly_schedule(store, settings, campaign_id, body.enabled, body.channel, body.days, body.time)
+
+    def _job_auth(token: str | None) -> None:
+        if not settings.job_token:
+            raise HTTPException(404, "The scheduled job is not set up (JOB_TOKEN).")
+        if not hmac.compare_digest(token or "", settings.job_token):
+            raise HTTPException(403, "Wrong job token.")
 
     @app.post("/api/jobs/weekly", include_in_schema=False)
     def jobs_weekly(x_job_token: str | None = Header(default=None)):
-        """Monday morning job: roll the weeks, snapshot promises, start the weekly campaigns."""
-        if not settings.job_token:
-            raise HTTPException(404, "The weekly job is not set up (JOB_TOKEN).")
-        if not hmac.compare_digest(x_job_token or "", settings.job_token):
-            raise HTTPException(403, "Wrong job token.")
+        """Cloud Scheduler, every hour: the weekly bookkeeping once a week, and the campaigns due this hour."""
+        _job_auth(x_job_token)
+        return services.scheduled_calls(store, settings)
+
+    @app.post("/api/jobs/run-all", include_in_schema=False)
+    def jobs_run_all(x_job_token: str | None = Header(default=None)):
+        """By hand: the weekly bookkeeping and every campaign with automatic calls, now."""
+        _job_auth(x_job_token)
         return services.weekly_job(store, settings)
 
     @app.post("/api/offers/{offer_id}/send-confirmation", dependencies=[Depends(need("offers.decide"))])
@@ -487,7 +640,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.post("/api/deliveries")
     def post_delivery(body: DeliveryIn, actor: auth.Actor = Depends(need("farmers.manage"))):
-        return track_record.record_delivery(store, settings, body.farmer_id, body.kg, body.date, actor.name)
+        return track_record.record_delivery(store, settings, body.farmer_id, body.kg, body.date, actor.name, "manual",
+                                            {"unripe": body.unripe_pct, "dirt": body.dirt_pct, "other": body.other_pct})
 
     @app.post("/api/deliveries/upload")
     def upload_deliveries(body: CsvIn, actor: auth.Actor = Depends(need("farmers.manage"))):
@@ -495,9 +649,13 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.delete("/api/deliveries/{delivery_id}", dependencies=[Depends(need("farmers.manage"))])
     def delete_delivery(delivery_id: str):
-        if not store.get("deliveries", delivery_id):
+        d = store.get("deliveries", delivery_id)
+        if not d:
             raise HTTPException(404, "Delivery not found.")
         store.delete("deliveries", delivery_id)
+        if d.get("offer_id") and store.get("offers", d["offer_id"]):
+            o = store.get("offers", d["offer_id"])
+            store.set("offers", d["offer_id"], {"delivered_kg": max(round(float(o.get("delivered_kg") or 0) - float(d.get("net_kg", d.get("kg", 0)))), 0)}, merge=True)
         return {"deleted": delivery_id}
 
     @app.get("/api/answers.csv")

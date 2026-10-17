@@ -199,8 +199,42 @@ def get_campaign(store: Store, settings: Settings, crop: str | None = None) -> d
     return resolve_campaign(store, settings, crop)
 
 
+def _date(value) -> dt.date | None:
+    try:
+        return dt.date.fromisoformat(str(value or "")[:10])
+    except ValueError:
+        return None
+
+
+def campaign_weeks(settings: Settings, camp: dict) -> int:
+    """How many weeks the forecast shows for a campaign: from week 1 (next week) to its end date, at most MAX_WEEKS.
+    A campaign without dates (older data) keeps its number of weeks."""
+    end = _date(camp.get("end_date"))
+    if end:
+        return max(1, min(MAX_WEEKS, ((end - settings.plan_start).days // 7) + 1))
+    return int(camp.get("weeks") or settings.weeks)
+
+
+def campaign_dates(settings: Settings, camp: dict) -> tuple[dt.date, dt.date]:
+    """The campaign's first and last day (from the weeks for older campaigns without dates)."""
+    start = _date(camp.get("start_date")) or settings.plan_start
+    end = _date(camp.get("end_date")) or settings.plan_start + dt.timedelta(days=7 * campaign_weeks(settings, camp) - 1)
+    return start, end
+
+
+def _before_start(settings: Settings, camp: dict, rows: list[dict]) -> list[dict]:
+    """Weeks that end before the campaign starts are shown but never count as short."""
+    start = _date(camp.get("start_date"))
+    for r in rows:
+        ws = _date(r.get("week_start"))
+        r["before_start"] = bool(start and ws and ws + dt.timedelta(days=6) < start)
+        if r["before_start"]:
+            r["is_gap"], r["gap_kg"] = False, 0
+    return rows
+
+
 def weeks_for(store: Store, settings: Settings, crop: str | None = None) -> int:
-    return int((get_campaign(store, settings, crop) or {}).get("weeks") or settings.weeks)
+    return campaign_weeks(settings, get_campaign(store, settings, crop) or {})
 
 
 def campaign_of_farmer(store: Store, settings: Settings, farmer: dict) -> dict | None:
@@ -221,7 +255,7 @@ def settings_for_crop(store: Store, settings: Settings, crop: str | None) -> Set
 
 def settings_for_campaign(settings: Settings, c: dict) -> Settings:
     voice = (c.get("persona") or {}).get("voice") or settings.voice_name
-    return dataclasses.replace(settings, weeks=int(c.get("weeks") or settings.weeks),
+    return dataclasses.replace(settings, weeks=campaign_weeks(settings, c),
                                target_kg_per_week=int(c.get("target_kg_per_week") or settings.target_kg_per_week),
                                voice_name=voice if voice in agent_profile.VOICES or voice == settings.voice_name
                                else settings.voice_name)
@@ -295,13 +329,43 @@ def edit_answer(store: Store, call_id: str, question_id: str, answer: str, actor
     return answers[question_id]
 
 
-def set_weekly_schedule(store: Store, settings: Settings, crop: str | None, enabled: bool, channel: str = "browser") -> dict:
-    """Mark a campaign to start by itself every Monday morning (run by the weekly job)."""
+# Automatic calls: each campaign can start itself on chosen weekdays at a chosen hour, in the mill's time zone
+# (Asia/Jakarta, UTC+7, no daylight saving). Cloud Scheduler calls the job every hour; see scheduled_calls.
+SCHEDULE_TZ = dt.timezone(dt.timedelta(hours=7), "WIB")
+DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def _check_schedule(days, time) -> tuple[list[int], str]:
+    days = sorted({int(d) for d in (days if days is not None else [0])})
+    if not days or any(not 0 <= d <= 6 for d in days):
+        raise ServiceError("Pick at least one day (Monday to Sunday).")
+    time = (time or "06:00").strip()
+    try:
+        hour, minute = (int(x) for x in time.split(":"))
+    except ValueError:
+        raise ServiceError("The time must look like 06:00.") from None
+    if not 0 <= hour <= 23 or minute != 0:
+        raise ServiceError("Pick a time on the hour (the job runs once an hour).")
+    return days, f"{hour:02d}:00"
+
+
+def schedule_text(weekly: dict) -> str:
+    days = weekly.get("days") or [0]
+    names = ("every day" if len(days) == 7 else "Monday to Friday" if days == [0, 1, 2, 3, 4]
+             else "Monday to Saturday" if days == [0, 1, 2, 3, 4, 5] else ", ".join(DAY_NAMES[d] for d in days))
+    return f"{names} at {weekly.get('time') or '06:00'}"
+
+
+def set_weekly_schedule(store: Store, settings: Settings, crop: str | None, enabled: bool, channel: str = "browser",
+                        days: list[int] | None = None, time: str | None = None) -> dict:
+    """Let a campaign start its calls by itself on the chosen days at the chosen hour (run by the hourly job)."""
     camp = need_campaign(store, settings, crop)
     crop = campaign_crop(settings, camp)
     if channel not in ("browser", "twilio"):
         raise ServiceError("Channel must be browser or twilio.")
-    weekly = {"enabled": bool(enabled), "channel": channel, "updated_at": now_iso()}
+    old = camp.get("weekly") or {}
+    days, time = _check_schedule(days if days is not None else old.get("days"), time or old.get("time"))
+    weekly = {"enabled": bool(enabled), "channel": channel, "days": days, "time": time, "updated_at": now_iso()}
     store.set("campaigns", camp["id"], {"weekly": weekly}, merge=True)
     return {**weekly, "crop": crop, "campaign_id": camp["id"]}
 
@@ -320,9 +384,60 @@ def roll_weeks(store: Store, settings: Settings, today: dt.date | None = None) -
     return rolled
 
 
+def weekly_bookkeeping(store: Store, settings: Settings) -> dict:
+    """Once a week: snapshot what farmers promised for the week that starts now (so deliveries can be checked
+    against it later), alert new gaps, and send the waiting-offers digest."""
+    from . import messaging, track_record
+
+    week = settings.plan_start - dt.timedelta(days=7)  # the week that starts today; week 1 is next week
+    snap = track_record.snapshot_promises(store, settings, week)
+    messaging.check_gap_alerts(store, settings)
+    waiting = [o for o in store.list("offers") if o.get("status") in ("pending", "escalated")]
+    if waiting:
+        messaging.alert_planner(store, settings, f"{settings.mill_name}: {len(waiting)} offers wait for your approval.",
+                                "offers_digest")
+    return {"plan_start": settings.plan_start.isoformat(), "promises": snap}
+
+
+def _start_scheduled(store: Store, settings: Settings, camp: dict) -> dict:
+    weekly = camp.get("weekly") or {}
+    crop = campaign_crop(settings, camp)
+    if camp.get("status") == "running":
+        return {"crop": crop, "campaign_id": camp["id"], "why": "already calling", "skipped": True}
+    try:
+        r = start_campaign(store, settings, "collect", camp["id"], weekly.get("channel", "browser"))
+        return {"crop": crop, "campaign_id": camp["id"], "queued": r["queued"], "channel": r["channel"]}
+    except ServiceError as e:
+        return {"crop": crop, "campaign_id": camp["id"], "why": str(e), "skipped": True}
+
+
+def scheduled_calls(store: Store, settings: Settings, now: dt.datetime | None = None) -> dict:
+    """The hourly job: the weekly bookkeeping once a week (from Monday 06:00), then start each campaign whose
+    automatic calls are due this hour. Each slot runs once, even if the job is called twice in the hour."""
+    local = (now or dt.datetime.now(dt.timezone.utc)).astimezone(SCHEDULE_TZ)
+    camps = list_campaigns(store, settings)
+    out: dict = {"now": local.isoformat(timespec="minutes"), "started": [], "skipped": []}
+    week = (local.date() - dt.timedelta(days=local.weekday())).isoformat()
+    marker = next((c for c in camps if c["id"] == "current"), camps[0] if camps else None)
+    if marker is not None and (local.weekday() > 0 or local.hour >= 6) and marker.get("bookkeeping_week") != week:
+        out["bookkeeping"] = weekly_bookkeeping(store, settings)
+        store.set("campaigns", marker["id"], {"bookkeeping_week": week}, merge=True)
+    slot = local.strftime("%Y-%m-%dT%H")
+    for camp in camps:
+        weekly = camp.get("weekly") or {}
+        if not weekly.get("enabled") or camp.get("last_scheduled_slot") == slot:
+            continue
+        if local.weekday() not in (weekly.get("days") or [0]) or local.hour != int((weekly.get("time") or "06:00")[:2]):
+            continue
+        store.set("campaigns", camp["id"], {"last_scheduled_slot": slot, "last_weekly_job": now_iso()}, merge=True)
+        r = _start_scheduled(store, settings, camp)
+        out["skipped" if r.pop("skipped", False) else "started"].append(r)
+    return out
+
+
 def weekly_job(store: Store, settings: Settings) -> dict:
-    """Monday morning: snapshot what farmers promised for the week that starts now (so deliveries can be checked
-    against it later), then start every campaign marked "call every Monday" that is not already calling."""
+    """Run everything now, whatever the day: the weekly bookkeeping, then start every campaign with automatic calls
+    switched on (for a manual run; the scheduler calls scheduled_calls every hour)."""
     from . import track_record
 
     from . import messaging
@@ -396,21 +511,51 @@ def _check_campaign_fields(target_kg_per_week: float | None, weeks: int | None, 
         raise ServiceError(f"The name can be at most {MAX_NAME} characters.")
 
 
-def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_week: float, weeks: int,
-                    name: str | None = None, farmer_ids: list[str] | None = None) -> dict:
-    """A new campaign for a crop (a crop can have several). farmer_ids: farmers of that crop to move into it."""
+def _check_dates(settings: Settings, start_date: str | None, end_date: str | None) -> dict:
+    """Start and end dates of a campaign (YYYY-MM-DD). The end must not be before the start or in the past."""
+    start, end = _date(start_date), _date(end_date)
+    if (start_date and not start) or (end_date and not end):
+        raise ServiceError("Dates must look like 2026-10-19.")
+    if bool(start) != bool(end):
+        raise ServiceError("Give both a start and an end date.")
+    if not start:
+        return {}
+    if end < start:
+        raise ServiceError("The end date is before the start date.")
+    if end < settings.plan_start:
+        raise ServiceError(f"The campaign must run into week 1 or later (it starts {settings.plan_start:%d %b %Y}): "
+                           "pick a later end date.")
+    if (end - start).days > 366:
+        raise ServiceError("A campaign can run for at most a year.")
+    return {"start_date": start.isoformat(), "end_date": end.isoformat()}
+
+
+def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_week: float, weeks: int | None = None,
+                    name: str | None = None, farmer_ids: list[str] | None = None, start_date: str | None = None,
+                    end_date: str | None = None, daily_capacity_kg: float | None = None,
+                    working_days: int | None = None, truck_kg: float | None = None) -> dict:
+    """A new campaign for a crop (a crop can have several), from a start date to an end date (or, older callers,
+    a number of weeks). farmer_ids: farmers of that crop to move into it."""
     if not settings.multi_crop:
         raise ServiceError("Running more than one campaign is turned off (MULTI_CROP).")
     key = normalize_crop(crop)
     if key not in CROP_LABELS:
         raise ServiceError(f"Unknown crop {crop!r}. Use one of: {', '.join(CROP_LABELS)}.")
-    _check_campaign_fields(target_kg_per_week, weeks, name)
+    from . import mill_ops
+
+    dates = _check_dates(settings, start_date, end_date)
+    ops = mill_ops.check_capacity_fields(daily_capacity_kg, working_days, truck_kg)
+    if not dates and weeks is None:
+        raise ServiceError("Give the campaign's start and end dates.")
+    _check_campaign_fields(target_kg_per_week, None if dates else weeks, name)
     camps = list_campaigns(store, settings)
     cid = campaign_id(settings, key)
     if any(c["id"] == cid for c in camps):
         cid = f"{key}-{hashlib.sha1(now_iso().encode() + str(len(camps)).encode()).hexdigest()[:6]}"
     doc = {"crop": key, "name": (name or "").strip() or None, "kind": None, "status": "idle",
-           "target_kg_per_week": round(target_kg_per_week), "weeks": int(weeks), "created_at": now_iso()}
+           "persona": dict(agent_profile.NEW_CAMPAIGN_PERSONA),  # English calls by default (Agent page to change)
+           "target_kg_per_week": round(target_kg_per_week), "created_at": now_iso(), **dates, **ops}
+    doc["weeks"] = campaign_weeks(settings, {**doc, "weeks": weeks})
     store.set("campaigns", cid, doc)
     if farmer_ids:
         set_campaign_farmers(store, settings, cid, add=farmer_ids)
@@ -419,17 +564,25 @@ def create_campaign(store: Store, settings: Settings, crop: str, target_kg_per_w
 
 
 def update_campaign(store: Store, settings: Settings, ref: str, name: str | None = None,
-                    target_kg_per_week: float | None = None, weeks: int | None = None) -> dict:
-    """Rename a campaign, or change its weekly target or weeks to plan. Fields left out stay as they are."""
+                    target_kg_per_week: float | None = None, weeks: int | None = None,
+                    start_date: str | None = None, end_date: str | None = None, daily_capacity_kg: float | None = None,
+                    working_days: int | None = None, truck_kg: float | None = None) -> dict:
+    """Rename a campaign, or change its weekly target or its dates (or weeks). Fields left out stay as they are."""
     camp = need_campaign(store, settings, ref)
+    from . import mill_ops
+
+    dates = _check_dates(settings, start_date, end_date)
     _check_campaign_fields(target_kg_per_week, weeks, name)
-    changes: dict = {"updated_at": now_iso()}
+    changes: dict = {"updated_at": now_iso(), **mill_ops.check_capacity_fields(daily_capacity_kg, working_days, truck_kg)}
     if name is not None:
         changes["name"] = name.strip() or None
     if target_kg_per_week is not None:
         changes["target_kg_per_week"] = round(target_kg_per_week)
     if weeks is not None:
-        changes["weeks"] = int(weeks)
+        changes.update(weeks=int(weeks), start_date=None, end_date=None)
+    if dates:
+        changes.update(dates)
+        changes["weeks"] = campaign_weeks(settings, dates)
     store.set("campaigns", camp["id"], changes, merge=True)
     recompute_forecast(store, settings)
     return {**camp, **changes}
@@ -497,12 +650,16 @@ def recompute_forecast(store: Store, settings: Settings) -> list[dict]:
     keep: set[str] = set()
     for camp in camps:
         crop = campaign_crop(settings, camp)
-        weeks = int(camp.get("weeks") or settings.weeks)
+        weeks = campaign_weeks(settings, camp)
         target = int(camp.get("target_kg_per_week") or settings.target_kg_per_week)
         mine = by_camp.get(camp["id"], {"harvests": [], "offers": []})
         harvests, offers = mine["harvests"], mine["offers"]
         crop_farmers = [f for f in farmer_list if farmer_campaign(settings, f, camps) == camp["id"]]
-        for row in fc.compute_forecast(harvests, offers, settings.plan_start, weeks, target, settings.gap_tolerance):
+        from . import mill_ops
+
+        computed = fc.compute_forecast(harvests, offers, settings.plan_start, weeks, target, settings.gap_tolerance)
+        computed = mill_ops.mark_surplus(camp, _before_start(settings, camp, computed))
+        for row in computed:
             row["crop"] = crop
             row["campaign_id"] = camp["id"]
             row["shortlist"] = (fc.shortlist(row["week"], crop_farmers, harvests, offers,
@@ -664,7 +821,7 @@ def create_offer(store: Store, settings: Settings, *, farmer: dict, crop: str, k
     if not camp:
         camp = resolve_campaign(store, settings, crop)
     camp = camp or {}
-    weeks = int(camp.get("weeks") or settings.weeks)
+    weeks = campaign_weeks(settings, camp)
     harvest = store.get("harvests", f"h-{farmer['id']}-{crop}")
     from_week = None
     harvest_id = None
@@ -737,14 +894,15 @@ def approval_impact(store: Store, settings: Settings, crop: str | None = None) -
     costs, and whether it opens a new gap somewhere else. Also the same for approving all of them together."""
     camp = need_campaign(store, settings, crop)
     crop = campaign_crop(settings, camp)
-    weeks = int(camp.get("weeks") or settings.weeks)
+    weeks = campaign_weeks(settings, camp)
     target = int(camp.get("target_kg_per_week") or settings.target_kg_per_week)
     harvests = campaign_records(store, settings, camp["id"], "harvests")
     offers = campaign_records(store, settings, camp["id"], "offers")
 
     def rows(approve_ids: set[str]) -> list[dict]:
         trial = [{**o, "status": "approved"} if o["id"] in approve_ids else o for o in offers]
-        return fc.compute_forecast(harvests, trial, settings.plan_start, weeks, target, settings.gap_tolerance)
+        return _before_start(settings, camp, fc.compute_forecast(harvests, trial, settings.plan_start, weeks, target,
+                                                                 settings.gap_tolerance))
 
     def compare(after: list[dict]) -> dict:
         changes = [{"label": a["label"], "before_kg": b["expected_kg"], "after_kg": a["expected_kg"],
@@ -839,6 +997,48 @@ def _open_call_for(store: Store, farmer_id: str, kind: str) -> bool:
                for c in store.list("calls"))
 
 
+# ---------- who to call (the "to call" stage) ----------
+# A harvest call asks a farmer for their next harvest. It is needed when the forecast has nothing current from them:
+# no harvest answer, an unsure one, or one whose harvest date has passed; or when the planner marked the farmer to
+# always call (to_call). A farmer with a firm, current answer is not called again. The dashboard shows the same reasons
+# (frontend crm.js); keep the two in step.
+CALL_REASONS = {
+    "no_answer": "No harvest answer yet",
+    "unsure": "Answer was unsure",
+    "date_passed": "Harvest date has passed",
+    "flagged": "Marked to call",
+}
+
+
+def call_reason(farmer: dict, harvest: dict | None, today: dt.date | None = None) -> str | None:
+    if farmer.get("type") == "supplier" or farmer.get("do_not_call"):
+        return None
+    today = today or dt.date.today()
+    if not harvest:
+        return "no_answer"
+    ready = _date(harvest.get("ready_date"))
+    if ready and ready < today and not harvest.get("every_days"):
+        return "date_passed"
+    if harvest.get("confidence") == "unsure":
+        return "unsure"
+    if farmer.get("to_call"):
+        return "flagged"
+    return None
+
+
+def call_list(store: Store, settings: Settings, members: list[dict], today: dt.date | None = None) -> dict[str, str]:
+    """The campaign's farmers who need a harvest call, with the reason for each."""
+    harvests = {h["farmer_id"]: h for h in store.list("harvests")}
+    # A harvest dated inside the planning weeks is current, even when the weeks are pinned to the past (PLAN_START).
+    cutoff = min(today or dt.date.today(), settings.plan_start)
+    out = {}
+    for f in members:
+        r = call_reason(f, harvests.get(f["id"]), cutoff)
+        if r:
+            out[f["id"]] = r
+    return out
+
+
 def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop: str | None = None,
                    channel: str = "browser") -> dict:
     """Queue the calls of one campaign (by id, or a crop's first campaign; the default campaign when none is named).
@@ -861,7 +1061,8 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
     recompute_forecast(store, settings)  # rows written before crops existed pick up their crop now
     gap = first_gap_week(store, camp["id"])
     if kind == "collect":
-        targets = [f for f in members if f.get("to_call")]
+        reasons = call_list(store, settings, members)
+        targets = [f for f in members if f["id"] in reasons]
         gap_week = gap["week"] if gap else None
     elif kind == "gap_fill":
         if not gap:
@@ -921,7 +1122,58 @@ def phone_calls_ready(settings: Settings) -> bool:
     return twilio_ready(settings) and settings.real_calls_enabled
 
 
-def phone_calls_note(settings: Settings) -> str:
+# ---------- the real-call allowlist ----------
+# A real call (and a real text) only goes to a number on the allowlist: REAL_CALL_ALLOWLIST on the server, plus the
+# numbers planners add in the dashboard (collection allowed_numbers, at most WEB_ALLOWLIST_MAX of them).
+
+def _number_id(e164: str) -> str:
+    return "n" + e164.lstrip("+")
+
+
+def allowed_numbers(store: Store | None, settings: Settings) -> set[str]:
+    nums = {n for n in settings.real_call_allowlist if n != "*"}
+    if store is not None:
+        nums |= {d["phone"] for d in store.list("allowed_numbers") if d.get("phone")}
+    return nums
+
+
+def number_allowed(store: Store | None, settings: Settings, e164: str) -> bool:
+    return "*" in settings.real_call_allowlist or e164 in allowed_numbers(store, settings)
+
+
+def allow_number(store: Store, settings: Settings, phone: str, label: str = "", farmer_id: str | None = None,
+                 actor=None) -> dict:
+    """Add a number to the real-call allowlist from the dashboard."""
+    if settings.web_allowlist_max <= 0:
+        raise ServiceError("Adding numbers from the dashboard is turned off (WEB_ALLOWLIST_MAX=0). "
+                           "Add them to REAL_CALL_ALLOWLIST on the server.")
+    e164 = normalize_phone(phone or "")
+    if not 8 <= len(e164) <= 16:
+        raise ServiceError(f"The phone number {phone!r} does not look right.")
+    nid = _number_id(e164)
+    old = store.get("allowed_numbers", nid)
+    mine = store.list("allowed_numbers")
+    if not old and len(mine) >= settings.web_allowlist_max:
+        raise ServiceError(f"The dashboard allowlist is full ({settings.web_allowlist_max} numbers). Remove one first, "
+                           "or raise WEB_ALLOWLIST_MAX on the server.")
+    if farmer_id and not store.get("farmers", farmer_id):
+        raise ServiceError("Farmer not found.")
+    if not farmer_id:  # link it to the farmer with this number, when there is one
+        farmer_id = next((f["id"] for f in store.list("farmers") if normalize_phone(f.get("phone") or "") == e164), None)
+    doc = {"phone": e164, "label": (label or "").strip()[:60] or None, "farmer_id": farmer_id,
+           "added_by": actor.name if actor else "Planner", "added_at": (old or {}).get("added_at") or now_iso()}
+    store.set("allowed_numbers", nid, doc)
+    return {"id": nid, **doc}
+
+
+def disallow_number(store: Store, number_id: str) -> dict:
+    if not store.get("allowed_numbers", number_id):
+        raise ServiceError("That number is not on the dashboard allowlist.", status=404)
+    store.delete("allowed_numbers", number_id)
+    return {"deleted": number_id}
+
+
+def phone_calls_note(settings: Settings, store: Store | None = None) -> str:
     """Why real phone calls are on or off, in words for the dashboard."""
     if not twilio_ready(settings):
         missing = [name for name, value in (("TWILIO_ACCOUNT_SID", settings.twilio_account_sid),
@@ -933,7 +1185,7 @@ def phone_calls_note(settings: Settings) -> str:
         return "Real phone calls are off: REAL_CALLS_ENABLED is not true."
     if "*" in settings.real_call_allowlist:
         return "Real phone calls are on, to any number."
-    n = len(settings.real_call_allowlist)
+    n = len(allowed_numbers(store, settings))
     return (f"Real phone calls are on, only to the {n} number{'s' if n != 1 else ''} on the allowlist."
             if n else "Real phone calls are on, but the allowlist is empty, so every number is refused.")
 
@@ -978,7 +1230,7 @@ def twilio_status(store: Store, settings: Settings, call_id: str, call_status: s
     return outcome
 
 
-def _dialable_number(settings: Settings, farmer: dict) -> str:
+def _dialable_number(store: Store, settings: Settings, farmer: dict) -> str:
     """The farmer's number in E.164, after the safety gate. Raises ServiceError with the reason."""
     if not twilio_ready(settings):
         raise ServiceError("Twilio is not configured (need TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, "
@@ -993,10 +1245,10 @@ def _dialable_number(settings: Settings, farmer: dict) -> str:
     # Stored/displayed as "+62 810 0000 1000" (seed_data._phone, and whatever a planner
     # types into the upload CSV) - Twilio's Calls API wants strict E.164, no separators.
     to_number = normalize_phone(phone)
-    if "*" not in settings.real_call_allowlist and to_number not in settings.real_call_allowlist:
-        raise ServiceError(f"{to_number} is not on the real-call allowlist (REAL_CALL_ALLOWLIST). "
-                           "This is a safety gate, not a bug - add the number there, or set it to "
-                           "\"*\" to allow any number (production).")
+    if not number_allowed(store, settings, to_number):
+        raise ServiceError(f"{to_number} is not on the real-call allowlist. This is a safety gate, not a bug: "
+                           "allow the number on the farmer's page or in Phone allowlist on the Farmers page "
+                           "(or in REAL_CALL_ALLOWLIST on the server).")
     return to_number
 
 
@@ -1028,9 +1280,9 @@ def dial_now(store: Store, settings: Settings, farmer_id: str, kind: str | None 
     farmer = store.get("farmers", farmer_id)
     if not farmer:
         if not twilio_ready(settings):
-            _dialable_number(settings, {})  # report the configuration problem first
+            _dialable_number(store, settings, {})  # report the configuration problem first
         raise ServiceError("Farmer not found.")
-    to_number = _dialable_number(settings, farmer)
+    to_number = _dialable_number(store, settings, farmer)
     if any(c["farmer_id"] == farmer_id and c.get("channel") == "twilio" and c["status"] == "on_call"
            for c in store.list("calls")):
         raise ServiceError("This farmer is on a phone call right now.")
@@ -1088,7 +1340,7 @@ def dial_next(store: Store, settings: Settings) -> str | None:
             try:
                 if not farmer:
                     raise ServiceError("Farmer not found.")
-                _place_twilio_call(store, settings, call["id"], _dialable_number(settings, farmer))
+                _place_twilio_call(store, settings, call["id"], _dialable_number(store, settings, farmer))
                 return call["id"]
             except ServiceError as e:
                 store.set("calls", call["id"], {"status": "dropped", "outcome": "skipped", "summary": f"Not dialled: {e}",
@@ -1144,7 +1396,7 @@ def finish_call(store: Store, settings: Settings, call_id: str, *, ended_cleanly
 
 # The languages a farmer can be called in. The agent speaks whatever the name says, so a typo here
 # would make it speak the wrong thing; the farmer form offers exactly this list.
-LANGUAGES = ("Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese", "Thai", "Vietnamese", "Filipino")
+LANGUAGES = agent_profile.LANGUAGES  # one list for the farmer form and the agent's languages
 LANGUAGE_ALIASES = {"indonesian": "Bahasa Indonesia", "indonesia": "Bahasa Indonesia",
                     "bahasa": "Bahasa Indonesia", "malay": "Bahasa Malaysia",
                     "malaysian": "Bahasa Malaysia", "bahasa melayu": "Bahasa Malaysia",
@@ -1180,10 +1432,13 @@ def _farmer_fields(row: dict) -> tuple[str, dict]:
         usual = max(0, int(float(row.get("usual_kg_week") or 0)))
     except ValueError:
         raise ServiceError("usual_kg_week must be a number.") from None
+    from . import mill_ops
+
     return digits, {
         "name": row["name"], "phone": row["phone"], "crop": crop,
         "language": language, "village": row.get("village", ""), "usual_kg_week": usual,
         "can_pull_forward": row.get("can_pull_forward", "").lower() in ("1", "yes", "true"),
+        **mill_ops.plot_fields(row),
     }
 
 
@@ -1218,6 +1473,9 @@ def update_farmer(store: Store, farmer_id: str, row: dict) -> dict:
     if not store.get("farmers", farmer_id):
         raise ServiceError("Farmer not found.")
     _, fields = _farmer_fields(row)
+    for keys in (("plot_lat", "plot_lng"), ("plot_ha",), ("certification",)):  # a field left empty clears it
+        if keys[0] in row and keys[0] not in fields:
+            fields.update({k: None for k in keys})
     store.set("farmers", farmer_id, fields, merge=True)
     return store.get("farmers", farmer_id)
 

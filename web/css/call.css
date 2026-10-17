@@ -129,3 +129,4 @@
 /* Inside the dashboard's Calls page (call.html?embed in an iframe). */
 .embed .call-page { min-height: 100vh; padding: 20px 16px; }
 .embed .back-link { display: none; }
+.embed .ai-badge { position: static; } /* inside the dashboard panel the disclosure scrolls with the page */

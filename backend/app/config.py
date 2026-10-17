@@ -81,6 +81,7 @@ class Settings:
     messaging_channel: str = "off"  # "sms" or "whatsapp" sends texts over Twilio; "off" only records them
     twilio_whatsapp_from: str | None = None  # the WhatsApp sender, when messaging_channel is "whatsapp"
     planner_alert_to: tuple[str, ...] = ()  # numbers that get the planner's alerts (gaps, waiting offers)
+    web_allowlist_max: int = 20  # numbers planners may add to the real-call allowlist from the dashboard; 0 turns it off
 
 
 def _load_dotenv(folders: tuple[Path, ...] | None = None) -> None:
@@ -150,6 +151,7 @@ def get_settings() -> Settings:
         twilio_whatsapp_from=os.environ.get("TWILIO_WHATSAPP_FROM") or None,
         planner_alert_to=tuple(normalize_phone(n) for n in (os.environ.get("PLANNER_ALERT_TO") or "").split(",")
                                if n.strip()),
+        web_allowlist_max=max(0, int(os.environ.get("WEB_ALLOWLIST_MAX") or "20")),
         twilio_account_sid=os.environ.get("TWILIO_ACCOUNT_SID") or None,
         twilio_auth_token=os.environ.get("TWILIO_AUTH_TOKEN") or None,
         twilio_from_number=os.environ.get("TWILIO_FROM_NUMBER") or None,

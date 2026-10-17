@@ -8,7 +8,7 @@ import datetime as dt
 from . import forecast as fc
 from .call_audio import recording_enabled
 from .config import Settings
-from .agent_profile import persona_rules, profile_of, questions_stage
+from .agent_profile import call_language, language_rule, persona_rules, profile_of, questions_stage, switch_languages
 from .rules_engine import crop_label, normalize_crop
 
 PERSONA = """\
@@ -16,9 +16,7 @@ You are a polite phone assistant calling on behalf of {mill}. You are an AI, and
 that you are a person.
 
 Voice rules:
-- Speak only {language}, in every sentence. Never slip into English, not even for prices, numbers, units \
-or the word "reference": say them in {language} too. If the farmer clearly prefers another language you can \
-speak well, switch to it completely.
+{language_rule}
 - Ask the consent question once, in your opening. When the farmer has answered it, never ask it again, \
 whatever they answered.
 - Short sentences. Ask one question at a time, then wait.
@@ -245,12 +243,12 @@ def build_system_instruction(settings: Settings, farmer: dict, kind: str, gap_we
                              harvest: dict | None = None, offer: dict | None = None,
                              today: dt.date | None = None, campaign: dict | None = None) -> str:
     today = today or dt.date.today()
-    language = farmer.get("language") or settings.demo_language
+    profile = profile_of(campaign)  # the campaign's persona (and its languages) and the planner's own questions
+    language = call_language(profile["persona"], farmer.get("language"), settings.demo_language)
     crop = crop_label(normalize_crop(farmer.get("crop") or settings.demo_crop))
     fmt = {"mill": settings.mill_name, "language": language, "name": farmer.get("name", "the farmer"),
-           "crop": crop}
+           "crop": crop, "language_rule": language_rule(language, switch_languages(profile["persona"], language))}
 
-    profile = profile_of(campaign)  # the campaign's persona and the planner's own questions
     agent = profile["persona"].get("name", "")
     notice = notice_for(language, settings.mill_name, fmt["name"], recording=recording_enabled(settings),
                         days=settings.call_audio_retention_days, agent=agent)

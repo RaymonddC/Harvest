@@ -128,6 +128,39 @@ def build_seed(plan_start: dt.date, language: str, crop: str = "palm",
     limits_doc = {**default_limits(crop).to_doc(),
                   "reference_source": "Illustrative. Replace with the published provincial FFB price and its date."}
     promises, deliveries = _history(plan_start, crop, [fid for fid in farmers if fid.startswith("b")][:40], rng)
+    # Mill operations, from their own random stream so the numbers above stay as they were.
+    ops = random.Random(rng_seed + 101)
+    late = []  # a late week with more fruit than the mill can press: the surplus to spread out
+    for i in range(14):
+        fid = f"x{i + 1:02d}"
+        add_farmer(fid, unique_name(), ops.choice(VILLAGES), 1800)
+        ready = week_start(5, plan_start) + dt.timedelta(days=ops.randint(0, 4))
+        harvests[f"h-{fid}-{crop}"] = {"farmer_id": fid, "crop": crop, "kg": ops.randrange(1600, 2401, 50),
+                                       "ready_date": ready.isoformat(), "confidence": "firm", "source": "previous_call"}
+        late.append(fid)
+    for n, (fid, f) in enumerate(sorted(farmers.items())):
+        if f["type"] == "supplier" or n % 7 == 6:  # about one in seven plots not mapped yet
+            continue
+        f.update(plot_lat=round(ops.uniform(0.25, 1.15), 5), plot_lng=round(ops.uniform(101.0, 102.1), 5),
+                 plot_ha=round(ops.uniform(1.2, 4.0), 1))
+        if n % 3 == 0:
+            f["certification"] = "ISPO"
+        elif n % 11 == 0:
+            f["certification"] = "RSPO"
+    if "b013" in farmers:  # delivers far more than a plot this size can grow: fruit bought from elsewhere?
+        farmers["b013"]["plot_ha"] = 0.1
+    reference = float(limits_doc["reference_price"])
+    for d in deliveries.values():
+        unripe, dirt = round(ops.uniform(0, 6), 1), round(ops.uniform(0, 3), 1)
+        pct = round(unripe + dirt, 1)
+        net = round(d["kg"] * (1 - pct / 100))
+        d.update(deductions={k: v for k, v in (("unripe", unripe), ("dirt", dirt)) if v}, deduction_pct=pct, net_kg=net,
+                 price_per_kg=reference, currency=limits_doc.get("currency", "IDR"), amount=round(net * reference),
+                 price_basis="reference price", offer_id=None, po_number=None)
+    official = {f"op-{crop}-riau-{(plan_start - dt.timedelta(days=12)).isoformat()}": {
+        "crop": crop, "province": "Riau", "valid_from": (plan_start - dt.timedelta(days=12)).isoformat(),
+        "price_per_kg": reference, "source": "Illustrative: replace with the published Disbun price", "url": None,
+        "added_by": "Seed"}}
     return {
         "farmers": farmers,
         "harvests": harvests,
@@ -135,7 +168,9 @@ def build_seed(plan_start: dt.date, language: str, crop: str = "palm",
         "deliveries": deliveries,
         "limits": {crop: limits_doc},
         "rival_quotes": rival_quotes,
-        "campaigns": {"current": {"status": "idle", "kind": None, "crop": crop, "target_kg_per_week": target_kg}},
+        "campaigns": {"current": {"status": "idle", "kind": None, "crop": crop, "target_kg_per_week": target_kg,
+                                  "daily_capacity_kg": 17_000, "working_days": 6, "truck_kg": 8_000}},
+        "official_prices": official,
     }
 
 
@@ -162,13 +197,97 @@ def _history(plan_start: dt.date, crop: str, farmer_ids: list[str], rng: random.
     return promises, deliveries
 
 
-def load_seed(store, settings) -> None:
-    from . import services
+# ---------- more campaigns for the demo: a second palm area and a rubber campaign ----------
+# Each has its own farmers (campaign_id set), harvests, four weeks of graded weighbridge history, a waiting offer,
+# and its own target, dates and mill capacity, so switching campaigns shows a different picture.
+KAMPAR_VILLAGES = ["Bangkinang", "Kuok", "Salo", "Air Tiris"]
+RUBBER_VILLAGES = ["Lubuk Jambi", "Baserah", "Cerenti", "Kari"]
+
+
+def _more_campaigns(plan_start: dt.date, language: str, rng_seed: int = 7) -> dict[str, dict[str, dict]]:
+    rng = random.Random(rng_seed + 202)
+    out: dict[str, dict[str, dict]] = {"farmers": {}, "harvests": {}, "promises": {}, "deliveries": {}, "limits": {},
+                                       "campaigns": {}, "offers": {}}
+    names = iter(f"{a} {b}." for b in "ABDEFHIKLMNPRSTWY" for a in ("Pak Hasan", "Bu Nur", "Pak Joni", "Bu Sri",
+                                                                    "Pak Udin", "Bu Wati", "Pak Rudi", "Bu Ina"))
+    phone = iter(range(5000, 9000, 31))
+    end = plan_start + dt.timedelta(days=7 * 6 - 1)
+
+    def campaign(cid, crop, name, target, cap, truck, ref, floor, ceil, villages, n, kg_range, weekly_shape, every):
+        out["campaigns"][cid] = {"crop": crop, "name": name, "status": "idle", "kind": None, "target_kg_per_week": target,
+                                 "start_date": (plan_start - dt.timedelta(days=7)).isoformat(), "end_date": end.isoformat(),
+                                 "weeks": 6, "daily_capacity_kg": cap, "working_days": 6, "truck_kg": truck,
+                                 "created_at": "2026-10-01T08:00:00+00:00"}
+        if crop != "palm":
+            out["limits"][crop] = {**Limits(crop=crop, floor=floor, ceiling=ceil, reference=ref, currency="IDR",
+                                            first_premium_pct=4.0, step_pct=2.0, increment=50.0).to_doc(),
+                                   "reference_source": "Illustrative. Replace with the published local price and its date."}
+        ids = []
+        for i in range(n):
+            fid = f"{cid[:1]}{cid[-1]}{i + 1:02d}"
+            out["farmers"][fid] = {"name": next(names), "phone": _phone(next(phone)), "language": language, "crop": crop,
+                                   "village": rng.choice(villages), "usual_kg_week": rng.randrange(*kg_range, 50),
+                                   "type": "farmer", "can_pull_forward": i % 3 == 0, "to_call": i % 2 == 0,
+                                   "campaign_id": cid, "plot_lat": round(rng.uniform(0.0, 0.6), 5),
+                                   "plot_lng": round(rng.uniform(101.0, 101.8), 5), "plot_ha": round(rng.uniform(1.0, 3.5), 1),
+                                   **({"certification": "ISPO"} if i % 4 == 0 else {})}
+            ids.append(fid)
+        # Harvests spread over the weeks with the campaign's shape (a short week shows as a gap).
+        for i, fid in enumerate(ids):
+            week = weekly_shape[i % len(weekly_shape)]
+            ready = week_start(week, plan_start) + dt.timedelta(days=rng.randint(0, 5))
+            out["harvests"][f"h-{fid}-{crop}"] = {"farmer_id": fid, "crop": crop, "kg": rng.randrange(*kg_range, 50),
+                                                  "ready_date": ready.isoformat(), "confidence": "unsure" if i % 7 == 3 else "firm",
+                                                  "source": "previous_call", "every_days": every}
+        promises, deliveries = _history(plan_start, crop, ids[: n // 2], rng)
+        for d in deliveries.values():
+            unripe, dirt = round(rng.uniform(0, 5), 1), round(rng.uniform(0, 3), 1)
+            pct = round(unripe + dirt, 1)
+            kg = round(d["kg"] * kg_range[1] / 2200 / 10) * 10 or d["kg"]
+            net = round(kg * (1 - pct / 100))
+            d.update(kg=kg, deductions={k: v for k, v in (("unripe", unripe), ("dirt", dirt)) if v}, deduction_pct=pct,
+                     net_kg=net, price_per_kg=ref, currency="IDR", amount=round(net * ref), price_basis="reference price",
+                     offer_id=None, po_number=None, farmer_name=out["farmers"][d["farmer_id"]]["name"])
+        for p in promises.values():
+            p["kg"] = round(p["kg"] * kg_range[1] / 2200 / 10) * 10 or p["kg"]
+        out["promises"].update(promises)
+        out["deliveries"].update(deliveries)
+        f = out["farmers"][ids[0]]
+        price = round(ref * 1.04 / 50) * 50
+        out["offers"][f"offer-{cid}-1"] = {
+            "campaign_id": cid, "farmer_id": ids[0], "farmer_name": f["name"], "village": f["village"], "kind": "farmer",
+            "crop": crop, "kg": kg_range[1], "price_per_kg": price, "reference_price": ref,
+            "premium_pct": round((price - ref) / ref * 100, 1), "currency": "IDR", "deliver_week": 2,
+            "deliver_week_start": week_start(2, plan_start).isoformat(), "from_week": None, "from_week_start": None,
+            "harvest_id": None, "status": "pending", "requested_price": None, "call_id": None, "source": "call",
+            "confirmed_by_voice": False, "created_at": "2026-10-16T09:00:00+00:00",
+            "negotiation": {"first_offer": price, "counter": None, "rung": 0}}
+        return ids
+
+    # Palm, Kampar: a smaller area; farmers harvest every 14 days and few start in week 2, so week 2 is short.
+    campaign("palm-kampar", "palm", "Palm, Kampar", 18_000, 4_000, 8_000, 3100.0, 2900.0, 3350.0, KAMPAR_VILLAGES, 24,
+             (900, 2200), [1] * 11 + [2] * 5 + [3] * 3 + [4] * 5, 14)
+    # Rubber: tappers sell slab rubber about every week; small loads, a factory taking 2.5 t a day.
+    campaign("rubber", "rubber", None, 12_000, 2_500, 4_000, 12_500.0, 11_500.0, 13_800.0, RUBBER_VILLAGES, 26,
+             (300, 800), [1, 1, 1, 1, 1, 2], 7)
+    return out
+
+
+def load_seed(store, settings, more_campaigns: bool = True, english_agent: bool = True) -> None:
+    """english_agent: the demo campaigns' agent calls in English (switching to the farmer's language when they answer
+    in it). The tests keep the agent on each farmer's own language (Bahasa Indonesia), as they were written for."""
+    from . import agent_profile, services
 
     data = build_seed(settings.plan_start, settings.demo_language, settings.demo_crop,
                       settings.target_kg_per_week)
+    if more_campaigns and settings.multi_crop:
+        for coll, docs in _more_campaigns(settings.plan_start, settings.demo_language).items():
+            data.setdefault(coll, {}).update(docs)
+    if english_agent:
+        for camp in data.get("campaigns", {}).values():
+            camp.setdefault("persona", dict(agent_profile.NEW_CAMPAIGN_PERSONA))
     for coll in ("farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes",
-                 "campaigns", "promises", "deliveries", "messages"):
+                 "campaigns", "promises", "deliveries", "messages", "official_prices"):
         store.clear(coll)
     for coll, docs in data.items():
         for doc_id, doc in docs.items():

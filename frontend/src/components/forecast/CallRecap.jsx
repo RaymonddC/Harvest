@@ -1,7 +1,7 @@
 import * as RDialog from "@radix-ui/react-dialog";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, apiUrl, callChip, can, fmtT, getSession, KIND_WORD, plainPrice } from "../../lib.js";
+import { api, apiUrl, callChip, callPoUrl, can, fmtT, getSession, KIND_WORD, plainPrice } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
 import { useConfirm } from "../../dialogs.jsx";
 import { useLive } from "../../live.jsx";
@@ -137,6 +137,12 @@ export default function CallRecap({ call, onClose }) {
                 </ul>
                 {offer && ["pending", "escalated"].includes(offer.status) && (
                   <Link className="btn solid" to="/approvals" onClick={onClose}><Icon name="approvals" size={16} />Review this offer</Link>
+                )}
+                {(offer?.status === "approved" || harvest) && (
+                  <div className="po-line">
+                    <a className="btn" href={apiUrl(callPoUrl(c.id))} download>{offer?.status === "approved" ? "Purchase order (PDF)" : "Draft purchase order (PDF)"}</a>
+                    <span className="small muted">{offer?.status === "approved" ? "The approved deal, ready to sign." : "At today's reference price, until a deal is approved."}</span>
+                  </div>
                 )}
               </section>
 

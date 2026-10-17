@@ -23,7 +23,7 @@ from typing import Any, Awaitable, Callable, Protocol
 from fastapi import WebSocket
 from google.genai import types
 
-from . import forecast as fc
+from . import agent_profile, forecast as fc
 from . import services
 from .config import Settings
 from .call_audio import CallRecorder, make_audio_store
@@ -45,9 +45,14 @@ LANGUAGE_CODES = {"bahasa indonesia": "id-ID", "indonesian": "id-ID", "bahasa ma
                   "thai": "th-TH", "vietnamese": "vi-VN", "filipino": "fil-PH", "tagalog": "fil-PH"}
 
 
-def stt_language_codes(language: str | None) -> list[str] | None:
-    code = LANGUAGE_CODES.get((language or "").strip().lower())
-    return [code] if code else None
+def stt_language_codes(language: str | None, also: list[str] | None = None) -> list[str] | None:
+    """The start language first, then the ones the agent may switch to (so a mixed call is transcribed right)."""
+    codes = []
+    for lang in [language, *(also or [])]:
+        code = LANGUAGE_CODES.get((lang or "").strip().lower())
+        if code and code not in codes:
+            codes.append(code)
+    return codes or None
 WRAP_UP_NUDGE = ("(The call is close to its time limit. Summarise what was agreed, call end_call, "
                  "then say goodbye.)")
 
@@ -145,8 +150,9 @@ class Transcript:
 
 
 def build_live_config(settings: Settings, system_instruction: str,
-                      language: str | None = None, hint_language: bool = True) -> types.LiveConnectConfig:
-    codes = stt_language_codes(language) if hint_language else None
+                      language: str | None = None, hint_language: bool = True,
+                      also: list[str] | None = None) -> types.LiveConnectConfig:
+    codes = stt_language_codes(language, also) if hint_language else None
     return types.LiveConnectConfig(
         response_modalities=["AUDIO"],
         system_instruction=system_instruction,
@@ -292,7 +298,14 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                                            harvest=harvest, offer=offer, campaign=campaign)
     store.set("calls", call_id, {"status": "on_call", "started_at": services.now_iso()}, merge=True)
     connect = connect or default_connect
-    language = (farmer.get("language") or settings.demo_language or "").lower()
+    # The call's language from the campaign's agent settings (each farmer's own, or one for every call), and the
+    # ones the agent may switch to.
+    persona = ((campaign or {}).get("persona") or {})
+    call_lang = agent_profile.call_language(persona, farmer.get("language"), settings.demo_language)
+    # Speech recognition gets the extra languages only when the planner picked them: a hint with every language
+    # would bring back the mis-heard short answers the hint is there to prevent.
+    also = (persona.get("also_speaks") or None) if persona.get("switch", True) is not False else None
+    language = (call_lang or "").lower()
     target = settings.caption_translate_to
     if target and target.lower() in language:
         target = None  # captions are already in the target language
@@ -336,11 +349,11 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
 
     try:
         async with contextlib.AsyncExitStack() as stack:
-            hinted = build_live_config(settings, instruction, language)
-            plain = build_live_config(settings, instruction, language, hint_language=False) if stt_language_codes(language) else None
+            hinted = build_live_config(settings, instruction, language, also=also)
+            plain = build_live_config(settings, instruction, language, hint_language=False) if stt_language_codes(language, also) else None
             live = await open_live(stack, connect, settings.live_model, hinted, plain)
             await send({"type": "connected", "farmer": farmer.get("name"), "village": farmer.get("village"),
-                        "language": farmer.get("language"), "kind": call["kind"],
+                        "language": call_lang, "kind": call["kind"],
                         "mill": settings.mill_name, "gap_week": call.get("gap_week")})
             await live.send_client_content(
                 turns=types.Content(role="user", parts=[types.Part(text=KICKOFF)]), turn_complete=True)

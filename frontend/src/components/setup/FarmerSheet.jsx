@@ -1,10 +1,12 @@
 import * as RDialog from "@radix-ui/react-dialog";
 import { useEffect, useState } from "react";
-import { api, callChip, can, cropLabel, fmtKg, KIND_WORD, maskPhone, plainPrice } from "../../lib.js";
+import { allowedEntry, api, apiUrl, callChip, can, cropLabel, fmtKg, KIND_WORD, maskPhone, numberAllowed, offerPoUrl, plainPrice } from "../../lib.js";
 import { useConfirm } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar, Pill } from "../../ui.jsx";
 import CallRecap from "../forecast/CallRecap.jsx";
+import { campaignsOf, farmerCampaign } from "../../campaigns.jsx";
+import { crmOf, REASONS, STAGES } from "../../crm.js";
 
 const day = (iso, opts = { day: "numeric", month: "short" }) => (iso ? new Date(iso.length === 10 ? iso + "T00:00:00" : iso).toLocaleDateString("en-GB", opts) : "");
 const when = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
@@ -116,15 +118,19 @@ function DeliveryBox({ farmer, stateKey }) {
   const confirm = useConfirm();
   const [rec, setRec] = useState(null);
   const [tick, setTick] = useState(0);
-  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), kg: "" });
+  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), kg: "", unripe: "", dirt: "" });
+  const pctIn = (k) => (e) => setForm({ ...form, [k]: e.target.value.replace(/[^0-9.]/g, "") });
+  const net = Number(form.kg) * (1 - (Number(form.unripe || 0) + Number(form.dirt || 0)) / 100);
   useEffect(() => {
     let live = true;
     api(`/api/farmers/${farmer.id}/track-record`, { method: "GET" }).then((r) => { if (live) setRec(r); }).catch(() => {});
     return () => { live = false; };
   }, [farmer.id, stateKey, tick]);
   const add = async () => {
-    const r = await act(() => api("/api/deliveries", { body: { farmer_id: farmer.id, kg: Number(form.kg), date: form.date } }), "Delivery recorded.");
-    if (r) { setForm({ ...form, kg: "" }); setTick((n) => n + 1); }
+    const r = await act(() => api("/api/deliveries", { body: { farmer_id: farmer.id, kg: Number(form.kg), date: form.date,
+      unripe_pct: form.unripe ? Number(form.unripe) : null, dirt_pct: form.dirt ? Number(form.dirt) : null } }),
+      (d) => `Delivery recorded: ${fmtKg(d.net_kg)} kg net${d.po_number ? `, paid at ${d.po_number}` : ""}.`);
+    if (r) { setForm({ ...form, kg: "", unripe: "", dirt: "" }); setTick((n) => n + 1); }
   };
   const remove = async (d) => {
     if (await confirm({ title: "Remove this delivery?", body: `${fmtKg(d.kg)} kg on ${day(d.date)}.`, confirm: "Remove", danger: true })) {
@@ -147,10 +153,13 @@ function DeliveryBox({ farmer, stateKey }) {
         </ul>
       )}
       {can("farmers.manage") && (
-        <div className="grid3" style={{ alignItems: "end", marginTop: 8 }}>
+        <div className="delivery-form">
           <label className="field">Delivered on<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
-          <label className="field">Kg<input type="text" inputMode="numeric" className="num-input" value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value.replace(/[^0-9]/g, "") })} /></label>
+          <label className="field">Gross kg<input type="text" inputMode="numeric" className="num-input" value={form.kg} onChange={(e) => setForm({ ...form, kg: e.target.value.replace(/[^0-9]/g, "") })} /></label>
+          <label className="field">Unripe %<input type="text" inputMode="decimal" className="num-input" placeholder="0" value={form.unripe} onChange={pctIn("unripe")} /></label>
+          <label className="field">Dirt %<input type="text" inputMode="decimal" className="num-input" placeholder="0" value={form.dirt} onChange={pctIn("dirt")} /></label>
           <ActButton className="btn sm leaf" busy="Saving…" disabled={!(Number(form.kg) > 0)} run={add}>Add delivery</ActButton>
+          {Number(form.kg) > 0 && <span className="small muted">{fmtKg(Math.round(net))} kg net after grading</span>}
         </div>
       )}
       {rec.deliveries.length > 0 && (
@@ -158,7 +167,9 @@ function DeliveryBox({ farmer, stateKey }) {
           <summary>All deliveries ({rec.deliveries.length})</summary>
           <ul className="fs-list">
             {rec.deliveries.map((d) => (
-              <li key={d.id} className="row"><span className="name">{day(d.date)} · {fmtKg(d.kg)} kg · {d.recorded_by}</span>
+              <li key={d.id} className="row"><span className="name">{day(d.date)} · {fmtKg(d.kg)} kg{d.deduction_pct ? ` − ${d.deduction_pct}% = ${fmtKg(d.net_kg)} kg net` : ""}
+                {d.amount != null && <small className="muted"> · {plainPrice(d.amount, d.currency || "IDR")}{d.po_number ? ` (${d.po_number})` : " (reference price)"}</small>}</span>
+                <a className="btn sm ghost" href={apiUrl(`/api/deliveries/${d.id}/receipt.pdf`)} download>Receipt</a>
                 {can("farmers.manage") && <button type="button" className="btn sm ghost" onClick={() => remove(d)}>Remove</button>}</li>
             ))}
           </ul>
@@ -166,6 +177,52 @@ function DeliveryBox({ farmer, stateKey }) {
       )}
     </div>
   );
+}
+
+// Whether real phone calls may reach this farmer's number, with Allow or Remove (the allowlist).
+function PhoneAllow({ f, state }) {
+  const act = useAct();
+  if (!state?.settings?.phone_calls) return null;
+  const allowed = numberAllowed(state, f.phone);
+  const entry = allowedEntry(state, f.phone);
+  return (
+    <span className="phone-allow">
+      <Pill cls={allowed ? "mint" : ""}>{allowed ? "Real phone calls allowed" : "Real phone calls not allowed"}</Pill>
+      {!allowed && can("campaign.run") && (
+        <ActButton className="btn sm" busy="Allowing…" run={() => act(() => api("/api/allowed-numbers", { body: { phone: f.phone, label: f.name, farmer_id: f.id } }), `${f.name}'s number can now be called.`)}>Allow</ActButton>
+      )}
+      {entry && can("campaign.run") && (
+        <ActButton className="btn sm ghost" busy="Removing…" run={() => act(() => api(`/api/allowed-numbers/${entry.id}`, { method: "DELETE" }), "Number removed from the allowlist.")}>Remove</ActButton>
+      )}
+      {allowed && !entry && <span className="small muted">set on the server</span>}
+    </span>
+  );
+}
+
+// The farmer's history as one timeline, newest first (a CRM contact's activity): calls, harvest answers and edits,
+// offers and decisions, deliveries and texts.
+function activityOf(state, f) {
+  const out = [];
+  const when = (iso) => (iso ? new Date(iso) : null);
+  for (const c of state.calls.filter((x) => x.farmer_id === f.id)) {
+    const t = c.ended_at || c.started_at || c.created_at;
+    const what = c.status === "queued" ? "Call waiting" : c.status === "on_call" ? "On a call now"
+      : `${({ collect: "Harvest call", gap_fill: "Gap-fill call", confirm: "Confirmation call" })[c.kind] || "Call"}: ${(c.outcome || c.status || "").replace(/_/g, " ")}`;
+    out.push({ t, kind: "call", what, detail: c.summary || "", call: c });
+  }
+  const h = state.harvests.find((x) => x.farmer_id === f.id);
+  if (h) {
+    out.push({ t: h.updated_at || null, kind: "harvest", what: `${h.source === "call" ? "Harvest given on a call" : h.edited_by ? `Harvest edited by ${h.edited_by}` : "Harvest on record"}: ${fmtKg(h.kg)} kg ready ${h.ready_date}`,
+      detail: [h.confidence === "unsure" ? "unsure" : "firm", h.every_days ? `every ${h.every_days} days` : "", h.rescheduled_from ? `moved from ${h.rescheduled_from}` : ""].filter(Boolean).join(" · ") });
+  }
+  for (const o of state.offers.filter((x) => x.farmer_id === f.id)) {
+    out.push({ t: o.created_at, kind: "offer", what: `Offer: ${fmtKg(o.kg)} kg at ${plainPrice(o.price_per_kg, o.currency || "IDR")}/kg`, detail: o.deliver_week_start ? `for the week of ${o.deliver_week_start}` : "" });
+    if (o.decided_at) out.push({ t: o.decided_at, kind: o.status === "approved" ? "deal" : "offer", what: `Offer ${o.status} by ${o.decided_by || "Planner"}`, detail: o.delivered_kg ? `${fmtKg(o.delivered_kg)} kg delivered so far` : "" });
+  }
+  for (const m of (state.messages || []).filter((x) => x.farmer_id === f.id)) {
+    out.push({ t: m.created_at, kind: "message", what: `Text (${(m.kind || "").replace(/_/g, " ")}): ${m.status === "sent" ? "sent" : "recorded, not sent"}`, detail: m.body || "" });
+  }
+  return out.filter((x) => x.t).sort((a, b) => when(b.t) - when(a.t));
 }
 
 // Everything about one farmer in one place: profile, next harvest (editable), every call (opens the recap),
@@ -179,6 +236,9 @@ export default function FarmerSheet({ farmer, state, onClose }) {
   const offers = f && state ? state.offers.filter((o) => o.farmer_id === f.id)
     .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")) : [];
   const answers = calls.flatMap((c) => Object.entries(c.answers || {}).map(([qid, a]) => ({ call: c, qid, a })));
+  const cid = f && state ? farmerCampaign(f, campaignsOf(state)) : null;
+  const crm = f && state && cid ? crmOf(state, cid).byId.get(f.id) : null;
+  const activity = f && state ? activityOf(state, f) : [];
 
   return (
     <RDialog.Root open={!!farmer} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -192,10 +252,45 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                 <RDialog.Title className="sheet-title">{f.name}</RDialog.Title>
                 <span className="sub">{[f.village, cropLabel(f.crop), f.language, maskPhone(f.phone)].filter(Boolean).join(" · ")}</span>
                 {f.do_not_call && <Pill cls="">Asked not to be called</Pill>}
+                <PhoneAllow f={f} state={state} />
+                <span className="plot-line small">
+                  {f.plot_lat != null && f.plot_lng != null
+                    ? <>Plot <a href={`https://www.google.com/maps?q=${f.plot_lat},${f.plot_lng}`} target="_blank" rel="noopener">{f.plot_lat}, {f.plot_lng}</a>{f.plot_ha ? ` · ${f.plot_ha} ha` : ""}</>
+                    : <span className="muted">Plot not mapped (needed for traceability)</span>}
+                  {f.certification && <> · <b>{f.certification}</b></>}
+                </span>
               </div>
               <RDialog.Close className="sheet-x" aria-label="Close"><span aria-hidden="true">×</span></RDialog.Close>
             </header>
             <div className="sheet-body">
+              {crm && (
+                <div className={`next-action st-${crm.stage}`}>
+                  <span className={`stage-chip st-${crm.stage}`}>{STAGES.find((s) => s.key === crm.stage)?.label}</span>
+                  <span>{crm.reason ? <><b>Next:</b> harvest call. {REASONS[crm.reason]}.</>
+                    : crm.stage === "offer" ? <><b>Next:</b> approve or reject the offer on Approvals.</>
+                    : crm.stage === "deal" ? <><b>Next:</b> the delivery at the weighbridge (purchase order sent).</>
+                    : crm.stage === "calling" ? <><b>Now:</b> the agent is calling.</>
+                    : <><b>Nothing to do:</b> a firm, current harvest is on record.</>}</span>
+                </div>
+              )}
+              <section aria-labelledby="fs-activity">
+                <h3 id="fs-activity">Activity <span className="sub">({activity.length})</span></h3>
+                {activity.length ? (
+                  <ol className="timeline">
+                    {activity.slice(0, 12).map((a, i) => (
+                      <li key={i} className={`tl-${a.kind}`}>
+                        <i aria-hidden="true" />
+                        <div>
+                          {a.call ? <button type="button" className="linkish" onClick={() => setShownCall(a.call)}><b>{a.what}</b></button> : <b>{a.what}</b>}
+                          {a.detail && <small>{a.detail}</small>}
+                          <time dateTime={a.t}>{new Date(a.t).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</time>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : <p className="muted">Nothing yet. The first harvest call starts the history.</p>}
+              </section>
+
               <section aria-labelledby="fs-harvest">
                 <h3 id="fs-harvest">Next harvest</h3>
                 <HarvestBox farmer={f} harvest={harvest} />
@@ -233,6 +328,7 @@ export default function FarmerSheet({ farmer, state, onClose }) {
                       <li key={o.id} className="row">
                         <span className="name">{fmtKg(o.kg)} kg to week {o.deliver_week} at {plainPrice(o.price_per_kg, o.currency || "IDR")}/kg</span>
                         <Pill cls={o.status === "approved" ? "mint" : o.status === "pending" ? "amber" : ""}>{{ pending: "Waiting for you", escalated: "Above the ceiling", approved: o.confirmed_by_voice ? "Approved · confirmed" : "Approved", rejected: "Rejected" }[o.status] || o.status}</Pill>
+                        {o.status === "approved" && <a className="btn sm ghost" href={apiUrl(offerPoUrl(o.id))} download>Purchase order</a>}
                       </li>
                     ))}
                   </ul>

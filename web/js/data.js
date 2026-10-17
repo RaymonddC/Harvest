@@ -6,7 +6,7 @@
 export const cfg = Object.assign({ apiBase: "", firebase: null, millName: "the cooperative" },
   window.HARVEST_CONFIG || {});
 
-const COLLECTIONS = ["farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns", "messages"];
+const COLLECTIONS = ["farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes", "campaigns", "messages", "allowed_numbers", "official_prices"];
 
 export function apiUrl(path) {
   return (cfg.apiBase || "").replace(/\/$/, "") + path;
@@ -239,6 +239,7 @@ export const ICON_PATHS = {
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   calls: '<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>',
   agent: '<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><path d="M9 13h.01M15 13h.01"/>',
+  overview: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
 };
 export function icon(name, size = 18) {

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { campaignsOf } from "../../campaigns.jsx";
-import { api } from "../../lib.js";
+import { api, can } from "../../lib.js";
 import { useLive } from "../../live.jsx";
 import { useAct } from "../../toast.jsx";
 import { Dialog, DialogClose, SubmitButton } from "../../ui.jsx";
 
 const LANGUAGES = ["Bahasa Indonesia", "Bahasa Malaysia", "English", "Javanese", "Sundanese", "Thai", "Vietnamese", "Filipino"];
-const EMPTY = { name: "", phone: "", crop: "palm", language: "Bahasa Indonesia", village: "", usual_kg_week: "", can_pull_forward: false, campaign_id: "" };
+const EMPTY = { name: "", phone: "", crop: "palm", language: "Bahasa Indonesia", village: "", usual_kg_week: "", can_pull_forward: false, campaign_id: "", allow_calls: false,
+  plot_lat: "", plot_lng: "", plot_ha: "", certification: "" };
 
 // Add a farmer (farmer = {}, or { crop, campaign_id } to start in a campaign) or edit one (farmer = the record);
 // null keeps it closed. Moving an existing farmer between campaigns is done on the Farmers or Campaign page.
@@ -21,6 +22,7 @@ export default function FarmerForm({ farmer, onClose }) {
       name: farmer.name || "", phone: farmer.phone || "", crop: farmer.crop || "palm",
       language: farmer.language || "Bahasa Indonesia", village: farmer.village || "",
       usual_kg_week: farmer.usual_kg_week || "", can_pull_forward: !!farmer.can_pull_forward,
+      plot_lat: farmer.plot_lat ?? "", plot_lng: farmer.plot_lng ?? "", plot_ha: farmer.plot_ha ?? "", certification: farmer.certification || "",
     } : { ...EMPTY, crop: farmer.crop || EMPTY.crop, campaign_id: farmer.campaign_id || "" });
   }, [farmer, editing]);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value });
@@ -30,8 +32,9 @@ export default function FarmerForm({ farmer, onClose }) {
   const [saving, setSaving] = useState(false);
   const save = async (e) => {
     e.preventDefault();
-    const body = { ...f, usual_kg_week: f.usual_kg_week ? Number(f.usual_kg_week) : null };
-    if (editing) delete body.campaign_id;
+    const body = { ...f, usual_kg_week: f.usual_kg_week ? Number(f.usual_kg_week) : null,
+      plot_lat: String(f.plot_lat ?? ""), plot_lng: String(f.plot_lng ?? ""), plot_ha: String(f.plot_ha ?? "") };
+    if (editing) { delete body.campaign_id; delete body.allow_calls; }
     setSaving(true);
     await act(() => (editing ? api(`/api/farmers/${farmer.id}`, { method: "PUT", body }) : api("/api/farmers", { body })),
       () => { onClose(); return editing ? "Farmer saved." : "Farmer added."; });
@@ -64,6 +67,26 @@ export default function FarmerForm({ farmer, onClose }) {
           <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
             <input type="checkbox" checked={f.can_pull_forward} onChange={set("can_pull_forward")} /> Can bring the harvest forward
           </label>
+          {!editing && state?.settings?.phone_calls && can("campaign.run") && !state.settings.allow_any_number && (
+            <label className="field" style={{ flexDirection: "row", gap: 8, alignItems: "center", fontWeight: 400 }}>
+              <input type="checkbox" checked={f.allow_calls} onChange={set("allow_calls")} /> Allow real phone calls to this number (adds it to the allowlist)
+            </label>
+          )}
+          <fieldset className="plot-fields">
+            <legend>Plot, for traceability <small className="muted">(optional)</small></legend>
+            <div className="grid3">
+              <label className="field">Latitude<input type="text" inputMode="decimal" placeholder="0.5123" value={f.plot_lat} onChange={set("plot_lat")} /></label>
+              <label className="field">Longitude<input type="text" inputMode="decimal" placeholder="101.4472" value={f.plot_lng} onChange={set("plot_lng")} /></label>
+              <label className="field">Area, ha<input type="text" inputMode="decimal" value={f.plot_ha} onChange={set("plot_ha")} /></label>
+            </div>
+            <label className="field">Certification
+              <select value={f.certification} onChange={set("certification")}>
+                <option value="">None</option><option>ISPO</option><option>RSPO</option><option>ISPO and RSPO</option>
+                {f.certification && !["ISPO", "RSPO", "ISPO and RSPO"].includes(f.certification) && <option>{f.certification}</option>}
+              </select>
+            </label>
+            <p className="sub" style={{ margin: 0 }}>Buyers (EU deforestation rules, RSPO, ISPO) ask where each delivery was grown. The plot's middle point is enough to start.</p>
+          </fieldset>
           <p className="sub" style={{ margin: "-4px 0 0" }}>When a week is short of supply, the agent may ask this farmer to harvest a week or two earlier to fill it. Leave it off if their crop cannot be picked early.</p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
