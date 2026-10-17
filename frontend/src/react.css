@@ -1194,6 +1194,5 @@ table.answers tr:focus-visible td { background: var(--leaf-soft); outline: none;
   background: linear-gradient(180deg, rgba(15, 61, 42, .85) 0%, rgba(15, 61, 42, 0) 22%, rgba(15, 61, 42, 0) 38%, rgba(15, 61, 42, .92) 66%, #0F3D2A 100%); }
 .login-story > :not(.ls-scene) { position: relative; z-index: 1; }
 @media (max-width: 860px) {
-  .login-story { min-height: 260px; }
-  .login-story::after { background: linear-gradient(180deg, rgba(15, 61, 42, .8) 0%, rgba(15, 61, 42, .25) 40%, rgba(15, 61, 42, .9) 100%); }
+  .ls-scene, .login-story::after { display: none; } /* a short header strip: no 3D picture */
 }

@@ -21,20 +21,22 @@ function returnTo(next) {
   return ["/", "/setup", "/approvals", "/users"].includes(next) ? next : "/";
 }
 
-// A 3D palm plantation seen from above: calls arc out from the mill and each farm lights up when its farmer
-// answers (components/PlantationScene.js, Three.js, loaded only here). Still with "reduce motion"; left out when the
-// browser has no WebGL (the panel keeps its plain colour).
+// A 3D phone playing a call on its screen: ringing, the conversation (lines from the recorded sample call), then
+// the harvest it saved (components/PhoneScene.js, Three.js, loaded only here). Still with "reduce motion"; left out
+// when the browser has no WebGL, and on narrow screens, where the panel is a short header strip.
+const NARROW = "(max-width: 860px)";
 function Field() {
   const ref = useRef(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState(() => window.matchMedia(NARROW).matches);
   useEffect(() => {
+    if (failed) return undefined;
     let stop = null, alive = true;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    import("../components/PlantationScene.js")
-      .then(({ startPlantation }) => { if (alive && ref.current) stop = startPlantation(ref.current, { still }); })
+    import("../components/PhoneScene.js")
+      .then(({ startPhone }) => { if (alive && ref.current) stop = startPhone(ref.current, { still }); })
       .catch(() => setFailed(true));
     return () => { alive = false; stop?.(); };
-  }, []);
+  }, [failed]);
   if (failed) return null;
   return <canvas ref={ref} className="ls-scene" aria-hidden="true" />;
 }
