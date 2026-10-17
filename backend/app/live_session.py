@@ -393,9 +393,12 @@ async def run_call(channel: Channel, store: Store, settings: Settings, call_id: 
                             continue
                         if sc.interrupted:
                             log.info("call %s: agent interrupted by the farmer's side (after_end=%s)", call_id, session.ended)
-                            if recorder:
-                                recorder.interrupted()
-                            await send({"type": "interrupted"})
+                            # Once end_call was called the goodbye is let finish: a "yes" or a cough from the farmer must not
+                            # clear the audio that is still playing, or the voice stops in the middle of the last sentence.
+                            if not session.ended:
+                                if recorder:
+                                    recorder.interrupted()
+                                await send({"type": "interrupted"})
                         if sc.model_turn:
                             for part in sc.model_turn.parts or []:
                                 if part.inline_data and part.inline_data.data:
