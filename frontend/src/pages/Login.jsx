@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import SignInForm from "../components/SignInForm.jsx";
 import { campaignsOf, inCampaign } from "../campaigns.jsx";
-import { cfg, getSession, OLD_URLS, roleLabel } from "../lib.js";
+import { getSession, OLD_URLS, roleLabel } from "../lib.js";
 import { useLive } from "../live.jsx";
 import { Icon } from "../ui.jsx";
 
@@ -85,7 +85,6 @@ export default function Login() {
             <div><dt>This week</dt><dd>{gap ? `Week ${gap.week} short` : "On track"}</dd></div>
           </motion.dl>
         )}
-        <p className="ls-foot">{cfg.millName} · synthetic data</p>
       </section>
 
       <section className="login-pick" aria-labelledby="login-title">

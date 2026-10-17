@@ -1,8 +1,8 @@
 import * as THREE from "three";
 
 // The sign-in page's picture: a phone floating in the panel, playing a call on its screen. It rings ("Calling Pak
-// Wahyu"), connects, shows the conversation line by line (the recorded sample call's lines, in English), then the
-// result the system saved; then it starts again. Soft rings spread
+// Wahyu"), connects, and plays a short harvest call line by line (what the agent asks, how it reads the answer
+// back), then the result the system saved; then it starts again. An illustration in English, not a recording. Soft rings spread
 // behind it while the call is on. Plain Three.js, loaded only on this page.
 //
 // startPhone(canvas, { still }) returns a stop() function that removes everything it added.
@@ -13,13 +13,14 @@ const FONT = '"Plus Jakarta Sans", system-ui, sans-serif';
 const C = { bg: "#0E1512", bar: "#16201B", agent: "#16774E", farmer: "#22302A", text: "#FFFFFF", sub: "#B9C2BD",
   en: "#9FD9BC", mint: "#7FE0B4", card: "#EAF6EF", cardText: "#0F3D2A" };
 
-// The recorded sample call (web/samples/gap-fill.json), in English: the agent's opening and lines 1, 3, 4, 5.
+// One harvest call, start to finish: the AI says who it is, asks, reads the answer back, and saves it.
 const LINES = [
-  { who: "agent", text: "Hello, this is an AI assistant calling for Koperasi Sawit Maju." },
-  { who: "farmer", text: "Yes, that's right. That's fine." },
-  { who: "farmer", text: "About 1,600 kilos." },
-  { who: "agent", text: "I've noted 1,600 kg for the first week of November. Is that right?" },
-  { who: "farmer", text: "Yes, correct." },
+  { who: "agent", text: "Hi Pak Wahyu, this is the AI assistant for Koperasi Sawit Maju. Is now a good time?" },
+  { who: "farmer", text: "Yes, go ahead." },
+  { who: "agent", text: "When is your next harvest, and about how much?" },
+  { who: "farmer", text: "Around 1,600 kilos, on the 14th." },
+  { who: "agent", text: "So 1,600 kg on Saturday 14 November. Is that right?" },
+  { who: "farmer", text: "Yes, that's right." },
 ];
 
 // The call as a timeline (seconds): ringing, then each line, then the saved card, then a pause.
@@ -154,11 +155,11 @@ export function startPhone(canvas, { still = false } = {}) {
       roundRect(30, H - 250, W - 60, 210, 26, C.card);
       ctx.fillStyle = C.cardText;
       ctx.font = `800 30px ${FONT}`;
-      ctx.fillText("✓  Harvest saved", 60, H - 186);
+      ctx.fillText("✓  Added to the forecast", 60, H - 186);
       ctx.font = `700 40px ${FONT}`;
-      ctx.fillText("1,600 kg · week 1 Nov", 60, H - 128);
+      ctx.fillText("1,600 kg on 14 Nov", 60, H - 128);
       ctx.font = `600 24px ${FONT}`;
-      ctx.fillText("Firm · read back and confirmed", 60, H - 82);
+      ctx.fillText("Confirmed by Pak Wahyu", 60, H - 82);
       ctx.globalAlpha = 1;
       y = H - 280;
     }
