@@ -3,9 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Logo from "../components/Logo.jsx";
 import SignInForm from "../components/SignInForm.jsx";
-import { campaignsOf, inCampaign } from "../campaigns.jsx";
 import { api, getSession, OLD_URLS, roleLabel, signIn } from "../lib.js";
-import { useLive } from "../live.jsx";
 import { Icon, Spinner } from "../ui.jsx";
 
 const ROLE_ICON = { planner: "forecast", coordinator: "setup", viewer: "eye", farmer: "phone" };
@@ -72,11 +70,10 @@ function Field({ brandRef, cardRef }) {
 const rise = (i) => ({ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 },
   transition: { duration: 0.45, delay: 0.08 * i, ease: [0.2, 0.8, 0.2, 1] } });
 
-// Left: what Harvest-Call is, with a few live figures. Right: the sign-in form.
+// Left: what Harvest-Call is, over the 3D phone. Right: who is signing in.
 export default function Login() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { state } = useLive();
   const current = getSession();
   const brandRef = useRef(null);
   const cardRef = useRef(null);
@@ -123,13 +120,6 @@ export default function Login() {
     }
   };
 
-  // The main campaign's figures (the forecast holds every campaign's weeks; counting them all said "17 weeks").
-  const camp = campaignsOf(state)[0];
-  const rows = state && camp ? inCampaign(state, state.forecast, camp.id).sort((a, b) => a.week - b.week) : [];
-  const farmers = state && camp ? inCampaign(state, state.farmers, camp.id).filter((f) => f.type !== "supplier").length : null;
-  const weeks = rows.length;
-  const gap = rows.find((r) => r.is_gap);
-
   return (
     <main className="login-split">
       <section className="login-story" aria-label="About Harvest-Call">
@@ -142,13 +132,6 @@ export default function Login() {
             {STEPS.map((s, i) => <motion.li key={s} {...rise(i + 1)}><span className="ls-n">{i + 1}</span>{s}</motion.li>)}
           </ol>
         </div>
-        {state && (
-          <motion.dl className="ls-facts" {...rise(4)}>
-            <div><dt>Farmers</dt><dd className="num">{farmers}</dd></div>
-            <div><dt>Forecast</dt><dd className="num">{weeks} weeks</dd></div>
-            <div><dt>This week</dt><dd>{gap ? `Week ${gap.week} short` : "On track"}</dd></div>
-          </motion.dl>
-        )}
         </div>
       </section>
 
