@@ -1012,3 +1012,66 @@ body.app .side .week-card a.wc-item:hover small { color: #CFE3D8; }
 .tbd.compact .tbd-rows li { grid-template-columns: 84px 1fr; }
 .tbd.compact .tbd-track { height: 18px; }
 @media (max-width: 640px) { .tbd-rows li { grid-template-columns: 70px 1fr; } .tbd-tip { min-width: 0; width: 100%; } }
+
+/* ---------- CRM: pipeline board, stages, the chart's links to farmers and the calendar ---------- */
+.tbd-rows li { grid-template-columns: 112px 1fr 24px; }
+.tbd.compact .tbd-rows li { grid-template-columns: 104px 1fr 24px; }
+.tbd-dates { font-weight: 600; color: var(--muted); font-size: 11.5px; }
+.tbd-cal { color: var(--muted); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; }
+.tbd-cal:hover { color: var(--leaf-deep); background: var(--leaf-soft); }
+.tbd-rows li { position: relative; }
+.tbd-tipwrap { display: contents; }
+.tbd-rows .tbd-tip { left: 112px; top: calc(100% + 4px); }
+.seg-btn { display: block; height: 100%; min-width: 2px; border: 0; padding: 0; cursor: pointer; }
+.tbd-bar .seg-btn:first-child { border-radius: 4px 0 0 4px; }
+.tbd-bar .seg-btn:last-child { border-radius: 0 4px 4px 0; }
+.tbd-bar .seg-btn:only-child { border-radius: 4px; }
+.seg-btn:hover, .seg-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; position: relative; z-index: 1; }
+.tip-hint { color: var(--on-ink-muted, #B9C2BD); font-style: italic; }
+@media (max-width: 640px) { .tbd-rows li, .tbd.compact .tbd-rows li { grid-template-columns: 78px 1fr 24px; } }
+.pipeline { gap: 12px; }
+.who-calls { font-size: 13.5px; color: var(--muted); }
+.who-calls summary { cursor: pointer; font-weight: 700; color: var(--leaf-deep); }
+.who-calls p { margin: 6px 0 0; max-width: 900px; }
+.pipe-filter { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px; background: var(--leaf-soft); font-size: 13.5px; }
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(170px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.board .col { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 12px; background: var(--fill, #F4F6F4); min-height: 120px; border-top: 3px solid var(--line-strong); }
+.board .col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.col-head { display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; }
+.count-pill { min-width: 24px; padding: 1px 8px; border-radius: 999px; background: var(--surface); font-size: 12px; font-weight: 800; text-align: center; }
+.col-hint { font-size: 11.5px; color: var(--muted); margin-top: -4px; }
+.pcard { width: 100%; display: flex; gap: 8px; align-items: center; padding: 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface);
+  font: inherit; text-align: left; cursor: pointer; }
+.pcard:hover { border-color: var(--leaf); }
+.pcard span { display: flex; flex-direction: column; min-width: 0; }
+.pcard b { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcard small { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.col-more { align-self: flex-start; }
+.st-to_call { border-top-color: var(--amber) !important; }
+.st-calling { border-top-color: #3C8FD0 !important; }
+.st-no_reply { border-top-color: #C2410C !important; }
+.st-answered { border-top-color: var(--leaf) !important; }
+.st-offer { border-top-color: #8A5605 !important; }
+.st-deal { border-top-color: #0F3D2A !important; }
+.st-delivered { border-top-color: #6B7280 !important; }
+.stage-chip { display: inline-flex; flex-direction: column; padding: 3px 8px; border-radius: 8px; background: var(--fill, #F4F6F4); font-size: 12.5px; font-weight: 700;
+  border-left: 3px solid var(--line-strong); border-top: 0 !important; }
+.stage-chip small { font-weight: 500; color: var(--muted); font-size: 11.5px; }
+.stage-chip.st-to_call { border-left-color: var(--amber); } .stage-chip.st-calling { border-left-color: #3C8FD0; }
+.stage-chip.st-no_reply { border-left-color: #C2410C; } .stage-chip.st-answered { border-left-color: var(--leaf); }
+.stage-chip.st-offer { border-left-color: #8A5605; } .stage-chip.st-deal { border-left-color: #0F3D2A; } .stage-chip.st-delivered { border-left-color: #6B7280; }
+.embedded-list { display: flex; flex-direction: column; }
+
+/* The farmer's page as a CRM record: stage and next action, then the activity timeline. */
+.next-action { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: var(--fill, #F4F6F4); font-size: 13.5px; }
+.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.timeline li { display: grid; grid-template-columns: 14px 1fr; gap: 10px; position: relative; padding-bottom: 12px; }
+.timeline li::before { content: ""; position: absolute; left: 6px; top: 14px; bottom: 0; width: 2px; background: var(--line); }
+.timeline li:last-child::before { display: none; }
+.timeline li > i { width: 12px; height: 12px; border-radius: 50%; margin-top: 3px; background: var(--line-strong); box-shadow: 0 0 0 2px var(--surface); position: relative; z-index: 1; }
+.timeline .tl-call > i { background: #3C8FD0; } .timeline .tl-harvest > i { background: var(--leaf); }
+.timeline .tl-offer > i { background: #B97507; } .timeline .tl-deal > i { background: #0F3D2A; } .timeline .tl-message > i { background: #C86FA0; }
+.timeline li > div { display: flex; flex-direction: column; gap: 1px; font-size: 13px; }
+.timeline small { color: var(--muted); }
+.timeline time { color: var(--faint); font-size: 11.5px; }
+.linkish { border: 0; background: none; padding: 0; font: inherit; text-align: left; color: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); }

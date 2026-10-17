@@ -637,9 +637,13 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.delete("/api/deliveries/{delivery_id}", dependencies=[Depends(need("farmers.manage"))])
     def delete_delivery(delivery_id: str):
-        if not store.get("deliveries", delivery_id):
+        d = store.get("deliveries", delivery_id)
+        if not d:
             raise HTTPException(404, "Delivery not found.")
         store.delete("deliveries", delivery_id)
+        if d.get("offer_id") and store.get("offers", d["offer_id"]):
+            o = store.get("offers", d["offer_id"])
+            store.set("offers", d["offer_id"], {"delivered_kg": max(round(float(o.get("delivered_kg") or 0) - float(d.get("net_kg", d.get("kg", 0)))), 0)}, merge=True)
         return {"deleted": delivery_id}
 
     @app.get("/api/answers.csv")

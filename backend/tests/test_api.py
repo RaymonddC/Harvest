@@ -44,7 +44,7 @@ def test_limits_validation(client, store):
 
 def test_campaign_queues_calls(client, store):
     r = client.post("/api/campaign/start", json={"kind": "collect"}).json()
-    assert r["queued"] == 12 and r["gap_week"] == 3
+    assert r["queued"] == 18 and r["gap_week"] == 3  # 12 with no harvest answer, 6 whose answer was unsure
     assert client.post("/api/campaign/start", json={"kind": "collect"}).json()["queued"] == 0
     gap = client.post("/api/campaign/start", json={"kind": "gap_fill"}).json()
     assert gap["queued"] == 16  # fifteen pull-forward farmers and the rival supplier
@@ -687,7 +687,7 @@ def test_phone_campaign_dials_one_farmer_at_a_time_and_skips_refused_numbers(sto
     fake = _FakeTwilio()
     monkeypatch.setattr("twilio.rest.Client", fake.Client)
     monkeypatch.setattr(services, "_after_phone_call", services.dial_next)  # run the next dial inline
-    to_call = sorted(f["id"] for f in store.list("farmers") if f.get("to_call"))
+    to_call = sorted(services.call_list(store, settings, services.campaign_members(store, settings, "current")))
     allowed = tuple(normalize_phone(store.get("farmers", fid)["phone"]) for fid in to_call[1:3])
     s = twilio_settings(settings, real_calls_enabled=True, real_call_allowlist=allowed)
 

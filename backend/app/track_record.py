@@ -165,6 +165,10 @@ def record_delivery(store: Store, settings: Settings, farmer_id: str, kg: float,
            "date": day.isoformat(), "week_start": week.isoformat(), "source": source,
            "recorded_by": recorded_by or "Planner", "recorded_at": _now()}
     did = store.add("deliveries", doc)
+    if order.get("offer_id"):  # the deal knows how much of it has arrived (the dashboard reads offers live)
+        o = store.get("offers", order["offer_id"]) or {}
+        store.set("offers", order["offer_id"], {"delivered_kg": round(float(o.get("delivered_kg") or 0) + net),
+                                                "last_delivery": day.isoformat()}, merge=True)
     return {**doc, "id": did}
 
 

@@ -5,6 +5,8 @@ import { useConfirm } from "../../dialogs.jsx";
 import { useAct } from "../../toast.jsx";
 import { ActButton, Avatar, Pill } from "../../ui.jsx";
 import CallRecap from "../forecast/CallRecap.jsx";
+import { campaignsOf, farmerCampaign } from "../../campaigns.jsx";
+import { crmOf, REASONS, STAGES } from "../../crm.js";
 
 const day = (iso, opts = { day: "numeric", month: "short" }) => (iso ? new Date(iso.length === 10 ? iso + "T00:00:00" : iso).toLocaleDateString("en-GB", opts) : "");
 const when = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
@@ -197,6 +199,32 @@ function PhoneAllow({ f, state }) {
   );
 }
 
+// The farmer's history as one timeline, newest first (a CRM contact's activity): calls, harvest answers and edits,
+// offers and decisions, deliveries and texts.
+function activityOf(state, f) {
+  const out = [];
+  const when = (iso) => (iso ? new Date(iso) : null);
+  for (const c of state.calls.filter((x) => x.farmer_id === f.id)) {
+    const t = c.ended_at || c.started_at || c.created_at;
+    const what = c.status === "queued" ? "Call waiting" : c.status === "on_call" ? "On a call now"
+      : `${({ collect: "Harvest call", gap_fill: "Gap-fill call", confirm: "Confirmation call" })[c.kind] || "Call"}: ${(c.outcome || c.status || "").replace(/_/g, " ")}`;
+    out.push({ t, kind: "call", what, detail: c.summary || "", call: c });
+  }
+  const h = state.harvests.find((x) => x.farmer_id === f.id);
+  if (h) {
+    out.push({ t: h.updated_at || null, kind: "harvest", what: `${h.source === "call" ? "Harvest given on a call" : h.edited_by ? `Harvest edited by ${h.edited_by}` : "Harvest on record"}: ${fmtKg(h.kg)} kg ready ${h.ready_date}`,
+      detail: [h.confidence === "unsure" ? "unsure" : "firm", h.every_days ? `every ${h.every_days} days` : "", h.rescheduled_from ? `moved from ${h.rescheduled_from}` : ""].filter(Boolean).join(" · ") });
+  }
+  for (const o of state.offers.filter((x) => x.farmer_id === f.id)) {
+    out.push({ t: o.created_at, kind: "offer", what: `Offer: ${fmtKg(o.kg)} kg at ${plainPrice(o.price_per_kg, o.currency || "IDR")}/kg`, detail: o.deliver_week_start ? `for the week of ${o.deliver_week_start}` : "" });
+    if (o.decided_at) out.push({ t: o.decided_at, kind: o.status === "approved" ? "deal" : "offer", what: `Offer ${o.status} by ${o.decided_by || "Planner"}`, detail: o.delivered_kg ? `${fmtKg(o.delivered_kg)} kg delivered so far` : "" });
+  }
+  for (const m of (state.messages || []).filter((x) => x.farmer_id === f.id)) {
+    out.push({ t: m.created_at, kind: "message", what: `Text (${(m.kind || "").replace(/_/g, " ")}): ${m.status === "sent" ? "sent" : "recorded, not sent"}`, detail: m.body || "" });
+  }
+  return out.filter((x) => x.t).sort((a, b) => when(b.t) - when(a.t));
+}
+
 // Everything about one farmer in one place: profile, next harvest (editable), every call (opens the recap),
 // offers and answers to the planner's questions (editable).
 export default function FarmerSheet({ farmer, state, onClose }) {
@@ -208,6 +236,9 @@ export default function FarmerSheet({ farmer, state, onClose }) {
   const offers = f && state ? state.offers.filter((o) => o.farmer_id === f.id)
     .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")) : [];
   const answers = calls.flatMap((c) => Object.entries(c.answers || {}).map(([qid, a]) => ({ call: c, qid, a })));
+  const cid = f && state ? farmerCampaign(f, campaignsOf(state)) : null;
+  const crm = f && state && cid ? crmOf(state, cid).byId.get(f.id) : null;
+  const activity = f && state ? activityOf(state, f) : [];
 
   return (
     <RDialog.Root open={!!farmer} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -232,6 +263,34 @@ export default function FarmerSheet({ farmer, state, onClose }) {
               <RDialog.Close className="sheet-x" aria-label="Close"><span aria-hidden="true">×</span></RDialog.Close>
             </header>
             <div className="sheet-body">
+              {crm && (
+                <div className={`next-action st-${crm.stage}`}>
+                  <span className={`stage-chip st-${crm.stage}`}>{STAGES.find((s) => s.key === crm.stage)?.label}</span>
+                  <span>{crm.reason ? <><b>Next:</b> harvest call. {REASONS[crm.reason]}.</>
+                    : crm.stage === "offer" ? <><b>Next:</b> approve or reject the offer on Approvals.</>
+                    : crm.stage === "deal" ? <><b>Next:</b> the delivery at the weighbridge (purchase order sent).</>
+                    : crm.stage === "calling" ? <><b>Now:</b> the agent is calling.</>
+                    : <><b>Nothing to do:</b> a firm, current harvest is on record.</>}</span>
+                </div>
+              )}
+              <section aria-labelledby="fs-activity">
+                <h3 id="fs-activity">Activity <span className="sub">({activity.length})</span></h3>
+                {activity.length ? (
+                  <ol className="timeline">
+                    {activity.slice(0, 12).map((a, i) => (
+                      <li key={i} className={`tl-${a.kind}`}>
+                        <i aria-hidden="true" />
+                        <div>
+                          {a.call ? <button type="button" className="linkish" onClick={() => setShownCall(a.call)}><b>{a.what}</b></button> : <b>{a.what}</b>}
+                          {a.detail && <small>{a.detail}</small>}
+                          <time dateTime={a.t}>{new Date(a.t).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</time>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : <p className="muted">Nothing yet. The first harvest call starts the history.</p>}
+              </section>
+
               <section aria-labelledby="fs-harvest">
                 <h3 id="fs-harvest">Next harvest</h3>
                 <HarvestBox farmer={f} harvest={harvest} />

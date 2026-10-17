@@ -225,5 +225,13 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     and "Rubber" with their own farmers, history and a waiting offer (`load_seed(..., more_campaigns=True)`; tests use
     the single-campaign demo).
 
+22. **Farmers as a CRM pipeline (17 Oct, same branch).** Who gets a harvest call is a rule now (`services.call_reason`,
+    mirrored in `frontend/src/crm.js`): no harvest answer, an unsure answer, a harvest date that has passed, or marked to
+    call (`to_call` is the planner's "always call"). Farmers with a firm, current answer are not called. Each farmer has
+    a stage (To call, Calling, No answer, Answered, Offer, Deal, Delivered) shown as a board or a list on the Campaign
+    page; the farmer page opens with the stage and next action and an activity timeline. The target chart shows each
+    week's dates, links to the calendar (`/calendar?date=`), and a click on a part lists the farmers behind it. Deals
+    carry `delivered_kg`. Not built yet: follow-up tasks with due dates, an owner per farmer.
+
 Test note: `tests/test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` fails on
 Python 3.13 because `audioop` was removed. Skip it when `audioop` is missing.

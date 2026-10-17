@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useCrop } from "../campaigns.jsx";
 import { api, fmtKg, fmtT, KIND_WORD } from "../lib.js";
 import { useLive } from "../live.jsx";
@@ -55,11 +56,13 @@ const cls = (e) => (e.type.startsWith("campaign_") ? "campaign" : e.type === "ca
 export default function Calendar() {
   const { state } = useLive();
   const { cid, campaign } = useCrop();
-  const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const [params] = useSearchParams();
+  const asked = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") || "") ? new Date(`${params.get("date")}T00:00:00`) : null;
+  const [month, setMonth] = useState(() => { const d = asked || new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [scope, setScope] = useState("one"); // "one": the picked campaign, "all": every campaign
   const [shownTypes, setShownTypes] = useState(() => new Set(TYPES.map((t) => t.key)));
   const [data, setData] = useState(null);
-  const [day, setDay] = useState(() => iso(new Date()));
+  const [day, setDay] = useState(() => iso(asked || new Date()));
   const [error, setError] = useState("");
 
   const gridStart = mondayOf(month);

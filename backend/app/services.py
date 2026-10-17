@@ -996,6 +996,48 @@ def _open_call_for(store: Store, farmer_id: str, kind: str) -> bool:
                for c in store.list("calls"))
 
 
+# ---------- who to call (the "to call" stage) ----------
+# A harvest call asks a farmer for their next harvest. It is needed when the forecast has nothing current from them:
+# no harvest answer, an unsure one, or one whose harvest date has passed; or when the planner marked the farmer to
+# always call (to_call). A farmer with a firm, current answer is not called again. The dashboard shows the same reasons
+# (frontend crm.js); keep the two in step.
+CALL_REASONS = {
+    "no_answer": "No harvest answer yet",
+    "unsure": "Answer was unsure",
+    "date_passed": "Harvest date has passed",
+    "flagged": "Marked to call",
+}
+
+
+def call_reason(farmer: dict, harvest: dict | None, today: dt.date | None = None) -> str | None:
+    if farmer.get("type") == "supplier" or farmer.get("do_not_call"):
+        return None
+    today = today or dt.date.today()
+    if not harvest:
+        return "no_answer"
+    ready = _date(harvest.get("ready_date"))
+    if ready and ready < today and not harvest.get("every_days"):
+        return "date_passed"
+    if harvest.get("confidence") == "unsure":
+        return "unsure"
+    if farmer.get("to_call"):
+        return "flagged"
+    return None
+
+
+def call_list(store: Store, settings: Settings, members: list[dict], today: dt.date | None = None) -> dict[str, str]:
+    """The campaign's farmers who need a harvest call, with the reason for each."""
+    harvests = {h["farmer_id"]: h for h in store.list("harvests")}
+    # A harvest dated inside the planning weeks is current, even when the weeks are pinned to the past (PLAN_START).
+    cutoff = min(today or dt.date.today(), settings.plan_start)
+    out = {}
+    for f in members:
+        r = call_reason(f, harvests.get(f["id"]), cutoff)
+        if r:
+            out[f["id"]] = r
+    return out
+
+
 def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop: str | None = None,
                    channel: str = "browser") -> dict:
     """Queue the calls of one campaign (by id, or a crop's first campaign; the default campaign when none is named).
@@ -1018,7 +1060,8 @@ def start_campaign(store: Store, settings: Settings, kind: str = "collect", crop
     recompute_forecast(store, settings)  # rows written before crops existed pick up their crop now
     gap = first_gap_week(store, camp["id"])
     if kind == "collect":
-        targets = [f for f in members if f.get("to_call")]
+        reasons = call_list(store, settings, members)
+        targets = [f for f in members if f["id"] in reasons]
         gap_week = gap["week"] if gap else None
     elif kind == "gap_fill":
         if not gap:

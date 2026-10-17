@@ -62,7 +62,7 @@ export default function Forecast() {
           </motion.div>
         )}
       </AnimatePresence>
-      <Kpis rows={rows} calls={campaignCalls} toCall={view ? view.farmers.filter((f) => f.to_call).length : 0} />
+      <Kpis rows={rows} calls={campaignCalls} toCall={state ? unknownSupply(state, cid).toCall.length : 0} />
       {state && rows.length > 0 && (
         <section className="card" aria-labelledby="stand-title">
           <div className="card-head"><h2 id="stand-title">Where each week's target stands</h2></div>

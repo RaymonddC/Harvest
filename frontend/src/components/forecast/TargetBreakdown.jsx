@@ -1,5 +1,12 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { fmtT } from "../../lib.js";
+
+const span = (ws) => {
+  const a = new Date(`${ws}T00:00:00`); const b = new Date(a); b.setDate(b.getDate() + 6);
+  const f = (d, m) => d.toLocaleDateString("en-GB", m ? { day: "numeric", month: "short" } : { day: "numeric" });
+  return a.getMonth() === b.getMonth() ? `${f(a)}–${f(b, true)}` : `${f(a, true)} – ${f(b, true)}`;
+};
 
 // Where each week's target stands, as one stacked bar per week (part of a whole):
 //   Already there    answers saved (firm, unsure at half, projected rounds) and approved deals
@@ -25,7 +32,7 @@ export function breakdown(rows, unknownKg) {
   });
 }
 
-export default function TargetBreakdown({ rows, unknownKg, compact = false }) {
+export default function TargetBreakdown({ rows, unknownKg, compact = false, onPick }) {
   const [table, setTable] = useState(false);
   const [hover, setHover] = useState(null);
   const data = breakdown(rows, unknownKg);
@@ -67,17 +74,25 @@ export default function TargetBreakdown({ rows, unknownKg, compact = false }) {
             <li key={d.id} className={`${d.before_start ? "before" : ""} ${hover === d.id ? "on" : ""}`}
               tabIndex={0} onMouseEnter={() => setHover(d.id)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(d.id)} onBlur={() => setHover(null)}
               aria-label={`${d.label}: ${fmtT(d.there)} t there, ${fmtT(d.waiting)} t waiting, ${fmtT(d.unknown)} t not answered, ${fmtT(d.missing)} t still to add, target ${fmtT(d.target_kg)} t`}>
-              <span className="tbd-label"><b>{d.label}</b><small>{d.before_start ? "not started" : d.missing ? `${fmtT(d.missing)} t to add` : d.over ? `${fmtT(d.over)} t over` : d.there >= d.target_kg ? "covered" : "covered once farmers answer"}</small></span>
+              <span className="tbd-label"><b>{d.label} <span className="tbd-dates">{span(d.week_start)}</span></b><small>{d.before_start ? "not started" : d.missing ? `${fmtT(d.missing)} t to add` : d.over ? `${fmtT(d.over)} t over` : d.there >= d.target_kg ? "covered" : "covered once farmers answer"}</small></span>
               <div className="tbd-track">
                 <div className="tbd-bar">
-                  {PARTS.map((p) => d[p.key] > 0 && <i key={p.key} className={p.cls} style={{ width: pct(d[p.key]) }} />)}
+                  {PARTS.map((p) => d[p.key] > 0 && (onPick
+                    ? <button key={p.key} type="button" className={`seg-btn ${p.cls}`} style={{ width: pct(d[p.key]) }} aria-label={`${p.label} in ${d.label}: show the farmers`} onClick={() => onPick(d, p.key)} />
+                    : <i key={p.key} className={p.cls} style={{ width: pct(d[p.key]) }} />))}
                 </div>
                 <i className="tbd-target" style={{ left: pct(d.target_kg) }} />
+              </div>
+              <Link className="tbd-cal" to={`/calendar?date=${d.week_start}`} aria-label={`${d.label} in the calendar`} title="Open this week in the calendar">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+              </Link>
+              <div className="tbd-tipwrap">
                 {hover === d.id && (
                   <div className="tbd-tip" role="tooltip">
                     <b>{d.label} · target {fmtT(d.target_kg)} t</b>
                     {PARTS.map((p) => <span key={p.key}><i className={p.cls} />{p.label}<b>{fmtT(d[p.key])} t</b></span>)}
                     {d.over > 0 && <span className="over">Over the target by {fmtT(d.over)} t</span>}
+                    {onPick && <span className="tip-hint">Click a part to see its farmers</span>}
                   </div>
                 )}
               </div>

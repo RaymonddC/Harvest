@@ -3,10 +3,11 @@ import { Link, useLocation } from "react-router-dom";
 import { campaignFor, cropName, inCampaign, useCrop } from "../campaigns.jsx";
 import Campaigns from "../components/setup/Campaigns.jsx";
 import FarmerForm from "../components/setup/FarmerForm.jsx";
-import FarmerList from "../components/setup/FarmerList.jsx";
 import FarmerSheet from "../components/setup/FarmerSheet.jsx";
 import FarmersStep from "../components/setup/FarmersStep.jsx";
 import NeedPanel from "../components/setup/NeedPanel.jsx";
+import FarmerPipeline from "../components/setup/FarmerPipeline.jsx";
+import { toCallOf } from "../crm.js";
 import PriceRange from "../components/setup/PriceRange.jsx";
 import StartCalling from "../components/setup/StartCalling.jsx";
 import { api } from "../lib.js";
@@ -21,14 +22,15 @@ export default function Setup() {
   const act = useAct();
   const [farmerForm, setFarmerForm] = useState(null); // {} to add, a farmer to edit, null when closed
   const [openFarmer, setOpenFarmer] = useState(null); // the farmer whose page is open
+  const [chartFilter, setChartFilter] = useState(null); // { ids: Set, label } from a click on the chart above
   const { cid, crop } = useCrop();
   const { hash } = useLocation();
   // Links to /setup#need (the sidebar's To do list) open at the mill's need.
   useEffect(() => { if (hash === "#need" && state) document.getElementById("need")?.scrollIntoView({ block: "start" }); }, [hash, !!state]); // eslint-disable-line react-hooks/exhaustive-deps
   const campaign = state ? campaignFor(state, cid) : {};
   const farmers = state ? inCampaign(state, state.farmers, cid).filter((f) => f.type !== "supplier")
-    .sort((a, b) => Number(!!b.to_call) - Number(!!a.to_call) || a.id.localeCompare(b.id)) : [];
-  const toCall = farmers.filter((f) => f.to_call).length;
+    .sort((a, b) => a.id.localeCompare(b.id)) : [];
+  const toCall = state ? toCallOf(state, cid).toCall.length : 0;
   const l = state ? state.limits.find((x) => (x.crop || x.id) === crop) || null : null; // none yet for a new crop: the form starts blank
 
   const head = (
@@ -43,7 +45,7 @@ export default function Setup() {
   return (
     <Shell title="Campaign" head={head}>
       {state && <Campaigns state={state} />}
-      {state && campaign.id && <NeedPanel state={state} cid={cid} campaign={campaign} />}
+      {state && campaign.id && <NeedPanel state={state} cid={cid} campaign={campaign} onPick={(f) => { setChartFilter(f); setTimeout(() => document.getElementById("farmer-list")?.scrollIntoView({ block: "start", behavior: "smooth" }), 50); }} />}
       {/* "linked": on a wide screen a line joins each step to the next, green once the step is done. */}
       <div className="steps linked">
         <FarmersStep farmers={farmers} toCall={toCall} cid={cid} crop={crop} onAdd={() => setFarmerForm({ crop, campaign_id: cid })} />
@@ -51,8 +53,8 @@ export default function Setup() {
         {state ? <StartCalling state={state} toCall={toCall} /> : <section className="card dark"><div className="stats" id="campaign-lines" /></section>}
       </div>
       {state && (
-        <FarmerList farmers={farmers} onEdit={setFarmerForm} onOpen={setOpenFarmer} cid={cid}
-          title={`Farmers in ${campaign.label || cropName(crop)}`}
+        <FarmerPipeline state={state} cid={cid} onEdit={setFarmerForm} onOpen={setOpenFarmer}
+          title={`Farmers in ${campaign.label || cropName(crop)}`} filter={chartFilter} onClearFilter={() => setChartFilter(null)}
           empty={<>No farmers in this campaign yet. Use <b>Add from database</b> above, or the <Link to="/farmers">Farmers</Link> page.</>} />
       )}
       <FarmerSheet farmer={openFarmer} state={state} onClose={() => setOpenFarmer(null)} />

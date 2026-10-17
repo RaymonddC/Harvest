@@ -79,7 +79,7 @@ def test_weeks_roll_forward_and_offers_keep_their_calendar_week(store, settings)
 def test_weekly_job_snapshots_promises_and_starts_weekly_campaigns(store, settings):
     services.set_weekly_schedule(store, settings, "palm", True, "browser")
     r = services.weekly_job(store, settings)
-    assert r["started"] == [{"crop": "palm", "campaign_id": "current", "queued": 12, "channel": "browser"}]
+    assert r["started"] == [{"crop": "palm", "campaign_id": "current", "queued": 18, "channel": "browser"}]
     again = services.weekly_job(store, settings)
     assert again["started"] == [] and again["skipped"][0]["why"] == "already calling"
     with pytest.raises(services.ServiceError):

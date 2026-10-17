@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { campaignsOf, CROPS, cropName, multiCrop, useCrop, useMembership } from "../../campaigns.jsx";
+import { toCallOf } from "../../crm.js";
 import { useConfirm } from "../../dialogs.jsx";
 import { api, can, fmtT } from "../../lib.js";
 import { useAct } from "../../toast.jsx";
@@ -26,7 +27,7 @@ export default function Campaigns({ state }) {
       <div className="camp-list" role="group" aria-label="Pick a campaign">
         {campaigns.map((c) => {
           const farmers = state.farmers.filter((f) => f.type !== "supplier" && ofFarmer(f) === c.id);
-          const toCall = farmers.filter((f) => f.to_call).length;
+          const toCall = toCallOf(state, c.id).toCall.length;
           const s = statusOf(c);
           const picked = c.id === cid;
           return (

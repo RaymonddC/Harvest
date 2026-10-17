@@ -47,8 +47,8 @@ export default function FarmersStep({ farmers, toCall, onAdd, cid, crop }) {
         <span className="big">{farmers.length ? `${farmers.length} farmers in this campaign` : "No farmers yet"}</span>
         <span className="sub">{farmers.length
           ? (unknown.unknown.length
-            ? <>{toCall} to call · <a href="#need">{unknown.unknown.length} have not given their harvest yet (about {fmtT(unknown.usualKg)} t a week)</a></>
-            : <>{toCall} to call · <a href="#need">all have given their next harvest</a></>)
+            ? <><a href="#farmer-list">{toCall} need a harvest call</a> · {unknown.unknown.length} with no current answer (about {fmtT(unknown.usualKg)} t a week)</>
+            : toCall ? <><a href="#farmer-list">{toCall} need a harvest call</a> (unsure answers)</> : <>Every farmer has a current answer</>)
           : `Add ${cropName(crop)} farmers from the database, or new ones.`}</span>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
           <button className="btn" type="button" onClick={() => setPicking(true)} {...needs("farmers.manage")}>Add from database</button>

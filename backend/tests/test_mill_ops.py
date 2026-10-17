@@ -66,6 +66,7 @@ def test_grading_net_weight_and_payment_from_the_purchase_order(store, settings)
     d = track_record.record_delivery(store, settings, "f01", 1000, day, "Weighbridge", deductions={"unripe": 4, "dirt": 1})
     assert d["deduction_pct"] == 5 and d["net_kg"] == 950 and d["price_basis"] == "purchase order"
     assert d["price_per_kg"] == 3300 and d["amount"] == 950 * 3300 and d["po_number"].startswith("PO-")
+    assert store.get("offers", o["id"])["delivered_kg"] == 950
     other = track_record.record_delivery(store, settings, "b004", 800, day)
     assert other["price_basis"] == "reference price" and other["net_kg"] == 800
     name, pdf = purchase_order.for_delivery(store, settings, d["id"])
