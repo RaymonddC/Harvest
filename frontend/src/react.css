@@ -1728,3 +1728,15 @@ body.app .start-card .call-mode { font-size: 12.5px; padding: 8px 10px; }
 body.app .start-card .start-acts .btn.big { min-height: 44px; font-size: 14.5px; }
 body.app .start-card .auto-days button { min-height: 32px; font-size: 12.5px; }
 @media (max-width: 860px) { body.app .start-card .auto-days button, body.app .steps.linked .drop .btn { min-height: 44px; } }
+
+/* Campaign steps: three cards of the same width and height, the action at the bottom of each */
+@media (min-width: 1240px) { body.app .steps.linked { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+body.app .steps.linked { align-items: stretch; }
+body.app .steps.linked > .card { align-self: stretch; display: flex; flex-direction: column; }
+body.app .steps.linked > .card > :last-child { margin-top: auto; }
+body.app .steps.linked .drop { flex: 1; }
+.auto-more summary { cursor: pointer; font-size: 13px; font-weight: 700; color: #D7E9DF; margin: 6px 0; }
+.auto-more[open] summary { margin-bottom: 8px; }
+
+/* Calls page: the live line above the answers */
+.live-now { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; font-size: 14px; }

@@ -23,6 +23,23 @@ const when = (c) => c.ended_at || c.started_at || c.created_at;
 const fmtWhen = (iso) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
 const day = (iso) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) : "");
 
+// What is on the phone right now, in one line: calls on now and phones ringing, and what is waiting.
+function LiveNow({ calls }) {
+  const on = calls.filter((c) => c.status === "on_call").length;
+  const ringing = calls.filter((c) => c.status === "queued" && c.channel === "twilio" && c.dialed_at).length;
+  const demo = calls.filter((c) => c.status === "queued" && (c.channel || "browser") === "browser").length;
+  const callBack = calls.filter((c) => c.status === "queued" && c.channel === "twilio" && !c.dialed_at && (c.attempt || 1) > 1).length;
+  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  const waiting = [demo && `${n(demo, "demo call", "demo calls")} waiting on the demo phone`, callBack && `${n(callBack, "missed call", "missed calls")} to call back`].filter(Boolean).join(", ");
+  return (
+    <p className="live-now" aria-live="polite">
+      {on || ringing ? <><span className="dot-live" aria-hidden="true" /><b>{[on && `${n(on, "call", "calls")} on now`, ringing && `${n(ringing, "phone", "phones")} ringing`].filter(Boolean).join(", ")}</b></>
+        : <b>No call is on right now.</b>}
+      {waiting && <span className="muted"> {waiting}.</span>}
+    </p>
+  );
+}
+
 export default function Calls() {
   const { state } = useLive();
   const { cid, campaign } = useCrop();
@@ -84,6 +101,7 @@ export default function Calls() {
           <button type="button" className="btn sm" style={{ marginLeft: 10 }} onClick={() => setPhone(true)}>Open the demo phone</button>
         </div>
       )}
+      <LiveNow calls={calls} />
       <div className="call-stats" role="group" aria-label="Filter calls">
         {stats.map((s) => (
           <button key={s.key} type="button" className={`call-stat ${filter === s.key ? "on" : ""} ${s.warn && s.n ? "warn" : ""}`} aria-pressed={filter === s.key} onClick={() => setFilter(s.key)}>

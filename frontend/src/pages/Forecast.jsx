@@ -2,7 +2,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import CallRecap from "../components/forecast/CallRecap.jsx";
-import { CallLog, Calls } from "../components/forecast/Calls.jsx";
 import Chart from "../components/forecast/Chart.jsx";
 import { FillList, Hero } from "../components/forecast/GapCard.jsx";
 import GapNote from "../components/forecast/GapNote.jsx";
@@ -26,7 +25,6 @@ export default function Forecast() {
   const setPeriod = (p) => { setPeriodState(p); try { localStorage.setItem(PERIOD_KEY, p); } catch { /* storage blocked */ } };
   const { state } = useLive();
   const [shown, setShown] = useState(null); // call in the detail dialog
-  const [logOpen, setLogOpen] = useState(false);
   const { cid, crop, campaign: picked } = useCrop();
   const rows = state ? inCampaign(state, state.forecast, cid).sort((a, b) => a.week - b.week) : []; // the picked campaign's weeks
   const gap = rows.find((r) => r.is_gap);
@@ -103,18 +101,9 @@ export default function Forecast() {
         <div className="col-side">
           {state && gap && <FillList gap={gap} state={view} />}
           {state && rows.find((r) => r.is_surplus) && <SurplusCard row={rows.find((r) => r.is_surplus)} cid={cid} />}
-          <section className="card" aria-labelledby="calls-title">
-            <div className="card-head">
-              <h2 id="calls-title">Calls</h2>
-              <Link to="/calls">Open the calls</Link>
-            </div>
-            {state ? <Calls calls={view.calls} onShow={setShown} /> : <div className="rows" id="calls" />}
-            <button className="btn" onClick={() => setLogOpen(true)}>Call log</button>
-          </section>
         </div>
       </div>
       <CallRecap call={shown} onClose={() => setShown(null)} />
-      <CallLog open={logOpen} calls={view ? view.calls : []} onClose={() => setLogOpen(false)} onShow={setShown} />
     </Shell>
   );
 }
