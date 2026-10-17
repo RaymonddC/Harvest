@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { campaignFor, cropName, inCampaign, useCrop } from "../campaigns.jsx";
 import Campaigns from "../components/setup/Campaigns.jsx";
 import FarmerForm from "../components/setup/FarmerForm.jsx";
 import FarmerList from "../components/setup/FarmerList.jsx";
 import FarmerSheet from "../components/setup/FarmerSheet.jsx";
 import FarmersStep from "../components/setup/FarmersStep.jsx";
+import NeedPanel from "../components/setup/NeedPanel.jsx";
 import PriceRange from "../components/setup/PriceRange.jsx";
 import StartCalling from "../components/setup/StartCalling.jsx";
 import { api } from "../lib.js";
@@ -21,6 +22,9 @@ export default function Setup() {
   const [farmerForm, setFarmerForm] = useState(null); // {} to add, a farmer to edit, null when closed
   const [openFarmer, setOpenFarmer] = useState(null); // the farmer whose page is open
   const { cid, crop } = useCrop();
+  const { hash } = useLocation();
+  // Links to /setup#need (the sidebar's To do list) open at the mill's need.
+  useEffect(() => { if (hash === "#need" && state) document.getElementById("need")?.scrollIntoView({ block: "start" }); }, [hash, !!state]); // eslint-disable-line react-hooks/exhaustive-deps
   const campaign = state ? campaignFor(state, cid) : {};
   const farmers = state ? inCampaign(state, state.farmers, cid).filter((f) => f.type !== "supplier")
     .sort((a, b) => Number(!!b.to_call) - Number(!!a.to_call) || a.id.localeCompare(b.id)) : [];
@@ -39,6 +43,7 @@ export default function Setup() {
   return (
     <Shell title="Campaign" head={head}>
       {state && <Campaigns state={state} />}
+      {state && campaign.id && <NeedPanel state={state} cid={cid} campaign={campaign} />}
       {/* "linked": on a wide screen a line joins each step to the next, green once the step is done. */}
       <div className="steps linked">
         <FarmersStep farmers={farmers} toCall={toCall} cid={cid} crop={crop} onAdd={() => setFarmerForm({ crop, campaign_id: cid })} />

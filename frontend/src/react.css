@@ -925,3 +925,45 @@ body.app .chart .target, body.app .chart .capacity { z-index: 3; pointer-events:
 /* The three steps: the farmer card no longer stretches empty space under its buttons. */
 .steps.linked > .card { align-self: stretch; }
 .steps.linked .drop { justify-content: center; }
+
+/* ---------- Campaign page: what the mill needs, and how each kind of call helps ---------- */
+.need { gap: 14px; }
+.need-status { display: inline-block; margin-top: 4px; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 800; }
+.need-status.short { background: var(--amber-soft); color: var(--amber-text); }
+.need-status.over { background: #FDE6DA; color: #9A3412; }
+.need-status.ok { background: var(--leaf-soft); color: var(--leaf-deep); }
+.need-weeks { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(56px, 1fr); gap: 8px; overflow-x: auto; }
+.nw { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; }
+.nw-plot { position: relative; width: 100%; height: 64px; border-bottom: 1px solid var(--line); }
+.nw-bar { position: absolute; bottom: 0; left: 22%; right: 22%; border-radius: 4px 4px 0 0; background: var(--leaf); }
+.nw.short .nw-bar { background: var(--amber); }
+.nw.over .nw-bar { background: #F08A5D; }
+.nw.before { opacity: .4; }
+.nw-target { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--ink); opacity: .45; }
+.nw small { color: var(--muted); font-size: 11px; }
+.need-actions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.need-actions li { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px; }
+.need-actions li.todo { border-color: var(--leaf-mid, #9CCFB5); background: #F6FBF8; }
+.need-actions li.over { border-color: #F3C4AE; background: #FFF7F2; }
+.need-actions li.done { opacity: .75; }
+.need-actions b { font-size: 14.5px; }
+.need-actions p { margin: 2px 0 0; font-size: 13.5px; color: var(--muted); }
+.need-actions p b { font-size: inherit; color: var(--ink); }
+.na-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--leaf-soft); color: var(--leaf-deep); }
+.need-actions li.over .na-icon { background: #FDE6DA; color: #9A3412; }
+@media (max-width: 640px) { .need-actions li { grid-template-columns: auto 1fr; } .need-actions li > .btn, .need-actions li > a.btn { grid-column: 1 / -1; } }
+
+/* The sidebar's To do list: each line is the problem and the next action, linking to where it is done. */
+.week-card .wc-item { display: flex; gap: 9px; align-items: flex-start; padding: 6px 6px; margin: 0 -6px; border-radius: 8px; text-decoration: none; }
+.week-card a.wc-item:hover { background: rgba(255, 255, 255, .07); }
+.week-card .wc-item .wc-dot { margin-top: 5px; }
+.week-card .wc-item span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+body.app .side .week-card .wc-item b { color: #fff; font-size: 13px; font-weight: 700; line-height: 1.3; }
+body.app .side .week-card .wc-item small { color: var(--pp-on-muted, #9FB8AA); font-size: 12px; font-weight: 600; line-height: 1.35; }
+body.app .side .week-card a.wc-item:hover small { color: #CFE3D8; }
+.week-card .wc-item.on .wc-dot { background: #2FBF7F; }
+.week-card .wc-item.amber .wc-dot { background: var(--amber); }
+.week-card .wc-item.red .wc-dot { background: #F08A5D; }
+.week-card .wc-item.done .wc-dot { background: #2FBF7F; }
+#need { scroll-margin-top: 120px; }

@@ -6,25 +6,54 @@ import AccountMenu from "./components/AccountMenu.jsx";
 import CropSwitcher from "./components/CropSwitcher.jsx";
 import { campaignFor, inCampaign, useCrop } from "./campaigns.jsx";
 import NextStep from "./components/NextStep.jsx";
+import { unknownSupply } from "./components/setup/NeedPanel.jsx";
 import { useUnsaved } from "./dialogs.jsx";
 import { useLive } from "./live.jsx";
 import { Dialog, DialogClose, Icon } from "./ui.jsx";
 
 // This week at a glance, under the page links: is calling on, is a week short, does anything
 // wait for a decision. Hidden on narrow screens, where the sidebar is a single row.
+// What is lacking in the picked campaign and what to do about it, most urgent first. Each line says the problem and
+// the next action, and links to where it is done. Ticks when nothing is left.
 function WeekCard({ state }) {
   const { cid } = useCrop();
   if (!state) return null;
   const campaign = campaignFor(state, cid);
   const running = campaign.status === "running";
-  const gap = inCampaign(state, state.forecast, cid).sort((a, b) => a.week - b.week).find((r) => r.is_gap);
+  const rows = inCampaign(state, state.forecast, cid).sort((a, b) => a.week - b.week);
+  const gap = rows.find((r) => r.is_gap);
+  const over = rows.find((r) => r.is_surplus);
   const waiting = inCampaign(state, state.offers, cid).filter((o) => ["pending", "escalated"].includes(o.status)).length;
+  const { toCall, unknown, usualKg } = unknownSupply(state, cid);
+  const confirming = inCampaign(state, state.calls, cid).filter((c) => c.kind === "confirm" && ["queued", "on_call"].includes(c.status)).length;
+  const items = [];
+  if (running) {
+    items.push({ to: campaign.channel === "twilio" ? "/" : "/calls", tone: "on", what: campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Harvest calls running",
+      next: campaign.channel === "twilio" ? "Watch the answers arrive" : "Answer them on the demo phone" });
+  }
+  if (waiting) items.push({ to: "/approvals", tone: "amber", what: `${waiting} offer${waiting > 1 ? "s" : ""} waiting for you`, next: "Approve or reject" });
+  if (!running && unknown.length) {
+    items.push({ to: "/setup#need", tone: "amber", what: `${unknown.length} farmers have not given their harvest`, next: `Call them: about ${fmtT(usualKg)} t a week is unknown` });
+  }
+  if (gap) {
+    const forward = (gap.shortlist || []).length;
+    items.push({ to: "/", tone: "amber", what: `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short`,
+      next: running && campaign.kind === "gap_fill" ? "Gap-fill calls are on it" : forward ? `Start gap-fill calls: ${forward} farmers can help` : "Add a rival quote or farmers who can harvest earlier" });
+  }
+  if (over) items.push({ to: "/", tone: "red", what: `Week ${over.week} is ${fmtT(over.surplus_kg)} t over capacity`, next: "Ask some farmers to deliver a week later" });
+  if (confirming) items.push({ to: "/calls", tone: "on", what: `${confirming} confirmation call${confirming > 1 ? "s" : ""} to make`, next: "The agent tells farmers their approved deal" });
+  if (!toCall.length && !running) items.push({ to: "/setup", tone: "amber", what: "No farmers to call", next: "Add farmers to this campaign" });
   return (
-    <div className="week-card" aria-label="This week">
-      <span className="wc-title">This week</span>
-      <div className="wc-row"><i className={`wc-dot ${running ? "on" : ""}`} />{running ? (campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Calling farmers") : "No calls running"}</div>
-      <div className="wc-row"><i className={`wc-dot ${gap ? "amber" : "on"}`} />{gap ? `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short` : "Every week on track"}</div>
-      {waiting > 0 && <Link className="wc-row wc-link" to="/approvals"><i className="wc-dot amber" />{waiting} waiting for a decision</Link>}
+    <div className="week-card" aria-label="To do">
+      <span className="wc-title">To do · {campaign.label || "this campaign"}</span>
+      {items.length ? items.slice(0, 4).map((it, i) => (
+        <Link key={i} className={`wc-item ${it.tone}`} to={it.to}>
+          <i className="wc-dot" />
+          <span><b>{it.what}</b><small>{it.next} →</small></span>
+        </Link>
+      )) : (
+        <div className="wc-item done"><i className="wc-dot" /><span><b>Nothing waiting</b><small>Every week is on track and every farmer has answered{campaign.weekly?.enabled ? `; next automatic calls ${(campaign.weekly.days || [0]).map((d) => ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][d]).join(", ")} at ${campaign.weekly.time || "06:00"}` : ""}.</small></span></div>
+      )}
     </div>
   );
 }
