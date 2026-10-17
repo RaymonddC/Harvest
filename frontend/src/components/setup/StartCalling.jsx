@@ -77,8 +77,9 @@ export default function StartCalling({ state, toCall }) {
   // While calls run: this round's calls (since the campaign started calling), waiting, done and answered.
   const since = campaign.started_at || "";
   const round = running ? state.calls.filter((c) => c.campaign_id === cid && (c.created_at || "") >= since.slice(0, 19) && c.kind === campaign.kind) : [];
-  const roundWaiting = round.filter((c) => ["queued", "on_call"].includes(c.status)).length;
-  const roundDone = round.length - roundWaiting;
+  const roundWaiting = round.filter((c) => c.status === "queued").length;  // not reached yet
+  const roundOn = round.filter((c) => c.status === "on_call").length;
+  const roundDone = round.length - roundWaiting;  // made: finished, plus the ones on now
   const answeredIds = new Set(state.harvests.filter((h) => h.call_id).map((h) => h.call_id));
   const offerIds = new Set(state.offers.filter((o) => o.call_id).map((o) => o.call_id));
   const roundGot = round.filter((c) => answeredIds.has(c.id) || offerIds.has(c.id)).length;
@@ -96,7 +97,7 @@ export default function StartCalling({ state, toCall }) {
           </div>
           <div className="stats" id="campaign-lines">
             <div><b>{roundWaiting}</b><span>still to call</span></div>
-            <div><b>{roundDone}</b><span>calls done</span></div>
+            <div><b>{roundDone}</b><span>{roundOn ? `calls made (${roundOn} on now)` : "calls made"}</span></div>
             <div><b>{roundGot}</b><span>{campaign.kind === "gap_fill" ? "offers" : "answers"}</span></div>
           </div>
         </>

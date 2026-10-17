@@ -130,7 +130,7 @@ export default function Calls() {
   const needle = q.trim().toLowerCase();
   const list = rows.filter(is[filter]).filter((r) => !needle || `${r.c.farmer_name} ${r.f.village || ""}`.toLowerCase().includes(needle));
   const waitingDemo = calls.filter((c) => c.status === "queued" && (c.channel || "browser") === "browser").length;
-  const finished = count((r) => !["queued", "on_call"].includes(r.c.status));
+  const finished = count((r) => r.c.status !== "queued");  // made: finished, plus the ones on now
   const stats = [
     { key: "all", n: finished, label: "calls made" },
     { key: "harvest", n: count(is.harvest), label: "harvests given", sub: `${fmtKg(rows.filter(is.harvest).reduce((n, r) => n + (r.h.kg || 0), 0))} kg` },
