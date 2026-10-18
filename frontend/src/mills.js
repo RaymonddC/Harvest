@@ -49,3 +49,19 @@ export const TIME_BANDS = [
   { key: "far", label: "Over 2 h: fruit may lose quality", max: Infinity, color: "#C2410C" },
 ];
 export const bandOf = (minutes) => TIME_BANDS.find((b) => minutes <= b.max);
+
+// Google's encoded polyline to [[lat, lng], ...] (the route from a plot to its mill).
+export function decodePolyline(str) {
+  const out = [];
+  let i = 0, lat = 0, lng = 0;
+  while (i < str.length) {
+    for (const k of [0, 1]) {
+      let shift = 0, result = 0, b;
+      do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      const d = result & 1 ? ~(result >> 1) : result >> 1;
+      if (k === 0) lat += d; else lng += d;
+    }
+    out.push([lat / 1e5, lng / 1e5]);
+  }
+  return out;
+}

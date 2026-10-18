@@ -28,6 +28,7 @@ TRUCK_KMH = 30
 TRUCK_FACTOR = 1.3  # a loaded truck on village roads against Google's car driving time
 FAR_MINUTES = 120
 MATRIX_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix"
+ROUTE_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 MAX_ELEMENTS = 600  # the route matrix takes at most 625 origin x destination pairs a request
 
 
@@ -153,7 +154,8 @@ def catchment(store: Store, farmer_ids: set[str] | None = None) -> list[dict]:
 
 # ---------- road routes from Google (Routes API, route matrix) ----------
 
-def _google_post(settings):
+def _google_post(settings, url: str = MATRIX_URL,
+                 fields: str = "originIndex,destinationIndex,distanceMeters,duration,condition"):
     """POST to the Routes API as this service (Cloud Run's service account, or local Application Default Credentials)."""
     import google.auth
     from google.auth.transport.requests import AuthorizedSession
@@ -165,8 +167,8 @@ def _google_post(settings):
     quota = None if getattr(creds, "service_account_email", None) else (settings.gcp_project or project)
 
     def post(body: dict) -> list[dict]:
-        r = session.post(MATRIX_URL, json=body, timeout=60, headers={
-            "X-Goog-FieldMask": "originIndex,destinationIndex,distanceMeters,duration,condition",
+        r = session.post(url, json=body, timeout=60, headers={
+            "X-Goog-FieldMask": fields,
             **({"X-Goog-User-Project": quota} if quota else {})})
         if r.status_code >= 400:
             raise MillError(f"Routes API {r.status_code}: {r.text[:300]}")
@@ -230,3 +232,38 @@ def refresh_in_background(store: Store, settings) -> None:
         except Exception:  # noqa: BLE001 - the estimate stays until the next try
             log.warning("mill routes: the Routes API call failed", exc_info=True)
     threading.Thread(target=run, daemon=True).start()
+
+
+def route_line(store: Store, settings, farmer_id: str, post=None) -> dict:
+    """The road from a farmer's plot to their nearest mill, for drawing on the map: Google's route (encoded polyline,
+    distance, driving time). Saved on the farmer as `mill_route_line` for this plot and these mills, so a second look
+    costs nothing; fetched again only when the plot or a mill moves."""
+    farmer = store.get("farmers", farmer_id)
+    if not farmer:
+        raise MillError("Farmer not found.")
+    mill_list = store.list("mills")
+    n = nearest(mill_list, farmer)
+    if not n:
+        raise MillError("This farmer has no mapped plot, or there is no mill yet.")
+    mill = next(m for m in mill_list if m["id"] == n["mill_id"])
+    sig = f"{signature(farmer, mill_list)}>{mill['id']}"
+    saved = farmer.get("mill_route_line") or {}
+    base = {"farmer_id": farmer_id, "mill_id": mill["id"], "mill_name": mill.get("name"), "far": n["far"],
+            "from": [float(farmer["plot_lat"]), float(farmer["plot_lng"])], "to": [float(mill["lat"]), float(mill["lng"])]}
+    if saved.get("sig") == sig:
+        return {**base, **{k: v for k, v in saved.items() if k != "sig"}, "cached": True}
+    post = post or _google_post(settings, ROUTE_URL, "routes.polyline.encodedPolyline,routes.distanceMeters,routes.duration")
+    resp = post({"origin": _point(farmer["plot_lat"], farmer["plot_lng"])["waypoint"],  # a plain waypoint here, not
+                 "destination": _point(mill["lat"], mill["lng"])["waypoint"],  # the matrix's wrapped one
+                 "travelMode": "DRIVE", "routingPreference": "TRAFFIC_UNAWARE", "polylineQuality": "OVERVIEW"})
+    routes = (resp or {}).get("routes") or []
+    if routes and routes[0].get("polyline", {}).get("encodedPolyline"):
+        r = routes[0]
+        secs = float(str(r.get("duration", "0s")).rstrip("s") or 0)
+        line = {"polyline": r["polyline"]["encodedPolyline"], "road_km": round(float(r.get("distanceMeters") or 0) / 1000, 1),
+                "drive_minutes": round(secs / 60), "minutes": round(secs / 60 * TRUCK_FACTOR), "by_road": True}
+    else:  # no road Google can find: a straight line, with the estimate
+        line = {"polyline": None, "road_km": n["road_km"], "minutes": n["minutes"], "by_road": False}
+    line["far"] = line["minutes"] > FAR_MINUTES
+    store.set("farmers", farmer_id, {"mill_route_line": {**line, "sig": sig}}, merge=True)
+    return {**base, **line, "cached": False}

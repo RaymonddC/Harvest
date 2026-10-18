@@ -545,6 +545,16 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
         except Exception as e:  # noqa: BLE001
             raise HTTPException(502, f"Could not get road routes from Google: {str(e)[:300]}") from None
 
+    @app.get("/api/farmers/{farmer_id}/mill-route")
+    def farmer_mill_route(farmer_id: str):
+        """The road from the farmer's plot to their nearest mill, to draw on the map."""
+        try:
+            return mills.route_line(store, settings, farmer_id)
+        except mills.MillError as e:
+            raise HTTPException(404 if "not found" in str(e) else 400, str(e)) from None
+        except Exception as e:  # noqa: BLE001 - Google unreachable: the map draws a straight line instead
+            raise HTTPException(502, f"Could not get the route from Google: {str(e)[:200]}") from None
+
     @app.get("/api/mills/catchment")
     def mill_catchment(campaign: str = ""):
         ids = {f["id"] for f in store.list("farmers") if f.get("campaign_id") == campaign} if campaign else None

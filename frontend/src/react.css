@@ -1828,3 +1828,14 @@ tr.is-live td { background: #F2F8F4; }
 @media (max-width: 640px) { .mills-table th:nth-child(5), .mills-table td:nth-child(5) { display: none; } }
 .plot-line.far { color: #C2410C; }
 .routes-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* Plot map: mill names and the road from a picked plot */
+.gmill-label { text-shadow: 0 0 3px rgba(0,0,0,.9), 0 0 6px rgba(0,0,0,.6); letter-spacing: .01em; }
+.svg-mill-label { font-size: 12px; font-weight: 700; fill: #0F3D2A; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.route-card { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px;
+  background: #EAF2FA; border: 1px solid #C9DDF0; }
+.route-card > div { display: flex; flex-direction: column; gap: 2px; flex: 1 1 260px; min-width: 0; font-size: 13.5px; }
+.mills-table th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
+.mills-table td, .mills-table th { padding-left: 6px; padding-right: 6px; }
+.mills-table .actions .btn { padding-left: 8px; padding-right: 8px; }
+.mills-table td:first-child { overflow-wrap: anywhere; }

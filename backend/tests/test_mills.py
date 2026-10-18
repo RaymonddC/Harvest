@@ -70,3 +70,22 @@ def test_road_routes_replace_the_estimate_until_something_moves(store, settings)
     mills.update(store, ms[0]["id"], ms[0]["name"], float(ms[0]["lat"]) + 0.01, ms[0]["lng"])
     assert mills.nearest(store.list("mills"), store.get("farmers", f["id"]))["source"] == "estimate"
     assert mills.refresh_routes(store, settings, post=post)["updated"] == len(mapped)
+
+
+def test_route_line_is_fetched_once_and_again_when_a_mill_moves(store, settings):
+    farmer = next(f for f in store.list("farmers") if f.get("plot_lat") is not None)
+    calls = []
+
+    def post(body):
+        calls.append(body)
+        return {"routes": [{"polyline": {"encodedPolyline": "_p~iF~ps|U_ulLnnqC"}, "distanceMeters": 23400, "duration": "2400s"}]}
+    first = mills.route_line(store, settings, farmer["id"], post=post)
+    assert first["polyline"] and first["road_km"] == 23.4 and first["minutes"] == round(40 * mills.TRUCK_FACTOR) and not first["cached"]
+    assert mills.route_line(store, settings, farmer["id"], post=post)["cached"] and len(calls) == 1
+    m = store.get("mills", first["mill_id"])
+    mills.update(store, first["mill_id"], m["name"], float(m["lat"]) + 0.01, m["lng"])
+    mills.route_line(store, settings, farmer["id"], post=post)
+    assert len(calls) == 2
+    nothing = mills.route_line(store, settings, next(f for f in store.list("farmers") if f.get("plot_lat") is not None and f["id"] != farmer["id"])["id"],
+                               post=lambda body: {})
+    assert nothing["polyline"] is None and not nothing["by_road"]
