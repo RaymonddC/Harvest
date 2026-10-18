@@ -59,7 +59,7 @@ def test_a_retired_text_model_falls_back(settings, monkeypatch):
     class Models:
         def generate_content(self, model, contents, config=None):
             asked.append(model)
-            if model != "gemini-2.5-flash":
+            if model != gemini_text.FALLBACK_MODELS[0]:
                 raise NotFound("NOT_FOUND")
             return "ok"
 
@@ -67,5 +67,5 @@ def test_a_retired_text_model_falls_back(settings, monkeypatch):
     monkeypatch.setattr(gemini_text, "_working", None)
     import dataclasses
     s = dataclasses.replace(settings, text_model="gemini-retired")
-    assert gemini_text.generate(s, "hi") == "ok" and asked == ["gemini-retired", "gemini-2.5-flash"]
-    assert gemini_text.generate(s, "hi") == "ok" and asked[-1] == "gemini-2.5-flash" and len(asked) == 3
+    assert gemini_text.generate(s, "hi") == "ok" and asked == ["gemini-retired", gemini_text.FALLBACK_MODELS[0]]
+    assert gemini_text.generate(s, "hi") == "ok" and asked[-1] == gemini_text.FALLBACK_MODELS[0] and len(asked) == 3

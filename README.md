@@ -69,7 +69,7 @@ One Google Cloud project, deployed in `asia-southeast1`.
 
 ```
  Farmer (basic phone) ──Twilio──┐                      ┌──▶ Vertex AI: Gemini Live (speech both ways, tool calls)
-                                ▼                      │        and a Gemini text model (summaries, captions, brief)
+                                ▼                      │        and Gemini 2.5 Flash (summaries, captions, brief)
  Planner (browser) ─▶ Firebase Hosting ─▶ Cloud Run: harvest-gateway (FastAPI)
                        React dashboard     relays the call audio, runs the 8 agent tools
                        + call client       and the rules engine, serves the planner API
@@ -87,14 +87,13 @@ One Google Cloud project, deployed in `asia-southeast1`.
 | Layer | Services | Why |
 |---|---|---|
 | Experience | Firebase Hosting, React dashboard, vanilla JS call client | Nothing for the farmer to install |
-| Intelligence | Vertex AI: Gemini 2.5 Flash native audio for the call; a Gemini text model for summaries, captions and the brief | Speech in, speech out, with no pipeline to stitch |
+| Intelligence | Vertex AI: Gemini 2.5 Flash native audio for the call; Gemini 2.5 Flash for summaries, captions and the brief | Speech in, speech out, with no pipeline to stitch |
 | Compute | Cloud Run `harvest-gateway`, Cloud Scheduler (hourly) | Scales to zero between campaigns |
 | Data | Firestore, BigQuery + BigQuery ML, Cloud Storage, Secret Manager | Every promise is a record, not a memory |
 | Ground truth | Maps JavaScript API, Routes API, Twilio Programmable Voice | Road time, and a real number that rings |
 
-Both model names are settings (`LIVE_MODEL`, `TEXT_MODEL`) because preview names are retired often. `TEXT_MODEL`
-defaults to `gemini-3.8-flash`; where that name is not available the service falls back to `gemini-2.5-flash`
-(`backend/app/gemini_text.py`), which is what writes the text on the deployed service today.
+Both model names are settings (`LIVE_MODEL`, `TEXT_MODEL`) because preview names are retired often: Gemini 2.5
+Flash native audio runs the call, and Gemini 2.5 Flash writes the summaries, captions and the daily brief.
 
 ## Guardrails, and where they live in code
 

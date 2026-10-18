@@ -11,7 +11,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-FALLBACK_MODELS = ("gemini-2.5-flash", "gemini-2.0-flash-001")
+FALLBACK_MODELS = ("gemini-2.0-flash-001",)
 _working: str | None = None
 _client = None
 

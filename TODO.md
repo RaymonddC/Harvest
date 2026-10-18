@@ -106,7 +106,7 @@ Fix later. Items 1 and 2 matter most for the "a human approves every deal" claim
     - Vertex us-central1 names that work: `gemini-live-2.5-flash-native-audio` (Live), `gemini-2.5-flash` and
       `gemini-2.5-flash-lite` (text), `gemini-2.5-flash-tts`, `gemini-2.5-flash-preview-tts` and
       `gemini-2.5-pro-preview-tts` (speech). Not available: `gemini-live-2.5-flash-preview-native-audio-09-2025`.
-      Note `.env.example` still says `TEXT_MODEL=gemini-3.8-flash`; that name was not checked on Vertex.
+      `TEXT_MODEL` is `gemini-2.5-flash` (checked on Vertex, us-central1). `gemini-3.8-flash` only answers on Vertex's `global` location.
     - Measured reply delay (end of the farmer's last audio chunk to the agent's first audio, at the gateway,
       `VAD_SILENCE_MS=400`), 6 scripted calls, per farmer turn: 1.5 to 1.8 s (name and consent), 1.3 to 1.4 s (volume),
       1.8 to 2.0 s (read-back, sometimes a `record_harvest` first), 1.4 to 2.4 s (counter-offer, `check_offer`), 1.8 to 3.0 s (final
