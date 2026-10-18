@@ -358,13 +358,25 @@ def plot_fields(row: dict) -> dict:
     return out
 
 
-def plausibility(store: Store, settings: Settings, farmer: dict, today: dt.date | None = None) -> dict | None:
-    """Net kg delivered by a farmer over the last 365 days against what their plot can grow."""
+def _delivered_last_year(deliveries: list[dict], today: dt.date) -> dict[str, float]:
+    """Net kg per farmer over the last 365 days, from one read of the deliveries."""
+    since = today - dt.timedelta(days=365)
+    out: dict[str, float] = {}
+    for d in deliveries:
+        if (_day(d.get("date")) or dt.date.min) >= since:
+            out[d.get("farmer_id")] = out.get(d.get("farmer_id"), 0.0) + float(d.get("net_kg", d.get("kg", 0)))
+    return out
+
+
+def plausibility(store: Store, settings: Settings, farmer: dict, today: dt.date | None = None,
+                 delivered: dict[str, float] | None = None) -> dict | None:
+    """Net kg delivered by a farmer over the last 365 days against what their plot can grow. Pass `delivered`
+    (from _delivered_last_year) when checking many farmers, so the deliveries are read once, not once per farmer."""
     today = today or today_local()
     ha = farmer.get("plot_ha")
-    since = today - dt.timedelta(days=365)
-    net = sum(float(d.get("net_kg", d.get("kg", 0))) for d in store.list("deliveries")
-              if d.get("farmer_id") == farmer["id"] and (_day(d.get("date")) or dt.date.min) >= since)
+    if delivered is None:
+        delivered = _delivered_last_year(store.list("deliveries"), today)
+    net = delivered.get(farmer["id"], 0.0)
     if not ha:
         return {"delivered_kg_year": round(net), "max_kg_year": None, "too_much": False}
     cap = float(ha) * MAX_T_PER_HA_YEAR * 1000
@@ -376,7 +388,8 @@ def traceability_csv(store: Store, settings: Settings, campaign: str | None = No
     farmers = {f["id"]: f for f in store.list("farmers")}
     deliveries = (services.campaign_records(store, settings, services.need_campaign(store, settings, campaign)["id"], "deliveries")
                   if campaign else store.list("deliveries"))
-    flags = {fid: plausibility(store, settings, f) for fid, f in farmers.items()}
+    delivered = _delivered_last_year(store.list("deliveries"), today_local())
+    flags = {fid: plausibility(store, settings, f, delivered=delivered) for fid, f in farmers.items()}
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(["delivery_id", "date", "farmer_id", "farmer", "village", "crop", "gross_kg", "deduction_pct", "net_kg",
@@ -399,7 +412,8 @@ def traceability_summary(store: Store, settings: Settings, campaign: str | None 
     members = [f for f in services.campaign_members(store, settings, camp["id"]) if f.get("type") != "supplier"]
     mapped = [f for f in members if f.get("plot_lat") is not None and f.get("plot_lng") is not None]
     certified = [f for f in members if f.get("certification")]
-    too_much = [{"farmer_id": f["id"], "name": f.get("name"), **plausibility(store, settings, f)} for f in members
-                if (plausibility(store, settings, f) or {}).get("too_much")]
+    delivered = _delivered_last_year(store.list("deliveries"), today_local())  # one read, not two per farmer
+    checks = [(f, plausibility(store, settings, f, delivered=delivered)) for f in members]
+    too_much = [{"farmer_id": f["id"], "name": f.get("name"), **p} for f, p in checks if (p or {}).get("too_much")]
     return {"campaign_id": camp["id"], "farmers": len(members), "mapped": len(mapped), "certified": len(certified),
             "over_plot_yield": too_much}
