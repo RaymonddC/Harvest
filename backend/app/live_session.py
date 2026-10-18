@@ -249,6 +249,9 @@ async def keep_recording(recorder: CallRecorder, audio_store, store: Store, sett
     try:
         data = await asyncio.to_thread(recorder.encode)
         name = await asyncio.to_thread(audio_store.save, call_id, data)
+        if not store.get("calls", call_id):  # the call was deleted meanwhile: keep nothing of it (and do not write a
+            await asyncio.to_thread(audio_store.delete, call_id)  # half call back, which breaks the live data)
+            return
         now = services.now_iso()
         expires = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=settings.call_audio_retention_days)).isoformat(timespec="seconds")
         store.set("calls", call_id, {"audio": {"name": name, "seconds": round(recorder.seconds(), 1), "bytes": len(data),

@@ -101,7 +101,10 @@ class FirestoreStore:
         return {**snap.to_dict(), "id": snap.id} if snap.exists else None
 
     def list(self, coll: str) -> list[dict]:
-        return [{**s.to_dict(), "id": s.id} for s in self._db.collection(coll).stream()]
+        docs = [{**s.to_dict(), "id": s.id} for s in self._db.collection(coll).stream()]
+        if coll == "calls":  # a late merge into a deleted call leaves a half call (no farmer, no status): skip it,
+            docs = [d for d in docs if "farmer_id" in d and "status" in d]  # or it takes the live data down
+        return docs
 
     def set(self, coll: str, doc_id: str, data: dict, merge: bool = False) -> None:
         data = {k: v for k, v in data.items() if k != "id"}

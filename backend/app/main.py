@@ -851,6 +851,16 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def reset():
         # The farmers the agent may really phone (Agent calls on: the planner's own test phones) survive a reset.
         keep = [f for f in store.list("farmers") if f.get("agent_calls") and f.get("phone")]
+        # The reset deletes every call, so their recordings go too: a recording without its call could no longer be
+        # played or deleted by a planner, and nothing may be kept of a call that is gone (PDP Law, DECISIONS.md).
+        audio_store = make_audio_store(settings)
+        if audio_store:
+            for c in store.list("calls"):
+                if c.get("audio"):
+                    try:
+                        audio_store.delete(c["id"])
+                    except Exception:  # noqa: BLE001 - the bucket's 90-day rule removes it anyway
+                        log.warning("reset: could not delete the recording of %s", c["id"], exc_info=True)
         seed_data.load_seed(store, settings)
         for f in keep:
             fid = f.pop("id")
