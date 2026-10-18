@@ -775,6 +775,19 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
     def get_farmer_record(farmer_id: str):
         return track_record.farmer_record(store, farmer_id)
 
+    @app.get("/api/deliveries")
+    def list_deliveries(campaign: str = "", limit: int = 200):
+        """Every weighbridge delivery (newest first) with the farmer's name, its amount and whether it is paid, and the
+        unpaid total: the mill's payables list."""
+        docs = services.campaign_records(store, settings, campaign, "deliveries") if campaign else store.list("deliveries")
+        names = {f["id"]: f.get("name") for f in store.list("farmers")}
+        rows = sorted(({**d, "farmer_name": names.get(d.get("farmer_id")) or d.get("farmer_name") or d.get("farmer_id")} for d in docs),
+                      key=lambda d: (d.get("date") or "", d.get("recorded_at") or ""), reverse=True)
+        unpaid = [d for d in rows if not d.get("paid")]
+        return {"deliveries": rows[:max(1, min(limit, 1000))], "count": len(rows),
+                "unpaid": {"count": len(unpaid), "amount": round(sum(d.get("amount") or 0 for d in unpaid)),
+                           "currency": (rows[0].get("currency") if rows else None) or "IDR"}}
+
     @app.post("/api/deliveries")
     def post_delivery(body: DeliveryIn, actor: auth.Actor = Depends(need("farmers.manage"))):
         return track_record.record_delivery(store, settings, body.farmer_id, body.kg, body.date, actor.name, "manual",

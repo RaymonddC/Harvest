@@ -1839,3 +1839,12 @@ tr.is-live td { background: #F2F8F4; }
 .mills-table td, .mills-table th { padding-left: 6px; padding-right: 6px; }
 .mills-table .actions .btn { padding-left: 8px; padding-right: 8px; }
 .mills-table td:first-child { overflow-wrap: anywhere; }
+
+/* Approvals: deliveries and payments */
+.deliveries-card { gap: 10px; }
+.deliv-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.deliv-table th { text-align: left; font-weight: 600; color: var(--g-text-3, #6B7280); font-size: 12.5px; padding: 6px; border-bottom: 1px solid var(--hairline, #E5E4DD); }
+.deliv-table td { padding: 7px 6px; border-bottom: 1px solid var(--hairline, #E5E4DD); vertical-align: middle; }
+.deliv-table .r { text-align: right; }
+.deliv-table .linkish { font-weight: 600; text-decoration: none; }
+@media (max-width: 720px) { .deliv-table th:nth-child(3), .deliv-table td:nth-child(3) { display: none; } }

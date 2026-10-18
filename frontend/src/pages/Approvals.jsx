@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Meter from "../components/approvals/Meter.jsx";
 import Offer from "../components/approvals/Offer.jsx";
+import Deliveries from "../components/approvals/Deliveries.jsx";
+import FarmerSheet from "../components/setup/FarmerSheet.jsx";
 import { api, cachedGet, gapFillBody, gapFillToast, peekGet, plainPrice, startUrl } from "../lib.js";
 import { forCrop, inCampaign, useCrop } from "../campaigns.jsx";
 import { useConfirm } from "../dialogs.jsx";
@@ -28,6 +30,7 @@ export default function Approvals() {
   const act = useAct();
   const confirm = useConfirm();
   const { cid, crop } = useCrop();
+  const [openFarmer, setOpenFarmer] = useState(null);
   // What approving each waiting offer would do (weeks, cost, new gaps), fetched again when offers change.
   const impactUrl = `/api/approvals/impact?campaign=${encodeURIComponent(cid)}`;
   const [impact, setImpact] = useState(() => peekGet(impactUrl) || null);
@@ -157,10 +160,12 @@ export default function Approvals() {
             </div>
           )}
         </div>
-        <div className="offers-foot">
+        <div className="offers-foot" data-anchor="offers-foot">
           {l && `Price range: floor ${plainPrice(l.floor_price, l.currency)}, ceiling ${plainPrice(l.ceiling_price, l.currency)}.${toDecide.length ? ` The bar under each price shows where it sits; red is above the ceiling${anyOut ? " (marked Needs planner)" : ""}.` : ""} Synthetic data.`}
         </div>
       </section>
+      <Deliveries cid={cid} refreshKey={(view.offers || []).map((o) => `${o.id}:${o.delivered_kg || 0}`).join(",")} onOpen={(id) => setOpenFarmer(state.farmers.find((f) => f.id === id) || null)} />
+      <FarmerSheet farmer={openFarmer} state={state} onClose={() => setOpenFarmer(null)} />
       </div>
       <div className="col-side">
         <Meter state={view} week={week} offers={view.offers} />
