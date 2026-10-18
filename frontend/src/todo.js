@@ -17,7 +17,7 @@ export function todoItems(state, cid) {
   const confirming = inCampaign(state, state.calls, cid).filter((c) => c.kind === "confirm" && ["queued", "on_call"].includes(c.status)).length;
   const items = [];
   if (running) {
-    items.push({ key: "running", verb: "Follow", to: campaign.channel === "twilio" ? "/forecast" : "/calls", tone: "on",
+    items.push({ key: "running", verb: "Follow", to: "/calls", tone: "on",
       what: campaign.kind === "gap_fill" ? "Gap-fill calls running" : "Harvest calls running",
       next: campaign.channel === "twilio" ? "Watch the answers arrive" : "Answer them on the demo phone" });
   }

@@ -61,7 +61,7 @@ export default function NeedPanel({ state, cid, campaign, onPick }) {
   const startCollect = async () => {
     const r = await act(() => api(startUrl(cid), { body: { kind: "collect", channel: state.settings?.phone_calls ? "twilio" : "browser" } }),
       (x) => `${x.queued} harvest calls started.`);
-    if (r) navigate(state.settings?.phone_calls ? "/forecast" : "/calls");
+    if (r) navigate("/calls");
   };
   const status = gap ? `Week ${gap.week} is ${fmtT(gap.gap_kg)} t short` : over ? `Week ${over.week} is ${fmtT(over.surplus_kg)} t over capacity` : "Every week is on track";
   return (

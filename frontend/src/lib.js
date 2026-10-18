@@ -69,7 +69,7 @@ export const stopUrl = (cid) => `/api/campaigns/${encodeURIComponent(cid)}/stop`
 export const gapFillToast = (r) => (r.channel === "twilio"
   ? `${r.queued} gap-fill calls: ringing the farmers' phones one at a time.`
   : `${r.queued} gap-fill demo calls ready on the Calls page.`);
-// While a campaign runs: the call client for demo calls, the live forecast for real phone calls.
+// While a campaign runs: the Calls page, which shows each phone call live (or plays the farmer's phone for demo calls).
 export const followCalls = (campaign) => (campaign?.channel === "twilio"
-  ? { href: "/forecast", label: "Watch the phone calls", external: false }
+  ? { href: "/calls", label: "Watch the phone calls", external: false }
   : { href: "/calls", label: "Open the demo phone", external: false });
