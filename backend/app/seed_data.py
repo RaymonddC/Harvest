@@ -37,6 +37,12 @@ FIRST_NAMES = ["Pak Ahmad", "Bu Siti", "Pak Darmawan", "Bu Lestari", "Pak Hendra
                "Pak Bambang", "Bu Fitri", "Pak Iwan", "Bu Murni", "Pak Rudi", "Bu Tuti",
                "Pak Eko", "Bu Yuli"]
 VILLAGES = ["Sungai Lala", "Bukit Raya", "Tanjung Sari", "Air Molek", "Pematang Reba", "Lirik"]
+# Where each village's plots sit: around Pekanbaru, Perawang and Minas, on the road network, so the plots cluster
+# like real smallholdings on the map and Google can route each one to a mill (mills.py). Plots are within ~3 km.
+VILLAGE_CENTRES = {"Tanjung Sari": (0.615, 101.43), "Bukit Raya": (0.455, 101.47), "Lirik": (0.72, 101.62),
+                   "Air Molek": (0.80, 101.34), "Pematang Reba": (0.43, 101.60), "Sungai Lala": (0.49, 101.27),
+                   "Pekanbaru": (0.51, 101.44)}
+PLOT_JITTER = 0.03
 
 
 def default_limits(crop: str = "palm") -> Limits:
@@ -141,8 +147,9 @@ def build_seed(plan_start: dt.date, language: str, crop: str = "palm",
     for n, (fid, f) in enumerate(sorted(farmers.items())):
         if f["type"] == "supplier" or n % 7 == 6:  # about one in seven plots not mapped yet
             continue
-        f.update(plot_lat=round(ops.uniform(0.25, 1.15), 5), plot_lng=round(ops.uniform(101.0, 102.1), 5),
-                 plot_ha=round(ops.uniform(1.2, 4.0), 1))
+        clat, clng = VILLAGE_CENTRES.get(f.get("village"), (0.6, 101.45))
+        f.update(plot_lat=round(clat + ops.uniform(-PLOT_JITTER, PLOT_JITTER), 5),
+                 plot_lng=round(clng + ops.uniform(-PLOT_JITTER, PLOT_JITTER), 5), plot_ha=round(ops.uniform(1.2, 4.0), 1))
         if n % 3 == 0:
             f["certification"] = "ISPO"
         elif n % 11 == 0:
@@ -157,6 +164,8 @@ def build_seed(plan_start: dt.date, language: str, crop: str = "palm",
         d.update(deductions={k: v for k, v in (("unripe", unripe), ("dirt", dirt)) if v}, deduction_pct=pct, net_kg=net,
                  price_per_kg=reference, currency=limits_doc.get("currency", "IDR"), amount=round(net * reference),
                  price_basis="reference price", offer_id=None, po_number=None)
+        if d["date"] < (plan_start - dt.timedelta(days=14)).isoformat():  # older deliveries are paid; the last ones wait
+            d.update(paid=True, paid_at=f"{d['date']}T15:00:00+07:00", paid_by="Finance", payment_ref=f"TRF-{d['date'].replace('-', '')}-{d['farmer_id']}")
     official = {f"op-{crop}-riau-{(plan_start - dt.timedelta(days=12)).isoformat()}": {
         "crop": crop, "province": "Riau", "valid_from": (plan_start - dt.timedelta(days=12)).isoformat(),
         "price_per_kg": reference, "source": "Illustrative: replace with the published Disbun price", "url": None,
@@ -278,6 +287,63 @@ DEMO_MILLS = {"mill-main": {"name": "Sawit Maju mill, Pekanbaru", "lat": 0.5071,
               "mill-perawang": {"name": "Sawit Maju mill, Perawang", "lat": 0.6466, "lng": 101.607}}
 
 
+# ---------- last week's calls and the planner's notes, so the relationship features have something to show ----------
+
+DEMO_CALLS = [  # (hours ago, sentiment, score, summary, concerns, transcript)
+    (5, "positive", 0.7, "Expects about 1.8 t ready next Tuesday and is happy with last month's price. Asked to be called again next week.",
+     [], [("agent", "Selamat pagi Pak, saya asisten AI dari Koperasi Sawit Maju. Boleh saya catat percakapan ini?"),
+          ("farmer", "Boleh, silakan."), ("agent", "Kira-kira berapa ton TBS yang siap minggu depan?"),
+          ("farmer", "Sekitar satu koma delapan ton, hari Selasa. Harga bulan lalu bagus.")]),
+    (9, "negative", -0.6, "Will deliver about 1.2 t but is unhappy: the last payment came two weeks late. Wants to know when it will be paid.",
+     ["late payment"], [("agent", "Selamat siang Bu, saya asisten AI dari Koperasi Sawit Maju. Boleh saya catat percakapan ini?"),
+                        ("farmer", "Boleh. Tapi pembayaran kemarin terlambat dua minggu."),
+                        ("agent", "Maaf atas keterlambatannya, saya catat untuk tim kami. Berapa ton yang siap minggu depan?"),
+                        ("farmer", "Satu koma dua ton. Tolong pembayarannya dipercepat.")]),
+    (20, "neutral", 0.1, "Harvest of about 2.1 t, but the road to the plot is flooded after the rain; may be two days late.",
+     ["flooded road", "transport"], [("agent", "Selamat sore Pak, saya asisten AI dari Koperasi Sawit Maju. Boleh saya catat?"),
+                                     ("farmer", "Boleh."), ("farmer", "Panen sekitar dua ton, tapi jalan ke kebun banjir, mungkin telat dua hari.")]),
+    (30, "negative", -0.5, "Says a rival buyer offers Rp 150 more per kg and may sell there unless the price improves.",
+     ["low price", "rival buyer"], [("agent", "Selamat pagi Bu, saya asisten AI dari Koperasi Sawit Maju. Boleh saya catat?"),
+                                    ("farmer", "Boleh. Pengepul sebelah kasih seratus lima puluh lebih mahal per kilo.")]),
+    (52, "positive", 0.8, "Firm 2.4 t for next week and offered to bring it early if the mill needs it.",
+     [], [("agent", "Selamat pagi Pak, saya asisten AI dari Koperasi Sawit Maju. Boleh saya catat?"),
+          ("farmer", "Boleh. Dua koma empat ton, bisa diantar lebih awal kalau perlu.")]),
+    (75, "positive", 0.5, "About 1.5 t ready on Thursday; no concerns.",
+     [], [("agent", "Selamat siang Bu, saya asisten AI dari Koperasi Sawit Maju. Boleh saya catat?"),
+          ("farmer", "Boleh. Sekitar satu setengah ton hari Kamis.")]),
+]
+
+
+def demo_history(store, settings) -> None:
+    """A few calls from the last days that the farmers agreed to keep, each with Gemini's summary and mood (two unhappy:
+    late payment, a rival's price), and the planner's notes: an open complaint, a follow-up due today, feedback.
+    Only for the full demo (load_seed with more_campaigns); the tests run without it."""
+    now = dt.datetime.now(dt.timezone.utc)
+    today = (now + dt.timedelta(hours=7)).date()
+    farmers = sorted((f for f in store.list("farmers") if f["id"].startswith("b") and f.get("type") != "supplier"),
+                     key=lambda f: f["id"])
+    picks = farmers[3:3 + len(DEMO_CALLS)]
+    for f, (hours, mood, score, summary, concerns, lines) in zip(picks, DEMO_CALLS):
+        end = now - dt.timedelta(hours=hours)
+        iso = lambda t: t.isoformat(timespec="seconds")  # noqa: E731
+        store.add("calls", {"farmer_id": f["id"], "farmer_name": f.get("name"), "kind": "collect", "status": "done",
+                            "outcome": "completed", "attempt": 1, "channel": "twilio", "campaign_id": f.get("campaign_id"),
+                            "created_at": iso(end - dt.timedelta(minutes=4)), "started_at": iso(end - dt.timedelta(minutes=3)),
+                            "ended_at": iso(end), "consent": True, "summary": summary,
+                            "transcript": [{"who": w, "text": t} for w, t in lines],
+                            "insights": {"summary": summary, "sentiment": mood, "score": score, "concerns": concerns, "at": iso(end)}})
+    if len(picks) >= 4:
+        notes = [(picks[1], "complaint", "Last payment arrived two weeks late. Promised to check with finance.", 2, None),
+                 (picks[2], "call", "Road to the plot is flooded. Call back to fix a new pickup day.", None, today.isoformat()),
+                 (picks[3], "note", "Rival buyer near Minas pays Rp 150/kg more. Discuss a loyalty premium.", None,
+                  (today + dt.timedelta(days=1)).isoformat()),
+                 (picks[0], "feedback", "Happy with the price and the quick weighing.", 5, None)]
+        for f, kind, text, rating, follow in notes:
+            store.add("notes", {"farmer_id": f["id"], "farmer_name": f.get("name"), "kind": kind, "text": text,
+                                "rating": rating, "follow_up_on": follow, "done": False, "by": "Dewi",
+                                "at": (now - dt.timedelta(days=1)).isoformat(timespec="seconds")})
+
+
 def load_seed(store, settings, more_campaigns: bool = True, english_agent: bool = True) -> None:
     """english_agent: the demo campaigns' agent calls in English (switching to the farmer's language when they answer
     in it). The tests keep the agent on each farmer's own language (Bahasa Indonesia), as they were written for."""
@@ -292,13 +358,15 @@ def load_seed(store, settings, more_campaigns: bool = True, english_agent: bool 
         for camp in data.get("campaigns", {}).values():
             camp.setdefault("persona", dict(agent_profile.NEW_CAMPAIGN_PERSONA))
     for coll in ("farmers", "calls", "harvests", "forecast", "offers", "limits", "rival_quotes",
-                 "campaigns", "promises", "deliveries", "messages", "official_prices"):
+                 "campaigns", "promises", "deliveries", "messages", "official_prices", "notes", "briefs"):
         store.clear(coll)
     for coll, docs in data.items():
         for doc_id, doc in docs.items():
             if coll == "deliveries":
                 doc = {**doc, "farmer_name": data["farmers"].get(doc["farmer_id"], {}).get("name", doc["farmer_id"])}
             store.set(coll, doc_id, doc)
+    if more_campaigns:
+        demo_history(store, settings)
     if not store.list("mills"):  # the mills are the planner's setup: a reset keeps them, a new store gets two
         for mill_id, mill in DEMO_MILLS.items():
             store.set("mills", mill_id, mill)

@@ -836,8 +836,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.post("/api/demo/reset", dependencies=[Depends(need("demo.reset"))])
     def reset():
+        # The farmers the agent may really phone (Agent calls on: the planner's own test phones) survive a reset.
+        keep = [f for f in store.list("farmers") if f.get("agent_calls") and f.get("phone")]
         seed_data.load_seed(store, settings)
-        return {"ok": True}
+        for f in keep:
+            fid = f.pop("id")
+            if f.get("campaign_id") and not store.get("campaigns", f["campaign_id"]):
+                f["campaign_id"] = "current"
+            store.set("farmers", fid, {**f, "mill_route": None, "mill_route_line": None})
+        services.recompute_forecast(store, settings)
+        mills.refresh_in_background(store, settings)  # the plots moved: fetch their road routes
+        return {"ok": True, "kept": [f.get("name") for f in keep]}
 
     # ----- voice -----
 

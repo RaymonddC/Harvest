@@ -790,3 +790,15 @@ def test_a_farmer_talking_over_the_goodbye_does_not_cut_it_off(fake_voice, store
         events, frames = drain(ws)
     assert not any(e["type"] == "interrupted" for e in events)
     assert frames >= 2  # the greeting and both goodbye pieces still reached the browser
+
+
+def test_demo_reset_keeps_the_real_phone_farmers_and_adds_last_weeks_calls(client, store):
+    store.set("farmers", "me", {"name": "Me", "phone": "+628111111111", "agent_calls": True, "campaign_id": "current",
+                                "crop": "palm", "type": "farmer"})
+    r = client.post("/api/demo/reset")
+    assert r.status_code == 200 and r.json()["kept"] == ["Me"]
+    assert store.get("farmers", "me")["agent_calls"]
+    kept = [c for c in store.list("calls") if c.get("consent") and (c.get("insights") or {}).get("sentiment") == "negative"]
+    assert len(kept) == 2 and any(n["kind"] == "complaint" for n in store.list("notes"))
+    paid = [d for d in store.list("deliveries") if d.get("paid")]
+    assert 0 < len(paid) < len(store.list("deliveries"))
