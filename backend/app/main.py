@@ -557,7 +557,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None) -> 
 
     @app.get("/api/mills/catchment")
     def mill_catchment(campaign: str = ""):
-        ids = {f["id"] for f in store.list("farmers") if f.get("campaign_id") == campaign} if campaign else None
+        ids = {f["id"] for f in services.campaign_members(store, settings, campaign)} if campaign else None
         return {"mills": mills.catchment(store, ids)}
 
     @app.post("/api/brief", dependencies=[Depends(need("campaign.run"))])

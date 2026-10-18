@@ -147,7 +147,8 @@ def catchment(store: Store, farmer_ids: set[str] | None = None) -> list[dict]:
         c["far"] += int(n["far"])
     rows = []
     for c in out.values():
-        c["avg_minutes"] = round(c.pop("minutes_sum") / c["farmers"]) if c["farmers"] else None
+        total = c.pop("minutes_sum")
+        c["avg_minutes"] = round(total / c["farmers"]) if c["farmers"] else None
         rows.append(c)
     return rows
 
