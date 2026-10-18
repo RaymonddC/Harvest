@@ -20,9 +20,13 @@ def test_mulaw_round_trip_is_close():
 def test_decode_matches_stdlib_audioop_exactly():
     # audioop is deprecated/gone in newer Pythons, which is why this codec exists -
     # but while it's still around in the dev/test environment, it's the ground
-    # truth to check the from-scratch decode table against, byte for byte.
-    import audioop
+    # truth to check the from-scratch decode table against, byte for byte. Python 3.13 removed it: skip there
+    # (CI and the Docker image run 3.12, so the check still runs on every push).
     import warnings
+
+    import pytest
+
+    audioop = pytest.importorskip("audioop")
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

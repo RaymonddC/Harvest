@@ -29,8 +29,8 @@ in `DECISIONS.md`). Do not delete, shorten or "simplify" any of it without askin
   ("push it"). Pushing to `main` deploys to production. `main` also receives teammates' PRs: always
   `git fetch origin main`, merge it into your branch, test, push, then check `git merge-base --is-ancestor HEAD origin/main`.
   Never chain the push behind a silent `&&` guard (that once skipped four pushes without any message).
-- Run tests: `cd backend && python -m pytest -q`. One known failure on Python 3.13:
-  `test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` (`audioop` was removed).
+- Run tests: `cd backend && python -m pytest -q`. On Python 3.13 one test is skipped:
+  `test_audio_codec.py::test_decode_matches_stdlib_audioop_exactly` needs `audioop` (removed in 3.13); it runs in CI (3.12).
 - Local run: `cd backend && HARVEST_NO_DOTENV=1 python -m uvicorn app.main:app --port 8765` (in-memory store,
   seeded demo data, sign-in by picking a person). Do not use `pkill -f` or `pgrep -f` with a pattern that
   matches your own command line; use `fuser -k 8765/tcp`.
